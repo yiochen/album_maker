@@ -29,9 +29,36 @@ export const Canvas: React.FC<CanvasProps> = ({
     const [isDragOver, setIsDragOver] = useState(false);
     const [activeSnapLines, setActiveSnapLines] = useState<SnapEdge[]>([]);
     const canvasRef = useRef<HTMLDivElement>(null);
+    const viewportRef = useRef<HTMLDivElement>(null);
 
     // Calculate aspect ratio for the spread (2x width, 1x height)
     const spreadAspectRatio = (settings.pageWidth * 2) / settings.pageHeight;
+
+    // Fit canvas to viewport (both width and height)
+    const fitToViewport = useCallback(() => {
+        if (!viewportRef.current || !canvasRef.current) return;
+
+        const viewport = viewportRef.current;
+        const canvas = canvasRef.current;
+
+        // Get viewport dimensions (with some padding)
+        const padding = 64; // 32px on each side
+        const availableWidth = viewport.clientWidth - padding;
+        const availableHeight = viewport.clientHeight - padding;
+
+        // Get canvas natural size (at 100% zoom)
+        const canvasWidth = canvas.offsetWidth;
+        const canvasHeight = canvas.offsetHeight;
+
+        // Calculate zoom to fit both dimensions
+        const zoomToFitWidth = (availableWidth / canvasWidth) * 100;
+        const zoomToFitHeight = (availableHeight / canvasHeight) * 100;
+
+        // Use the smaller zoom to fit both dimensions
+        const fitZoom = Math.min(zoomToFitWidth, zoomToFitHeight, 100);
+
+        setZoom(Math.max(25, Math.round(fitZoom)));
+    }, []);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -102,6 +129,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     return (
         <section className="canvas-container">
             <div
+                ref={viewportRef}
                 className="canvas-viewport"
                 onKeyDown={handleKeyDown}
                 tabIndex={0}
@@ -208,7 +236,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 </button>
                 <button
                     className="btn btn-ghost"
-                    onClick={() => setZoom(100)}
+                    onClick={fitToViewport}
                     style={{ marginLeft: 'var(--space-2)' }}
                 >
                     Fit
