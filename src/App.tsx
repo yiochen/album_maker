@@ -99,6 +99,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     addElement,
     updateElement,
     deleteElement,
+    moveElement,
     addToPool,
     undo,
     redo,
@@ -360,6 +361,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           onElementUpdate={handleElementUpdate}
           onElementDelete={handleElementDelete}
           onImageDrop={handleImageDrop}
+          onMoveElementToPage={moveElement}
         />
 
         <PropertiesPanel

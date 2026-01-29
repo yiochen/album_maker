@@ -10,7 +10,7 @@ export class UpdateElementCommand implements Command<Album> {
         public readonly updates: Partial<PageElement>,
         public readonly oldValues: Partial<PageElement>,
         public readonly groupId?: string
-    ) {}
+    ) { }
 
     execute(state: Album): Album {
         return {
@@ -76,7 +76,7 @@ export class AddElementCommand implements Command<Album> {
     constructor(
         public readonly pageId: string,
         public readonly element: PageElement
-    ) {}
+    ) { }
 
     execute(state: Album): Album {
         return {
@@ -112,7 +112,7 @@ export class DeleteElementCommand implements Command<Album> {
     constructor(
         public readonly pageId: string,
         public readonly element: PageElement
-    ) {}
+    ) { }
 
     execute(state: Album): Album {
         return {

@@ -174,6 +174,7 @@ export type AlbumAction =
   | { type: 'ADD_ELEMENT'; payload: { pageId: string; element: PageElement } }
   | { type: 'UPDATE_ELEMENT'; payload: { pageId: string; elementId: string; updates: Partial<PageElement> } }
   | { type: 'DELETE_ELEMENT'; payload: { pageId: string; elementId: string } }
+  | { type: 'MOVE_ELEMENT'; payload: { fromPageId: string; toPageId: string; elementId: string } }
   | { type: 'ADD_TO_POOL'; payload: PoolImage[] }
   | { type: 'REMOVE_FROM_POOL'; payload: string }
   | { type: 'CLEAR_POOL' };
