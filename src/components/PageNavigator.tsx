@@ -1,7 +1,6 @@
 import React from 'react';
 import { Page } from '../types';
 import { getTemplate } from '../templates/pageTemplates';
-import { getThumbnailUrl } from '../services/googlePhotos';
 
 interface PageNavigatorProps {
     pages: Page[];
@@ -119,7 +118,8 @@ const ThumbnailPreview: React.FC<ThumbnailPreviewProps> = ({ page }) => {
     const firstImage = page.elements[0];
     if (!firstImage) return null;
 
-    const thumbnailUrl = getThumbnailUrl(firstImage.thumbnailUrl || firstImage.imageUrl, 150);
+    // Use thumbnail URL directly (sources provide full URLs)
+    const thumbnailUrl = firstImage.thumbnailUrl || firstImage.imageUrl;
 
     return (
         <img
@@ -133,3 +133,4 @@ const ThumbnailPreview: React.FC<ThumbnailPreviewProps> = ({ page }) => {
         />
     );
 };
+

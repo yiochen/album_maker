@@ -1,132 +1,167 @@
 import { Album, Page, TemplateId } from '../types';
-import { getDefaultTemplateId } from '../templates/pageTemplates';
+import { albumDB, settingsDB } from '../db';
 
-const STORAGE_KEY = 'album_editor_state';
-const DEBOUNCE_MS = 1000;
+const CURRENT_ALBUM_KEY = 'currentAlbumId';
 
-let saveTimeout: number | null = null;
+// Create a new empty album
+export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
+    const now = Date.now();
+    const albumId = crypto.randomUUID();
 
-// Generate a new empty album
-export const createNewAlbum = (): Album => ({
-    id: crypto.randomUUID(),
-    name: 'Untitled Album',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    pages: [createNewPage()],
-    imagePool: [],
-});
+    return {
+        id: albumId,
+        name,
+        createdAt: now,
+        updatedAt: now,
+        pages: [createNewPage()],
+        imagePool: [],
+    };
+};
 
-// Generate a new empty page
-export const createNewPage = (templateId: TemplateId = getDefaultTemplateId()): Page => ({
-    id: crypto.randomUUID(),
-    templateId,
-    elements: [],
-});
+// Create a new empty page
+export const createNewPage = (templateId: TemplateId = 'fullpage'): Page => {
+    return {
+        id: crypto.randomUUID(),
+        templateId,
+        elements: [],
+        background: '#ffffff',
+    };
+};
 
-// Save album to localStorage with debouncing
-export const saveToLocalStorage = (album: Album): void => {
+// Album operations using IndexedDB
+export const albumStorage = {
+    // Get all albums (metadata only)
+    async getAllAlbums(): Promise<{ id: string; name: string; lastModified: number }[]> {
+        const records = await albumDB.getAll();
+        return records.map(r => ({
+            id: r.id,
+            name: r.name,
+            lastModified: r.lastModified,
+        }));
+    },
+
+    // Load a specific album
+    async loadAlbum(id: string): Promise<Album | null> {
+        const record = await albumDB.get(id);
+        if (!record) return null;
+
+        try {
+            return JSON.parse(record.data) as Album;
+        } catch {
+            console.error('Failed to parse album data');
+            return null;
+        }
+    },
+
+    // Save an album
+    async saveAlbum(album: Album): Promise<void> {
+        await albumDB.save({
+            id: album.id,
+            name: album.name,
+            lastModified: Date.now(),
+            data: JSON.stringify(album),
+        });
+    },
+
+    // Delete an album
+    async deleteAlbum(id: string): Promise<void> {
+        await albumDB.delete(id);
+    },
+
+    // Get current album ID
+    async getCurrentAlbumId(): Promise<string | null> {
+        return settingsDB.get(CURRENT_ALBUM_KEY);
+    },
+
+    // Set current album ID
+    async setCurrentAlbumId(id: string): Promise<void> {
+        await settingsDB.set(CURRENT_ALBUM_KEY, id);
+    },
+
+    // Load current album or create new one
+    async loadCurrentAlbum(): Promise<Album> {
+        const currentId = await this.getCurrentAlbumId();
+
+        if (currentId) {
+            const album = await this.loadAlbum(currentId);
+            if (album) return album;
+        }
+
+        // No current album, create a new one
+        const newAlbum = createNewAlbum();
+        await this.saveAlbum(newAlbum);
+        await this.setCurrentAlbumId(newAlbum.id);
+        return newAlbum;
+    },
+};
+
+// Auto-save with debouncing
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+const SAVE_DELAY = 1000; // 1 second debounce
+
+export const debouncedSave = (album: Album): void => {
     if (saveTimeout) {
         clearTimeout(saveTimeout);
     }
 
-    saveTimeout = window.setTimeout(() => {
+    saveTimeout = setTimeout(async () => {
         try {
-            const updatedAlbum = {
-                ...album,
-                updatedAt: new Date().toISOString(),
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedAlbum));
-            console.log('Album auto-saved to localStorage');
+            await albumStorage.saveAlbum(album);
+            console.debug('Album auto-saved');
         } catch (error) {
-            console.error('Failed to save to localStorage:', error);
+            console.error('Failed to auto-save album:', error);
         }
-    }, DEBOUNCE_MS);
+    }, SAVE_DELAY);
 };
 
-// Save immediately without debounce
-export const saveImmediately = (album: Album): void => {
+export const immediatelyFlushSave = async (album: Album): Promise<void> => {
     if (saveTimeout) {
         clearTimeout(saveTimeout);
         saveTimeout = null;
     }
-
-    try {
-        const updatedAlbum = {
-            ...album,
-            updatedAt: new Date().toISOString(),
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedAlbum));
-        console.log('Album saved to localStorage');
-    } catch (error) {
-        console.error('Failed to save to localStorage:', error);
-    }
+    await albumStorage.saveAlbum(album);
 };
 
-// Load album from localStorage
-export const loadFromLocalStorage = (): Album | null => {
-    try {
-        const data = localStorage.getItem(STORAGE_KEY);
-        if (!data) return null;
+// Export album as JSON file (for download)
+export const exportAlbumAsJson = (album: Album): void => {
+    const data = JSON.stringify(album, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
 
-        const album = JSON.parse(data) as Album;
-
-        // Validate basic structure
-        if (!album.id || !album.pages || !Array.isArray(album.pages)) {
-            console.warn('Invalid album data in localStorage');
-            return null;
-        }
-
-        return album;
-    } catch (error) {
-        console.error('Failed to load from localStorage:', error);
-        return null;
-    }
-};
-
-// Clear localStorage
-export const clearStorage = (): void => {
-    localStorage.removeItem(STORAGE_KEY);
-};
-
-// Export album as JSON file
-export const exportAsJSON = (album: Album): void => {
-    try {
-        const data = JSON.stringify(album, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${sanitizeFilename(album.name)}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        URL.revokeObjectURL(url);
-    } catch (error) {
-        console.error('Failed to export as JSON:', error);
-        throw new Error('Failed to export album');
-    }
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${album.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 };
 
 // Import album from JSON file
-export const importFromJSON = (file: File): Promise<Album> => {
+export const importAlbumFromJson = (): Promise<Album> => {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
 
-        reader.onload = (event) => {
+        input.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (!file) {
+                reject(new Error('No file selected'));
+                return;
+            }
+
             try {
-                const data = event.target?.result as string;
-                const album = JSON.parse(data) as Album;
+                const text = await file.text();
+                const album = JSON.parse(text) as Album;
 
-                // Validate basic structure
-                if (!album.id || !album.pages || !Array.isArray(album.pages)) {
-                    throw new Error('Invalid album format');
-                }
-
-                // Assign new ID to avoid conflicts
+                // Generate new ID for imported album to avoid conflicts
                 album.id = crypto.randomUUID();
-                album.updatedAt = new Date().toISOString();
+                album.updatedAt = Date.now();
+
+                // Save to IndexedDB
+                await albumStorage.saveAlbum(album);
+                await albumStorage.setCurrentAlbumId(album.id);
 
                 resolve(album);
             } catch (error) {
@@ -134,16 +169,22 @@ export const importFromJSON = (file: File): Promise<Album> => {
             }
         };
 
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsText(file);
+        input.click();
     });
 };
 
-// Helper to sanitize filename
-const sanitizeFilename = (name: string): string => {
-    return name
-        .replace(/[^a-z0-9]/gi, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '')
-        .toLowerCase() || 'album';
+// Legacy: Load from localStorage (for migration)
+export const loadFromLocalStorage = (): Album | null => {
+    try {
+        const data = localStorage.getItem('albumEditor_album');
+        if (!data) return null;
+        return JSON.parse(data) as Album;
+    } catch {
+        return null;
+    }
+};
+
+// Legacy: Clear localStorage after migration
+export const clearLocalStorage = (): void => {
+    localStorage.removeItem('albumEditor_album');
 };

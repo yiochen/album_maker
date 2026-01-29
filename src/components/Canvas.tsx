@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Page, PageElement, PoolImage } from '../types';
 import { getTemplate } from '../templates/pageTemplates';
-import { getMediaUrl, getThumbnailUrl } from '../services/googlePhotos';
 
 interface CanvasProps {
     page: Page;
@@ -216,7 +215,8 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
         }
     }, [isDragging, handleMouseMove, handleMouseUp]);
 
-    const imageUrl = getMediaUrl(element.imageUrl, 800);
+    // Use the image URL directly (sources provide full URLs)
+    const imageUrl = element.imageUrl;
 
     return (
         <div

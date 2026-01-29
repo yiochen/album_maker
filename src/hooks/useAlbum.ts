@@ -2,126 +2,120 @@ import { useReducer, useCallback, useMemo } from 'react';
 import { Album, Page, PageElement, AlbumAction, PoolImage, TemplateId } from '../types';
 import { createNewPage } from '../services/storage';
 
-// Album reducer
+// Reducer for album state management
 const albumReducer = (state: Album, action: AlbumAction): Album => {
     switch (action.type) {
         case 'SET_ALBUM':
             return action.payload;
 
         case 'SET_NAME':
-            return { ...state, name: action.payload };
+            return { ...state, name: action.payload, updatedAt: Date.now() };
 
         case 'ADD_PAGE': {
             const newPage = createNewPage(action.payload?.templateId);
             return {
                 ...state,
                 pages: [...state.pages, newPage],
+                updatedAt: Date.now(),
             };
         }
 
-        case 'DELETE_PAGE': {
-            if (state.pages.length <= 1) return state;
+        case 'DELETE_PAGE':
+            if (state.pages.length <= 1) return state; // Keep at least one page
             return {
                 ...state,
                 pages: state.pages.filter(p => p.id !== action.payload),
+                updatedAt: Date.now(),
             };
-        }
 
         case 'REORDER_PAGES': {
             const { fromIndex, toIndex } = action.payload;
-            const pages = [...state.pages];
-            const [removed] = pages.splice(fromIndex, 1);
-            pages.splice(toIndex, 0, removed);
-            return { ...state, pages };
+            const newPages = [...state.pages];
+            const [removed] = newPages.splice(fromIndex, 1);
+            newPages.splice(toIndex, 0, removed);
+            return { ...state, pages: newPages, updatedAt: Date.now() };
         }
 
-        case 'UPDATE_PAGE': {
-            const { pageId, updates } = action.payload;
+        case 'UPDATE_PAGE':
             return {
                 ...state,
                 pages: state.pages.map(p =>
-                    p.id === pageId ? { ...p, ...updates } : p
-                ),
-            };
-        }
-
-        case 'ADD_ELEMENT': {
-            const { pageId, element } = action.payload;
-            return {
-                ...state,
-                pages: state.pages.map(p =>
-                    p.id === pageId
-                        ? { ...p, elements: [...p.elements, element] }
+                    p.id === action.payload.pageId
+                        ? { ...p, ...action.payload.updates }
                         : p
                 ),
+                updatedAt: Date.now(),
             };
-        }
 
-        case 'UPDATE_ELEMENT': {
-            const { pageId, elementId, updates } = action.payload;
+        case 'ADD_ELEMENT':
             return {
                 ...state,
                 pages: state.pages.map(p =>
-                    p.id === pageId
+                    p.id === action.payload.pageId
+                        ? { ...p, elements: [...p.elements, action.payload.element] }
+                        : p
+                ),
+                updatedAt: Date.now(),
+            };
+
+        case 'UPDATE_ELEMENT':
+            return {
+                ...state,
+                pages: state.pages.map(p =>
+                    p.id === action.payload.pageId
                         ? {
                             ...p,
                             elements: p.elements.map(e =>
-                                e.id === elementId ? { ...e, ...updates } : e
+                                e.id === action.payload.elementId
+                                    ? { ...e, ...action.payload.updates }
+                                    : e
                             ),
                         }
                         : p
                 ),
+                updatedAt: Date.now(),
             };
-        }
 
-        case 'DELETE_ELEMENT': {
-            const { pageId, elementId } = action.payload;
+        case 'DELETE_ELEMENT':
             return {
                 ...state,
                 pages: state.pages.map(p =>
-                    p.id === pageId
-                        ? { ...p, elements: p.elements.filter(e => e.id !== elementId) }
+                    p.id === action.payload.pageId
+                        ? {
+                            ...p,
+                            elements: p.elements.filter(e => e.id !== action.payload.elementId),
+                        }
                         : p
                 ),
+                updatedAt: Date.now(),
             };
-        }
 
         case 'ADD_TO_POOL':
             return {
                 ...state,
                 imagePool: [...state.imagePool, ...action.payload],
+                updatedAt: Date.now(),
+            };
+
+        case 'REMOVE_FROM_POOL':
+            return {
+                ...state,
+                imagePool: state.imagePool.filter(img => img.id !== action.payload),
+                updatedAt: Date.now(),
             };
 
         case 'CLEAR_POOL':
-            return { ...state, imagePool: [] };
+            return { ...state, imagePool: [], updatedAt: Date.now() };
 
         default:
             return state;
     }
 };
 
-export interface UseAlbumReturn {
-    album: Album;
-    // Album actions
-    setAlbum: (album: Album) => void;
-    setName: (name: string) => void;
-    // Page actions
-    addPage: (templateId?: TemplateId) => void;
-    deletePage: (pageId: string) => void;
-    reorderPages: (fromIndex: number, toIndex: number) => void;
-    updatePage: (pageId: string, updates: Partial<Page>) => void;
-    // Element actions
-    addElement: (pageId: string, element: PageElement) => void;
-    updateElement: (pageId: string, elementId: string, updates: Partial<PageElement>) => void;
-    deleteElement: (pageId: string, elementId: string) => void;
-    // Image pool actions
-    addToPool: (images: PoolImage[]) => void;
-    clearPool: () => void;
-}
-
-export const useAlbum = (initialAlbum: Album): UseAlbumReturn => {
+export const useAlbum = (initialAlbum: Album) => {
     const [album, dispatch] = useReducer(albumReducer, initialAlbum);
 
+    // Memoized actions
     const setAlbum = useCallback((newAlbum: Album) => {
         dispatch({ type: 'SET_ALBUM', payload: newAlbum });
     }, []);
@@ -165,6 +159,10 @@ export const useAlbum = (initialAlbum: Album): UseAlbumReturn => {
         dispatch({ type: 'ADD_TO_POOL', payload: images });
     }, []);
 
+    const removeFromPool = useCallback((imageId: string) => {
+        dispatch({ type: 'REMOVE_FROM_POOL', payload: imageId });
+    }, []);
+
     const clearPool = useCallback(() => {
         dispatch({ type: 'CLEAR_POOL' });
     }, []);
@@ -182,6 +180,7 @@ export const useAlbum = (initialAlbum: Album): UseAlbumReturn => {
             updateElement,
             deleteElement,
             addToPool,
+            removeFromPool,
             clearPool,
         }),
         [
@@ -196,6 +195,7 @@ export const useAlbum = (initialAlbum: Album): UseAlbumReturn => {
             updateElement,
             deleteElement,
             addToPool,
+            removeFromPool,
             clearPool,
         ]
     );

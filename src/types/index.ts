@@ -2,16 +2,26 @@
 export interface Album {
   id: string;
   name: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: number;
+  updatedAt: number;
   pages: Page[];
   imagePool: PoolImage[];
+}
+
+// Album metadata (for list view, without full data)
+export interface AlbumMetadata {
+  id: string;
+  name: string;
+  lastModified: number;
+  pageCount?: number;
+  thumbnailUrl?: string;
 }
 
 export interface Page {
   id: string;
   templateId: TemplateId;
   elements: PageElement[];
+  background?: string;
 }
 
 export interface PageElement {
@@ -19,7 +29,8 @@ export interface PageElement {
   type: 'image';
   imageUrl: string;
   thumbnailUrl: string;
-  googleMediaId: string;
+  sourceId: string;  // Which source this image came from
+  sourceImageId: string;  // ID within that source
   position: Position;
   size: Size;
   crop?: CropArea;
@@ -42,20 +53,22 @@ export interface CropArea {
   height: number;
 }
 
-// Image pool (imported from Google Photos)
+// Image pool (imported from any source)
 export interface PoolImage {
   id: string;
-  googleMediaId: string;
+  sourceId: string;  // Which source this came from
+  sourceImageId: string;  // ID within that source
   baseUrl: string;
+  thumbnailUrl?: string;
   filename: string;
   mimeType: string;
-  width: number;
-  height: number;
-  creationTime: string;
+  width?: number;
+  height?: number;
+  createdAt?: number;
 }
 
 // Template types
-export type TemplateId = 
+export type TemplateId =
   | 'fullpage'
   | 'square-center'
   | 'portrait'
@@ -90,39 +103,13 @@ export interface TemplateSlot {
   aspectRatio?: number;
 }
 
-// Google Photos API types
-export interface GoogleMediaItem {
-  id: string;
-  baseUrl: string;
-  filename: string;
-  mimeType: string;
-  mediaMetadata: {
-    width: string;
-    height: string;
-    creationTime: string;
-    photo?: {
-      cameraMake?: string;
-      cameraModel?: string;
-    };
-  };
-}
-
-export interface GoogleAlbum {
-  id: string;
-  title: string;
-  productUrl: string;
-  mediaItemsCount: string;
-  coverPhotoBaseUrl?: string;
-}
-
 // App state types
 export interface AppState {
   album: Album;
   currentPageIndex: number;
   selectedElementId: string | null;
   isImagePoolOpen: boolean;
-  isAuthenticated: boolean;
-  isLoading: boolean;
+  activeSourceId: string | null;
 }
 
 export interface SelectionState {
@@ -143,6 +130,7 @@ export type AlbumAction =
   | { type: 'UPDATE_ELEMENT'; payload: { pageId: string; elementId: string; updates: Partial<PageElement> } }
   | { type: 'DELETE_ELEMENT'; payload: { pageId: string; elementId: string } }
   | { type: 'ADD_TO_POOL'; payload: PoolImage[] }
+  | { type: 'REMOVE_FROM_POOL'; payload: string }
   | { type: 'CLEAR_POOL' };
 
 // Export types

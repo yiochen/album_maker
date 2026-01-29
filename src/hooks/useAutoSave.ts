@@ -1,39 +1,31 @@
 import { useEffect, useRef } from 'react';
 import { Album } from '../types';
-import { saveToLocalStorage, saveImmediately } from '../services/storage';
+import { debouncedSave, immediatelyFlushSave } from '../services/storage';
 
-export const useAutoSave = (album: Album, enabled: boolean = true): void => {
-    const isFirstRender = useRef(true);
+export const useAutoSave = (album: Album) => {
+    const lastSavedRef = useRef<string>('');
 
     useEffect(() => {
-        // Skip first render to avoid saving initial state
-        if (isFirstRender.current) {
-            isFirstRender.current = false;
-            return;
+        const albumJson = JSON.stringify(album);
+
+        // Only save if actually changed
+        if (albumJson !== lastSavedRef.current) {
+            lastSavedRef.current = albumJson;
+            debouncedSave(album);
         }
+    }, [album]);
 
-        if (!enabled) return;
-
-        // Debounced save
-        saveToLocalStorage(album);
-
-        // Cleanup: save immediately when component unmounts
-        return () => {
-            saveImmediately(album);
-        };
-    }, [album, enabled]);
-
-    // Save on page unload
+    // Flush save on unmount or page unload
     useEffect(() => {
-        if (!enabled) return;
-
         const handleBeforeUnload = () => {
-            saveImmediately(album);
+            immediatelyFlushSave(album);
         };
 
         window.addEventListener('beforeunload', handleBeforeUnload);
+
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
+            immediatelyFlushSave(album);
         };
-    }, [album, enabled]);
+    }, [album]);
 };
