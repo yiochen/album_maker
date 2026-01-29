@@ -1,204 +1,123 @@
-import { useReducer, useCallback, useMemo } from 'react';
-import type { Album, Page, PageElement, AlbumAction, PoolImage, TemplateId, AlbumSettings } from '../types';
-import { createNewPage } from '../services/storage';
-
-// Reducer for album state management
-const albumReducer = (state: Album, action: AlbumAction): Album => {
-    switch (action.type) {
-        case 'SET_ALBUM':
-            return action.payload;
-
-        case 'SET_NAME':
-            return { ...state, name: action.payload, updatedAt: Date.now() };
-
-        case 'SET_SETTINGS':
-            return {
-                ...state,
-                settings: { ...state.settings, ...action.payload },
-                updatedAt: Date.now(),
-            };
-
-        case 'ADD_PAGE': {
-            const newPage = createNewPage(action.payload?.templateId);
-            return {
-                ...state,
-                pages: [...state.pages, newPage],
-                updatedAt: Date.now(),
-            };
-        }
-
-        case 'ADD_PAGES': {
-            const count = action.payload?.count ?? 2;
-            const maxPages = state.settings?.maxPages ?? 40;
-            const availableSlots = maxPages - state.pages.length;
-            const pagesToAdd = Math.min(count, availableSlots);
-
-            if (pagesToAdd <= 0) return state;
-
-            const newPages = Array.from({ length: pagesToAdd }, () =>
-                createNewPage(action.payload?.templateId)
-            );
-            return {
-                ...state,
-                pages: [...state.pages, ...newPages],
-                updatedAt: Date.now(),
-            };
-        }
-
-        case 'DELETE_PAGE':
-            if (state.pages.length <= 1) return state;
-            return {
-                ...state,
-                pages: state.pages.filter(p => p.id !== action.payload),
-                updatedAt: Date.now(),
-            };
-
-        case 'REORDER_PAGES': {
-            const { fromIndex, toIndex } = action.payload;
-            const newPages = [...state.pages];
-            const [removed] = newPages.splice(fromIndex, 1);
-            newPages.splice(toIndex, 0, removed);
-            return { ...state, pages: newPages, updatedAt: Date.now() };
-        }
-
-        case 'UPDATE_PAGE':
-            return {
-                ...state,
-                pages: state.pages.map(p =>
-                    p.id === action.payload.pageId
-                        ? { ...p, ...action.payload.updates }
-                        : p
-                ),
-                updatedAt: Date.now(),
-            };
-
-        case 'ADD_ELEMENT':
-            return {
-                ...state,
-                pages: state.pages.map(p =>
-                    p.id === action.payload.pageId
-                        ? { ...p, elements: [...p.elements, action.payload.element] }
-                        : p
-                ),
-                updatedAt: Date.now(),
-            };
-
-        case 'UPDATE_ELEMENT':
-            return {
-                ...state,
-                pages: state.pages.map(p =>
-                    p.id === action.payload.pageId
-                        ? {
-                            ...p,
-                            elements: p.elements.map(e =>
-                                e.id === action.payload.elementId
-                                    ? { ...e, ...action.payload.updates }
-                                    : e
-                            ),
-                        }
-                        : p
-                ),
-                updatedAt: Date.now(),
-            };
-
-        case 'DELETE_ELEMENT':
-            return {
-                ...state,
-                pages: state.pages.map(p =>
-                    p.id === action.payload.pageId
-                        ? {
-                            ...p,
-                            elements: p.elements.filter(e => e.id !== action.payload.elementId),
-                        }
-                        : p
-                ),
-                updatedAt: Date.now(),
-            };
-
-        case 'ADD_TO_POOL':
-            return {
-                ...state,
-                imagePool: [...state.imagePool, ...action.payload],
-                updatedAt: Date.now(),
-            };
-
-        case 'REMOVE_FROM_POOL':
-            return {
-                ...state,
-                imagePool: state.imagePool.filter(img => img.id !== action.payload),
-                updatedAt: Date.now(),
-            };
-
-        case 'CLEAR_POOL':
-            return { ...state, imagePool: [], updatedAt: Date.now() };
-
-        default:
-            return state;
-    }
-};
+import { useCallback, useMemo } from 'react';
+import type { Album, Page, PageElement, PoolImage, TemplateId, AlbumSettings } from '../types';
+import { useHistory } from './useHistory';
+import {
+    UpdateElementCommand,
+    AddElementCommand,
+    DeleteElementCommand
+} from '../commands/elementCommands';
+import {
+    AddPageCommand,
+    AddPagesCommand,
+    DeletePageCommand,
+    ReorderPagesCommand,
+    UpdatePageCommand
+} from '../commands/pageCommands';
+import {
+    SetAlbumNameCommand,
+    SetSettingsCommand
+} from '../commands/albumCommands';
+import {
+    AddToPoolCommand,
+    RemoveFromPoolCommand,
+    ClearPoolCommand
+} from '../commands/poolCommands';
 
 export const useAlbum = (initialAlbum: Album) => {
-    const [album, dispatch] = useReducer(albumReducer, initialAlbum);
+    const { state: album, dispatch, undo, redo, canUndo, canRedo, set } = useHistory<Album>(initialAlbum);
 
     // Memoized actions
     const setAlbum = useCallback((newAlbum: Album) => {
-        dispatch({ type: 'SET_ALBUM', payload: newAlbum });
-    }, []);
+        set(newAlbum);
+    }, [set]);
 
     const setName = useCallback((name: string) => {
-        dispatch({ type: 'SET_NAME', payload: name });
-    }, []);
+        dispatch(new SetAlbumNameCommand(name, album.name));
+    }, [dispatch, album.name]);
 
     const setSettings = useCallback((settings: Partial<AlbumSettings>) => {
-        dispatch({ type: 'SET_SETTINGS', payload: settings });
-    }, []);
+        const oldValues: Partial<AlbumSettings> = {};
+        for (const key of Object.keys(settings) as Array<keyof AlbumSettings>) {
+            // @ts-expect-error - Partial types handling
+            oldValues[key] = album.settings[key];
+        }
+        dispatch(new SetSettingsCommand(settings, oldValues));
+    }, [dispatch, album.settings]);
 
     const addPage = useCallback((templateId?: TemplateId) => {
-        dispatch({ type: 'ADD_PAGE', payload: templateId ? { templateId } : undefined });
-    }, []);
+        dispatch(new AddPageCommand(templateId));
+    }, [dispatch]);
 
     const addPages = useCallback((count: number = 2, templateId?: TemplateId) => {
-        dispatch({ type: 'ADD_PAGES', payload: { count, templateId } });
-    }, []);
+        dispatch(new AddPagesCommand(count, templateId));
+    }, [dispatch]);
 
     const deletePage = useCallback((pageId: string) => {
-        dispatch({ type: 'DELETE_PAGE', payload: pageId });
-    }, []);
+        const index = album.pages.findIndex(p => p.id === pageId);
+        if (index === -1) return;
+        const page = album.pages[index];
+        dispatch(new DeletePageCommand(pageId, page, index));
+    }, [dispatch, album.pages]);
 
     const reorderPages = useCallback((fromIndex: number, toIndex: number) => {
-        dispatch({ type: 'REORDER_PAGES', payload: { fromIndex, toIndex } });
-    }, []);
+        dispatch(new ReorderPagesCommand(fromIndex, toIndex));
+    }, [dispatch]);
 
     const updatePage = useCallback((pageId: string, updates: Partial<Page>) => {
-        dispatch({ type: 'UPDATE_PAGE', payload: { pageId, updates } });
-    }, []);
+        const page = album.pages.find(p => p.id === pageId);
+        if (!page) return;
+
+        const oldValues: Partial<Page> = {};
+        for (const key of Object.keys(updates) as Array<keyof Page>) {
+            // @ts-expect-error - Partial types handling
+            oldValues[key] = page[key];
+        }
+
+        dispatch(new UpdatePageCommand(pageId, updates, oldValues));
+    }, [dispatch, album.pages]);
 
     const addElement = useCallback((pageId: string, element: PageElement) => {
-        dispatch({ type: 'ADD_ELEMENT', payload: { pageId, element } });
-    }, []);
+        dispatch(new AddElementCommand(pageId, element));
+    }, [dispatch]);
 
     const updateElement = useCallback(
-        (pageId: string, elementId: string, updates: Partial<PageElement>) => {
-            dispatch({ type: 'UPDATE_ELEMENT', payload: { pageId, elementId, updates } });
+        (pageId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => {
+            const page = album.pages.find(p => p.id === pageId);
+            if (!page) return;
+            const element = page.elements.find(e => e.id === elementId);
+            if (!element) return;
+
+            const oldValues: Partial<PageElement> = {};
+            for (const key of Object.keys(updates) as Array<keyof PageElement>) {
+                // @ts-expect-error - Partial types handling
+                oldValues[key] = element[key];
+            }
+
+            dispatch(new UpdateElementCommand(pageId, elementId, updates, oldValues, groupId));
         },
-        []
+        [dispatch, album.pages]
     );
 
     const deleteElement = useCallback((pageId: string, elementId: string) => {
-        dispatch({ type: 'DELETE_ELEMENT', payload: { pageId, elementId } });
-    }, []);
+        const page = album.pages.find(p => p.id === pageId);
+        if (!page) return;
+        const element = page.elements.find(e => e.id === elementId);
+        if (!element) return;
+
+        dispatch(new DeleteElementCommand(pageId, element));
+    }, [dispatch, album.pages]);
 
     const addToPool = useCallback((images: PoolImage[]) => {
-        dispatch({ type: 'ADD_TO_POOL', payload: images });
-    }, []);
+        dispatch(new AddToPoolCommand(images));
+    }, [dispatch]);
 
     const removeFromPool = useCallback((imageId: string) => {
-        dispatch({ type: 'REMOVE_FROM_POOL', payload: imageId });
-    }, []);
+        dispatch(new RemoveFromPoolCommand(imageId));
+    }, [dispatch]);
 
     const clearPool = useCallback(() => {
-        dispatch({ type: 'CLEAR_POOL' });
-    }, []);
+        dispatch(new ClearPoolCommand());
+    }, [dispatch]);
 
     return useMemo(
         () => ({
@@ -217,6 +136,10 @@ export const useAlbum = (initialAlbum: Album) => {
             addToPool,
             removeFromPool,
             clearPool,
+            undo,
+            redo,
+            canUndo,
+            canRedo
         }),
         [
             album,
@@ -234,6 +157,10 @@ export const useAlbum = (initialAlbum: Album) => {
             addToPool,
             removeFromPool,
             clearPool,
+            undo,
+            redo,
+            canUndo,
+            canRedo
         ]
     );
 };
