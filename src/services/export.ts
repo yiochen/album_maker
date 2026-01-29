@@ -1,6 +1,5 @@
-import { Album, Page, PageElement, ExportOptions, ExportProgress } from '../types';
+import type { Album, Page, PageElement, ExportOptions, ExportProgress } from '../types';
 import { getTemplate } from '../templates/pageTemplates';
-import { getMediaUrl } from './googlePhotos';
 
 const DEFAULT_OPTIONS: ExportOptions = {
     format: 'png',
@@ -85,8 +84,8 @@ const drawElement = async (
     if (element.type !== 'image') return;
 
     try {
-        // Get high-resolution image URL
-        const imageUrl = getMediaUrl(element.imageUrl, element.size.width * 2, element.size.height * 2);
+        // Use image URL directly (sources provide full URLs)
+        const imageUrl = element.imageUrl;
         const img = await loadImage(imageUrl);
 
         // Scale position and size from percentage to pixels
