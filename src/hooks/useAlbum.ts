@@ -1,5 +1,5 @@
 import { useReducer, useCallback, useMemo } from 'react';
-import { Album, Page, PageElement, AlbumAction, PoolImage, TemplateId } from '../types';
+import type { Album, Page, PageElement, AlbumAction, PoolImage, TemplateId, AlbumSettings } from '../types';
 import { createNewPage } from '../services/storage';
 
 // Reducer for album state management
@@ -11,6 +11,13 @@ const albumReducer = (state: Album, action: AlbumAction): Album => {
         case 'SET_NAME':
             return { ...state, name: action.payload, updatedAt: Date.now() };
 
+        case 'SET_SETTINGS':
+            return {
+                ...state,
+                settings: { ...state.settings, ...action.payload },
+                updatedAt: Date.now(),
+            };
+
         case 'ADD_PAGE': {
             const newPage = createNewPage(action.payload?.templateId);
             return {
@@ -20,8 +27,26 @@ const albumReducer = (state: Album, action: AlbumAction): Album => {
             };
         }
 
+        case 'ADD_PAGES': {
+            const count = action.payload?.count ?? 2;
+            const maxPages = state.settings?.maxPages ?? 40;
+            const availableSlots = maxPages - state.pages.length;
+            const pagesToAdd = Math.min(count, availableSlots);
+
+            if (pagesToAdd <= 0) return state;
+
+            const newPages = Array.from({ length: pagesToAdd }, () =>
+                createNewPage(action.payload?.templateId)
+            );
+            return {
+                ...state,
+                pages: [...state.pages, ...newPages],
+                updatedAt: Date.now(),
+            };
+        }
+
         case 'DELETE_PAGE':
-            if (state.pages.length <= 1) return state; // Keep at least one page
+            if (state.pages.length <= 1) return state;
             return {
                 ...state,
                 pages: state.pages.filter(p => p.id !== action.payload),
@@ -124,8 +149,16 @@ export const useAlbum = (initialAlbum: Album) => {
         dispatch({ type: 'SET_NAME', payload: name });
     }, []);
 
+    const setSettings = useCallback((settings: Partial<AlbumSettings>) => {
+        dispatch({ type: 'SET_SETTINGS', payload: settings });
+    }, []);
+
     const addPage = useCallback((templateId?: TemplateId) => {
         dispatch({ type: 'ADD_PAGE', payload: templateId ? { templateId } : undefined });
+    }, []);
+
+    const addPages = useCallback((count: number = 2, templateId?: TemplateId) => {
+        dispatch({ type: 'ADD_PAGES', payload: { count, templateId } });
     }, []);
 
     const deletePage = useCallback((pageId: string) => {
@@ -172,7 +205,9 @@ export const useAlbum = (initialAlbum: Album) => {
             album,
             setAlbum,
             setName,
+            setSettings,
             addPage,
+            addPages,
             deletePage,
             reorderPages,
             updatePage,
@@ -187,7 +222,9 @@ export const useAlbum = (initialAlbum: Album) => {
             album,
             setAlbum,
             setName,
+            setSettings,
             addPage,
+            addPages,
             deletePage,
             reorderPages,
             updatePage,

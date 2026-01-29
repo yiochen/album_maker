@@ -1,4 +1,5 @@
-import { Album, Page, TemplateId } from '../types';
+import type { Album, Page, TemplateId } from '../types';
+import { DEFAULT_ALBUM_SETTINGS } from '../types';
 import { albumDB, settingsDB } from '../db';
 
 const CURRENT_ALBUM_KEY = 'currentAlbumId';
@@ -11,9 +12,10 @@ export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
     return {
         id: albumId,
         name,
+        settings: { ...DEFAULT_ALBUM_SETTINGS },
         createdAt: now,
         updatedAt: now,
-        pages: [createNewPage()],
+        pages: [createNewPage(), createNewPage()], // Start with one spread (2 pages)
         imagePool: [],
     };
 };

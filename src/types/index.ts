@@ -1,7 +1,45 @@
+// Album settings
+export type Unit = 'inch' | 'cm';
+
+export interface AlbumSettings {
+  pageWidth: number;
+  pageHeight: number;
+  unit: Unit;
+  isSquare: boolean;
+  maxPages: number;
+}
+
+// Snap constraint for smart positioning
+export type SnapEdge =
+  | 'left' | 'right' | 'top' | 'bottom'
+  | 'seam'
+  | 'left-center-h' | 'left-center-v'
+  | 'right-center-h' | 'right-center-v';
+
+export interface SnapConstraint {
+  edge: SnapEdge;
+  offset: number; // Distance from snap target in percentage
+}
+
+export interface SnapConstraints {
+  horizontal?: SnapConstraint; // x-axis snap
+  vertical?: SnapConstraint;   // y-axis snap
+}
+
+// Default album settings
+export const DEFAULT_ALBUM_SETTINGS: AlbumSettings = {
+  pageWidth: 8,
+  pageHeight: 10,
+  unit: 'inch',
+  isSquare: false,
+  maxPages: 40,
+};
+
 // Album and page related types
 export interface Album {
   id: string;
   name: string;
+  settings: AlbumSettings;
   createdAt: number;
   updatedAt: number;
   pages: Page[];
@@ -29,11 +67,15 @@ export interface PageElement {
   type: 'image';
   imageUrl: string;
   thumbnailUrl: string;
-  sourceId: string;  // Which source this image came from
-  sourceImageId: string;  // ID within that source
+  sourceId: string;
+  sourceImageId: string;
   position: Position;
   size: Size;
   crop?: CropArea;
+  lockAspectRatio?: boolean;
+  snapConstraints?: SnapConstraints;
+  // Original aspect ratio (stored when image added)
+  originalAspectRatio?: number;
 }
 
 export interface Position {
@@ -56,8 +98,8 @@ export interface CropArea {
 // Image pool (imported from any source)
 export interface PoolImage {
   id: string;
-  sourceId: string;  // Which source this came from
-  sourceImageId: string;  // ID within that source
+  sourceId: string;
+  sourceImageId: string;
   baseUrl: string;
   thumbnailUrl?: string;
   filename: string;
@@ -96,10 +138,10 @@ export interface Padding {
 
 export interface TemplateSlot {
   id: string;
-  x: number; // percentage
-  y: number; // percentage
-  width: number; // percentage
-  height: number; // percentage
+  x: number;
+  y: number;
+  width: number;
+  height: number;
   aspectRatio?: number;
 }
 
@@ -110,6 +152,7 @@ export interface AppState {
   selectedElementId: string | null;
   isImagePoolOpen: boolean;
   activeSourceId: string | null;
+  isSnappingEnabled: boolean;
 }
 
 export interface SelectionState {
@@ -122,7 +165,9 @@ export interface SelectionState {
 export type AlbumAction =
   | { type: 'SET_ALBUM'; payload: Album }
   | { type: 'SET_NAME'; payload: string }
+  | { type: 'SET_SETTINGS'; payload: Partial<AlbumSettings> }
   | { type: 'ADD_PAGE'; payload?: { templateId?: TemplateId } }
+  | { type: 'ADD_PAGES'; payload?: { count?: number; templateId?: TemplateId } }
   | { type: 'DELETE_PAGE'; payload: string }
   | { type: 'REORDER_PAGES'; payload: { fromIndex: number; toIndex: number } }
   | { type: 'UPDATE_PAGE'; payload: { pageId: string; updates: Partial<Page> } }
@@ -136,7 +181,7 @@ export type AlbumAction =
 // Export types
 export interface ExportOptions {
   format: 'png' | 'jpeg';
-  quality: number; // 0-1 for jpeg
+  quality: number;
   includePageNumbers: boolean;
   filenamePrefix: string;
 }

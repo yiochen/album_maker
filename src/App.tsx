@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import type { Album, PageElement, PoolImage, TemplateId } from './types';
+import type { Album, Page, PageElement, PoolImage, TemplateId, AlbumSettings } from './types';
+import { DEFAULT_ALBUM_SETTINGS } from './types';
 import { useAlbum } from './hooks/useAlbum';
 import { useAutoSave } from './hooks/useAutoSave';
 import {
@@ -11,6 +12,8 @@ import {
   clearLocalStorage,
 } from './services/storage';
 import { initializeSources } from './sources';
+import { Toolbar } from './components/Toolbar';
+import { AlbumSettingsPanel } from './components/AlbumSettingsPanel';
 import { PageNavigator } from './components/PageNavigator';
 import { Canvas } from './components/Canvas';
 import { PropertiesPanel } from './components/PropertiesPanel';
@@ -32,10 +35,11 @@ const App: React.FC = () => {
         // Check for legacy localStorage data and migrate
         const legacyAlbum = loadFromLocalStorage();
         if (legacyAlbum) {
-          // Migrate to IndexedDB
+          // Migrate to IndexedDB with settings
           const migrated: Album = {
             ...legacyAlbum,
             id: crypto.randomUUID(),
+            settings: legacyAlbum.settings || { ...DEFAULT_ALBUM_SETTINGS },
             createdAt: Date.now(),
             updatedAt: Date.now(),
           };
@@ -46,6 +50,10 @@ const App: React.FC = () => {
         } else {
           // Load from IndexedDB
           const album = await albumStorage.loadCurrentAlbum();
+          // Ensure settings exist
+          if (!album.settings) {
+            album.settings = { ...DEFAULT_ALBUM_SETTINGS };
+          }
           setInitialAlbum(album);
         }
       } catch (error) {
@@ -84,7 +92,8 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     album,
     setAlbum,
     setName,
-    addPage,
+    setSettings,
+    addPages,
     deletePage,
     updatePage,
     addElement,
@@ -97,34 +106,48 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   useAutoSave(album);
 
   // UI state
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [currentSpreadIndex, setCurrentSpreadIndex] = useState(0);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [isImagePoolOpen, setIsImagePoolOpen] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSnappingEnabled, setIsSnappingEnabled] = useState(true);
 
-  // Current page
-  const currentPage = album.pages[currentPageIndex];
+  // Get current spread (pair of pages)
+  const currentSpread = useMemo(() => {
+    const leftIndex = currentSpreadIndex * 2;
+    const left = album.pages[leftIndex];
+    const right = album.pages[leftIndex + 1];
+    return [left, right].filter(Boolean) as Page[];
+  }, [album.pages, currentSpreadIndex]);
 
   // Selected element
   const selectedElement = useMemo(() => {
-    if (!selectedElementId || !currentPage) return null;
-    return currentPage.elements.find(e => e.id === selectedElementId) || null;
-  }, [currentPage, selectedElementId]);
-
-  // Ensure currentPageIndex is valid when pages change
-  useEffect(() => {
-    if (currentPageIndex >= album.pages.length) {
-      setCurrentPageIndex(Math.max(0, album.pages.length - 1));
+    if (!selectedElementId) return null;
+    for (const page of currentSpread) {
+      const element = page.elements.find(e => e.id === selectedElementId);
+      if (element) return element;
     }
-  }, [album.pages.length, currentPageIndex]);
+    return null;
+  }, [currentSpread, selectedElementId]);
 
-  // Clear selection when switching pages
+  // Ensure currentSpreadIndex is valid when pages change
+  useEffect(() => {
+    const maxSpreadIndex = Math.max(0, Math.floor((album.pages.length - 1) / 2));
+    if (currentSpreadIndex > maxSpreadIndex) {
+      setCurrentSpreadIndex(maxSpreadIndex);
+    }
+  }, [album.pages.length, currentSpreadIndex]);
+
+  // Clear selection when switching spreads
   useEffect(() => {
     setSelectedElementId(null);
-  }, [currentPageIndex]);
+    setSelectedPageId(null);
+  }, [currentSpreadIndex]);
 
   // Handle image drop on canvas
-  const handleImageDrop = useCallback((image: PoolImage, position: { x: number; y: number }) => {
-    if (!currentPage) return;
+  const handleImageDrop = useCallback((pageId: string, image: PoolImage, position: { x: number; y: number }) => {
+    const aspectRatio = image.width && image.height ? image.width / image.height : 1;
 
     const newElement: PageElement = {
       id: crypto.randomUUID(),
@@ -139,49 +162,45 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
       },
       size: {
         width: 30,
-        height: 30,
+        height: 30 / aspectRatio,
       },
+      originalAspectRatio: aspectRatio,
+      lockAspectRatio: true,
     };
 
-    addElement(currentPage.id, newElement);
+    addElement(pageId, newElement);
     setSelectedElementId(newElement.id);
-  }, [currentPage, addElement]);
-
-  // Handle template change
-  const handleTemplateChange = useCallback((templateId: TemplateId) => {
-    if (!currentPage) return;
-    updatePage(currentPage.id, { templateId });
-  }, [currentPage, updatePage]);
+    setSelectedPageId(pageId);
+  }, [addElement]);
 
   // Handle element update
-  const handleElementUpdate = useCallback((elementId: string, updates: Partial<PageElement>) => {
-    if (!currentPage) return;
-    updateElement(currentPage.id, elementId, updates);
-  }, [currentPage, updateElement]);
+  const handleElementUpdate = useCallback((pageId: string, elementId: string, updates: Partial<PageElement>) => {
+    updateElement(pageId, elementId, updates);
+  }, [updateElement]);
 
   // Handle element delete
-  const handleElementDelete = useCallback((elementId: string) => {
-    if (!currentPage) return;
-    deleteElement(currentPage.id, elementId);
+  const handleElementDelete = useCallback((pageId: string, elementId: string) => {
+    deleteElement(pageId, elementId);
     setSelectedElementId(null);
-  }, [currentPage, deleteElement]);
+    setSelectedPageId(null);
+  }, [deleteElement]);
 
-  // Handle page delete
-  const handleDeletePage = useCallback((pageId: string) => {
-    const pageIndex = album.pages.findIndex(p => p.id === pageId);
-    if (pageIndex <= currentPageIndex && currentPageIndex > 0) {
-      setCurrentPageIndex(currentPageIndex - 1);
-    }
-    deletePage(pageId);
-  }, [album.pages, currentPageIndex, deletePage]);
+  // Handle spread delete (delete both pages)
+  const handleDeleteSpread = useCallback((leftPageId: string, rightPageId: string) => {
+    deletePage(leftPageId);
+    deletePage(rightPageId);
+  }, [deletePage]);
 
   // Handle album selection
   const handleSelectAlbum = useCallback(async (id: string) => {
     const newAlbum = await albumStorage.loadAlbum(id);
     if (newAlbum) {
+      if (!newAlbum.settings) {
+        newAlbum.settings = { ...DEFAULT_ALBUM_SETTINGS };
+      }
       await albumStorage.setCurrentAlbumId(id);
       setAlbum(newAlbum);
-      setCurrentPageIndex(0);
+      setCurrentSpreadIndex(0);
       setSelectedElementId(null);
     }
   }, [setAlbum]);
@@ -192,7 +211,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     await albumStorage.saveAlbum(newAlbum);
     await albumStorage.setCurrentAlbumId(newAlbum.id);
     setAlbum(newAlbum);
-    setCurrentPageIndex(0);
+    setCurrentSpreadIndex(0);
     setSelectedElementId(null);
   }, [setAlbum]);
 
@@ -205,8 +224,11 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   const handleImportAlbum = useCallback(async () => {
     try {
       const imported = await importAlbumFromJson();
+      if (!imported.settings) {
+        imported.settings = { ...DEFAULT_ALBUM_SETTINGS };
+      }
       setAlbum(imported);
-      setCurrentPageIndex(0);
+      setCurrentSpreadIndex(0);
       setSelectedElementId(null);
     } catch (error) {
       console.error('Failed to import album:', error);
@@ -218,8 +240,8 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     exportAlbumAsJson(album);
   }, [album]);
 
-  // Early return if no current page
-  if (!currentPage) {
+  // Early return if no pages
+  if (currentSpread.length === 0) {
     return (
       <div className="app-container">
         <div className="loading-screen">
@@ -231,74 +253,99 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
 
   return (
     <div className="app-container">
-      <div className="toolbar">
-        <div className="toolbar-section">
-          <AlbumSelector
-            currentAlbumId={album.id}
-            onSelectAlbum={handleSelectAlbum}
-            onCreateAlbum={handleCreateAlbum}
-            onDeleteAlbum={handleDeleteAlbum}
-          />
-          <input
-            type="text"
-            className="toolbar-title"
-            value={album.name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
+      <Toolbar
+        albumName={album.name}
+        onAlbumNameChange={setName}
+        isSnappingEnabled={isSnappingEnabled}
+        onSnappingToggle={() => setIsSnappingEnabled(!isSnappingEnabled)}
+        onImport={handleImportAlbum}
+        onExport={handleExportAlbum}
+        onSettingsClick={() => setIsSettingsOpen(!isSettingsOpen)}
+      />
 
-        <div className="toolbar-section">
-          <button className="btn btn-secondary btn-sm" onClick={handleImportAlbum}>
-            Import
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={handleExportAlbum}>
-            Export
-          </button>
-          <div className="toolbar-divider" />
-          <button
-            className={`btn btn-ghost btn-icon ${isImagePoolOpen ? 'active' : ''}`}
-            onClick={() => setIsImagePoolOpen(!isImagePoolOpen)}
-            title="Toggle Image Pool"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
-              <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
+      {/* Album selector bar */}
+      <div className="album-bar">
+        <AlbumSelector
+          currentAlbumId={album.id}
+          onSelectAlbum={handleSelectAlbum}
+          onCreateAlbum={handleCreateAlbum}
+          onDeleteAlbum={handleDeleteAlbum}
+        />
+        <button
+          className={`btn btn-ghost btn-icon ${isImagePoolOpen ? 'active' : ''}`}
+          onClick={() => setIsImagePoolOpen(!isImagePoolOpen)}
+          title="Toggle Image Pool"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
+            <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
       </div>
 
       <main className={`main-content ${isImagePoolOpen ? 'image-pool-open' : ''}`}>
+        {/* Settings Panel (left sidebar when open) */}
+        {isSettingsOpen && (
+          <aside className="settings-sidebar">
+            <AlbumSettingsPanel
+              settings={album.settings}
+              onSettingsChange={setSettings}
+              currentPageCount={album.pages.length}
+            />
+          </aside>
+        )}
+
         <PageNavigator
           pages={album.pages}
-          currentPageIndex={currentPageIndex}
-          onPageSelect={setCurrentPageIndex}
-          onAddPage={() => addPage()}
-          onDeletePage={handleDeletePage}
+          currentSpreadIndex={currentSpreadIndex}
+          maxPages={album.settings.maxPages}
+          onSpreadSelect={setCurrentSpreadIndex}
+          onAddPages={() => addPages(2)}
+          onDeleteSpread={handleDeleteSpread}
         />
 
         <Canvas
-          page={currentPage}
+          pages={currentSpread}
+          pageIndex={currentSpreadIndex * 2}
+          settings={album.settings}
           selectedElementId={selectedElementId}
-          onElementSelect={setSelectedElementId}
+          isSnappingEnabled={isSnappingEnabled}
+          onElementSelect={(id) => {
+            setSelectedElementId(id);
+            if (id) {
+              // Find which page contains this element
+              for (const page of currentSpread) {
+                if (page.elements.some(e => e.id === id)) {
+                  setSelectedPageId(page.id);
+                  break;
+                }
+              }
+            } else {
+              setSelectedPageId(null);
+            }
+          }}
           onElementUpdate={handleElementUpdate}
           onElementDelete={handleElementDelete}
           onImageDrop={handleImageDrop}
         />
 
         <PropertiesPanel
-          page={currentPage}
+          pages={currentSpread}
+          settings={album.settings}
           selectedElement={selectedElement}
-          onTemplateChange={handleTemplateChange}
+          selectedPageId={selectedPageId}
+          onTemplateChange={(pageId, templateId) => {
+            updatePage(pageId, { templateId });
+          }}
           onElementUpdate={(updates) => {
-            if (selectedElementId) {
-              handleElementUpdate(selectedElementId, updates);
+            if (selectedElementId && selectedPageId) {
+              handleElementUpdate(selectedPageId, selectedElementId, updates);
             }
           }}
           onElementDelete={() => {
-            if (selectedElementId) {
-              handleElementDelete(selectedElementId);
+            if (selectedElementId && selectedPageId) {
+              handleElementDelete(selectedPageId, selectedElementId);
             }
           }}
         />

@@ -1,30 +1,34 @@
 import React from 'react';
-import { Page, PageElement, TemplateId } from '../types';
+import type { Page, PageElement, TemplateId, AlbumSettings } from '../types';
 import { getTemplateList, getTemplate } from '../templates/pageTemplates';
+import { percentToUnit } from '../utils/snapping';
 
 interface PropertiesPanelProps {
-    page: Page;
+    pages: Page[];  // Current spread (2 pages)
+    settings: AlbumSettings;
     selectedElement: PageElement | null;
-    onTemplateChange: (templateId: TemplateId) => void;
+    selectedPageId: string | null;
+    onTemplateChange: (pageId: string, templateId: TemplateId) => void;
     onElementUpdate: (updates: Partial<PageElement>) => void;
     onElementDelete: () => void;
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
-    page,
+    pages,
+    settings,
     selectedElement,
+    selectedPageId,
     onTemplateChange,
     onElementUpdate,
     onElementDelete,
 }) => {
-    const templates = getTemplateList();
-    const currentTemplate = getTemplate(page.templateId);
+    const currentPage = pages.find(p => p.id === selectedPageId) || pages[0];
 
     return (
         <aside className="properties-panel">
             <div className="properties-header">
                 <h2 className="properties-title">
-                    {selectedElement ? 'Image Properties' : 'Page Properties'}
+                    {selectedElement ? 'Image Properties' : 'Spread Properties'}
                 </h2>
             </div>
 
@@ -32,15 +36,14 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 {selectedElement ? (
                     <ElementProperties
                         element={selectedElement}
+                        settings={settings}
                         onUpdate={onElementUpdate}
                         onDelete={onElementDelete}
                     />
                 ) : (
-                    <PageProperties
-                        page={page}
-                        templates={templates}
-                        currentTemplate={currentTemplate}
-                        onTemplateChange={onTemplateChange}
+                    <SpreadProperties
+                        pages={pages}
+                        settings={settings}
                     />
                 )}
             </div>
@@ -48,55 +51,52 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     );
 };
 
-interface PagePropertiesProps {
-    page: Page;
-    templates: ReturnType<typeof getTemplateList>;
-    currentTemplate: ReturnType<typeof getTemplate>;
-    onTemplateChange: (templateId: TemplateId) => void;
+interface SpreadPropertiesProps {
+    pages: Page[];
+    settings: AlbumSettings;
 }
 
-const PageProperties: React.FC<PagePropertiesProps> = ({
-    page,
-    templates,
-    currentTemplate,
-    onTemplateChange,
+const SpreadProperties: React.FC<SpreadPropertiesProps> = ({
+    pages,
+    settings,
 }) => {
+    const totalElements = pages.reduce((sum, p) => sum + p.elements.length, 0);
+
     return (
         <>
             <div className="property-section">
-                <h3 className="property-section-title">Template</h3>
-                <div className="template-grid">
-                    {templates.map(template => (
-                        <button
-                            key={template.id}
-                            className={`template-option ${template.id === page.templateId ? 'active' : ''}`}
-                            onClick={() => onTemplateChange(template.id)}
-                            title={template.description}
-                        >
-                            <div className="template-preview" style={getTemplatePreviewStyle(template.id)} />
-                            <span className="template-name">{template.name}</span>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            <div className="property-section">
-                <h3 className="property-section-title">Export Size</h3>
+                <h3 className="property-section-title">Spread Size</h3>
                 <div className="property-row">
                     <span className="property-label">Width</span>
-                    <span style={{ color: 'var(--color-text-primary)' }}>{currentTemplate.exportWidth}px</span>
+                    <span style={{ color: 'var(--color-text-primary)' }}>
+                        {settings.pageWidth * 2} {settings.unit}
+                    </span>
                 </div>
                 <div className="property-row">
                     <span className="property-label">Height</span>
-                    <span style={{ color: 'var(--color-text-primary)' }}>{currentTemplate.exportHeight}px</span>
+                    <span style={{ color: 'var(--color-text-primary)' }}>
+                        {settings.pageHeight} {settings.unit}
+                    </span>
                 </div>
             </div>
 
             <div className="property-section">
-                <h3 className="property-section-title">Page Info</h3>
+                <h3 className="property-section-title">Spread Info</h3>
                 <div className="property-row">
-                    <span className="property-label">Elements</span>
-                    <span style={{ color: 'var(--color-text-primary)' }}>{page.elements.length}</span>
+                    <span className="property-label">Total Elements</span>
+                    <span style={{ color: 'var(--color-text-primary)' }}>{totalElements}</span>
+                </div>
+                <div className="property-row">
+                    <span className="property-label">Left Page</span>
+                    <span style={{ color: 'var(--color-text-primary)' }}>
+                        {pages[0]?.elements.length || 0} elements
+                    </span>
+                </div>
+                <div className="property-row">
+                    <span className="property-label">Right Page</span>
+                    <span style={{ color: 'var(--color-text-primary)' }}>
+                        {pages[1]?.elements.length || 0} elements
+                    </span>
                 </div>
             </div>
         </>
@@ -105,15 +105,21 @@ const PageProperties: React.FC<PagePropertiesProps> = ({
 
 interface ElementPropertiesProps {
     element: PageElement;
+    settings: AlbumSettings;
     onUpdate: (updates: Partial<PageElement>) => void;
     onDelete: () => void;
 }
 
 const ElementProperties: React.FC<ElementPropertiesProps> = ({
     element,
+    settings,
     onUpdate,
     onDelete,
 }) => {
+    // Calculate size in physical units
+    const widthInUnits = percentToUnit(element.size.width, settings.pageWidth, settings.unit);
+    const heightInUnits = percentToUnit(element.size.height, settings.pageHeight, settings.unit);
+
     const handlePositionChange = (axis: 'x' | 'y', value: string) => {
         const numValue = parseFloat(value) || 0;
         onUpdate({
@@ -121,21 +127,63 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                 ...element.position,
                 [axis]: Math.max(0, Math.min(100, numValue)),
             },
+            snapConstraints: undefined, // Clear snap constraints on manual edit
         });
     };
 
     const handleSizeChange = (dimension: 'width' | 'height', value: string) => {
         const numValue = parseFloat(value) || 0;
+        let newWidth = dimension === 'width' ? numValue : element.size.width;
+        let newHeight = dimension === 'height' ? numValue : element.size.height;
+
+        // Enforce aspect ratio if locked
+        if (element.lockAspectRatio && element.originalAspectRatio) {
+            if (dimension === 'width') {
+                newHeight = newWidth / element.originalAspectRatio;
+            } else {
+                newWidth = newHeight * element.originalAspectRatio;
+            }
+        }
+
         onUpdate({
             size: {
-                ...element.size,
-                [dimension]: Math.max(1, Math.min(100, numValue)),
+                width: Math.max(1, Math.min(100, newWidth)),
+                height: Math.max(1, Math.min(100, newHeight)),
             },
+        });
+    };
+
+    const handleAspectRatioToggle = () => {
+        const newLocked = !element.lockAspectRatio;
+        onUpdate({
+            lockAspectRatio: newLocked,
+            // Store current aspect ratio when locking
+            originalAspectRatio: newLocked
+                ? element.size.width / element.size.height
+                : element.originalAspectRatio,
         });
     };
 
     return (
         <>
+            <div className="property-section">
+                <h3 className="property-section-title">
+                    Size ({settings.unit})
+                </h3>
+                <div className="property-row">
+                    <span className="property-label">Width</span>
+                    <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                        {widthInUnits.toFixed(2)} {settings.unit}
+                    </span>
+                </div>
+                <div className="property-row">
+                    <span className="property-label">Height</span>
+                    <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                        {heightInUnits.toFixed(2)} {settings.unit}
+                    </span>
+                </div>
+            </div>
+
             <div className="property-section">
                 <h3 className="property-section-title">Position (%)</h3>
                 <div className="property-row">
@@ -190,6 +238,16 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         step={0.5}
                     />
                 </div>
+
+                {/* Aspect Ratio Lock Toggle */}
+                <label className="property-checkbox" style={{ marginTop: 'var(--space-2)' }}>
+                    <input
+                        type="checkbox"
+                        checked={element.lockAspectRatio || false}
+                        onChange={handleAspectRatioToggle}
+                    />
+                    <span>Lock aspect ratio</span>
+                </label>
             </div>
 
             <div className="property-section">
@@ -197,7 +255,11 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                     <button
                         className="btn btn-secondary"
-                        onClick={() => onUpdate({ position: { x: 0, y: 0 }, size: { width: 100, height: 100 } })}
+                        onClick={() => onUpdate({
+                            position: { x: 0, y: 0 },
+                            size: { width: 100, height: 100 },
+                            snapConstraints: undefined,
+                        })}
                     >
                         Fill Page
                     </button>
@@ -208,34 +270,21 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                             onUpdate({
                                 position: { x: (100 - size) / 2, y: (100 - size) / 2 },
                                 size: { width: size, height: size },
+                                snapConstraints: undefined,
                             });
                         }}
                     >
                         Center Square
                     </button>
-                    <button className="btn btn-secondary" onClick={onDelete} style={{ color: 'var(--color-error)' }}>
+                    <button
+                        className="btn btn-secondary"
+                        onClick={onDelete}
+                        style={{ color: 'var(--color-error)' }}
+                    >
                         Delete Image
                     </button>
                 </div>
             </div>
         </>
     );
-};
-
-// Get preview style for template thumbnails
-const getTemplatePreviewStyle = (templateId: TemplateId): React.CSSProperties => {
-    const styles: Record<TemplateId, React.CSSProperties> = {
-        'fullpage': { width: '100%', height: '100%' },
-        'square-center': { width: '70%', height: '70%', aspectRatio: '1' },
-        'portrait': { width: '60%', height: '80%' },
-        'landscape': { width: '80%', height: '60%' },
-        'polaroid': { width: '70%', height: '55%', marginBottom: '15%' },
-        'grid-2x2': {
-            background: 'repeating-linear-gradient(to right, var(--color-bg-tertiary) 0%, var(--color-bg-tertiary) 48%, transparent 48%, transparent 52%, var(--color-bg-tertiary) 52%, var(--color-bg-tertiary) 100%), repeating-linear-gradient(to bottom, var(--color-bg-tertiary) 0%, var(--color-bg-tertiary) 48%, transparent 48%, transparent 52%, var(--color-bg-tertiary) 52%, var(--color-bg-tertiary) 100%)',
-            width: '80%',
-            height: '80%',
-        },
-        'grid-1-2': { width: '80%', height: '80%' },
-    };
-    return styles[templateId] || {};
 };
