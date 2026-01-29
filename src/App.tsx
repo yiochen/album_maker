@@ -11,6 +11,7 @@ import {
   loadFromLocalStorage,
   clearLocalStorage,
 } from './services/storage';
+import { spreadThumbnailDB, generateSpreadContentHash } from './db';
 import { initializeSources } from './sources';
 import { Toolbar } from './components/Toolbar';
 import { AlbumSettingsPanel } from './components/AlbumSettingsPanel';
@@ -214,6 +215,22 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     setSelectedPageId(null);
   }, [deleteElement]);
 
+  const handleCanvasChange = useCallback(async (dataUrl: string) => {
+    if (!album) return;
+
+    const startIndex = currentSpreadIndex * 2;
+    const pages = album.pages.slice(startIndex, startIndex + 2);
+
+    if (pages.length === 0) return;
+
+    const contentHash = generateSpreadContentHash(pages);
+    try {
+      await spreadThumbnailDB.set(album.id, currentSpreadIndex, dataUrl, contentHash);
+    } catch (error) {
+      console.warn('Failed to save thumbnail:', error);
+    }
+  }, [album, currentSpreadIndex]);
+
   // Handle spread delete (delete both pages)
   const handleDeleteSpread = useCallback((leftPageId: string, rightPageId: string) => {
     deletePage(leftPageId);
@@ -364,6 +381,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           onElementDelete={handleElementDelete}
           onImageDrop={handleImageDrop}
           onMoveElementToPage={moveElement}
+          onCanvasChange={handleCanvasChange}
         />
 
         <PropertiesPanel
