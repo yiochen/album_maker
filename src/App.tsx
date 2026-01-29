@@ -333,6 +333,8 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           pages={album.pages}
           currentSpreadIndex={currentSpreadIndex}
           maxPages={album.settings.maxPages}
+          albumId={album.id}
+          settings={album.settings}
           onSpreadSelect={setCurrentSpreadIndex}
           onAddPages={() => addPages(2)}
           onDeleteSpread={handleDeleteSpread}
