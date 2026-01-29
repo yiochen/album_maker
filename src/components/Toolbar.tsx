@@ -8,6 +8,10 @@ interface ToolbarProps {
     onImport: () => void;
     onExport: () => void;
     onSettingsClick: () => void;
+    onUndo: () => void;
+    onRedo: () => void;
+    canUndo: boolean;
+    canRedo: boolean;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -18,10 +22,39 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     onImport,
     onExport,
     onSettingsClick,
+    onUndo,
+    onRedo,
+    canUndo,
+    canRedo,
 }) => {
     return (
         <header className="toolbar">
             <div className="toolbar-left">
+                <div className="history-controls" style={{ display: 'flex', gap: '4px', marginRight: '12px' }}>
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={onUndo}
+                        disabled={!canUndo}
+                        title="Undo (Ctrl+Z)"
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 14L4 9L9 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M4 9H15C18.866 9 22 12.134 22 16V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={onRedo}
+                        disabled={!canRedo}
+                        title="Redo (Ctrl+Y)"
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M15 14L20 9L15 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M20 9H9C5.13401 9 2 12.134 2 16V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
+                </div>
+
                 <button
                     className="btn btn-ghost btn-icon"
                     onClick={onSettingsClick}
