@@ -11,7 +11,7 @@
     # We use 'start' to run the local dev server during the build process.
     start = "npm run dev"
     wait-on = "http://localhost:5173"
-    wait-on-timeout = 120
+    wait-on-timeout = 180
 
     # Run Cypress with the 'cypress:run' script.
     # We set CYPRESS_visualRegressionFailSilently=true to prevent deployment failures
