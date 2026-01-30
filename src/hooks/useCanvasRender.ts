@@ -78,8 +78,8 @@ export function useCanvasRender({
 
                 // Convert spread % to pixels
                 // position.x is 0-100% of SPREAD (not page, for our new logic)
-                // Wait, previous logic mixed page% and spread%. 
-                // In Phase 4 we moved to spread-relative positioning in logic, 
+                // Wait, previous logic mixed page% and spread%.
+                // In Phase 4 we moved to spread-relative positioning in logic,
                 // but let's verify if data structure changed.
                 // Re-checking CanvasElement in Phase 4:
                 // "spreadX = pageOffset + (element.position.x / 100) * 50;"

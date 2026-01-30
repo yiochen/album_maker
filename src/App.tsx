@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import type { Album, Page, PageElement, PoolImage } from './types';
+import type { Album, Page, PageElement, PoolImage, TemplateId } from './types';
 import { DEFAULT_ALBUM_SETTINGS } from './types';
 import { useAlbum } from './hooks/useAlbum';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -98,6 +98,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     deletePage,
     addElement,
     updateElement,
+    updatePage,
     deleteElement,
     moveElement,
     addToPool,
@@ -137,17 +138,14 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   }, [currentSpread, selectedElementId]);
 
   // Ensure currentSpreadIndex is valid when pages change
-  useEffect(() => {
-    const maxSpreadIndex = Math.max(0, Math.floor((album.pages.length - 1) / 2));
-    if (currentSpreadIndex > maxSpreadIndex) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCurrentSpreadIndex(maxSpreadIndex);
-    }
-  }, [album.pages.length, currentSpreadIndex]);
+  const maxSpreadIndex = Math.max(0, Math.floor((album.pages.length - 1) / 2));
+  if (currentSpreadIndex > maxSpreadIndex) {
+    setCurrentSpreadIndex(maxSpreadIndex);
+  }
 
   // Clear selection when switching spreads
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line
     setSelectedElementId(null);
     setSelectedPageId(null);
   }, [currentSpreadIndex]);
@@ -361,6 +359,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
 
         <Canvas
           pages={currentSpread}
+          pageIndex={currentSpreadIndex * 2}
           settings={album.settings}
           selectedElementId={selectedElementId}
           isSnappingEnabled={isSnappingEnabled}
@@ -389,6 +388,10 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           pages={currentSpread}
           settings={album.settings}
           selectedElement={selectedElement}
+          selectedPageId={selectedPageId}
+          onTemplateChange={(pageId, templateId) => {
+            updatePage(pageId, { templateId: templateId as TemplateId });
+          }}
           onElementUpdate={(updates) => {
             if (selectedElementId && selectedPageId) {
               handleElementUpdate(selectedPageId, selectedElementId, updates);

@@ -1,0 +1,1 @@
+{"root":["./cypress/e2e/album-settings.cy.ts","./cypress/e2e/canvas.cy.ts","./cypress/e2e/image-pool.cy.ts","./cypress/e2e/page-creation.cy.ts","./cypress/support/commands.ts","./cypress/support/e2e.ts"],"version":"5.9.3"}
