@@ -159,7 +159,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             // Trigger update after drop
             // The hook's handleDrop calls onImageDrop, which updates state -> triggers render.
             // onCanvasChange should be called after render?
-            // Since drop is "instant" and we want the thumbnail of the result,
+            // Since drop is "instant" and we want the thumbnail of the result, 
             // the onImageDrop will cause a re-render of App -> Canvas -> useCanvasRender.
             // We might need an effect to capture that change?
             // For now rely on onInteractionEnd for moves, and maybe explicit call here?
@@ -167,7 +167,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
             // Let's rely on a separate specific debounced effect or the parent passing a "force capture" ref.
             // Or simpler: The user asked for "change handler".
-            // We can add an effect on `pages` that calls `onCanvasChange`.
+            // We can add an effect on `pages` that calls `onCanvasChange`. 
             // But `pages` changes often during drag (if we did realtime update).
             // We are doing realtime update. So that would be too frequent.
             // Debouncing is the key.
