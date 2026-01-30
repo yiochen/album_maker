@@ -196,6 +196,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             <div
                 ref={viewportRef}
                 className="canvas-viewport"
+                data-testid="canvas-viewport"
                 onKeyDown={handleKeyDown}
                 tabIndex={0}
             >
@@ -221,6 +222,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     <div
                         ref={containerRef}
                         className="interaction-layer"
+                        data-testid="interaction-layer"
                         style={{
                             position: 'absolute',
                             inset: 0,
@@ -242,6 +244,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                         {selectedElement && (
                             <div
                                 className="selection-overlay"
+                                data-testid="selection-overlay"
                                 style={{
                                     position: 'absolute',
                                     left: `${(selectedElement.pageIndex === 0 ? 0 : 50) + (selectedElement.position.x / 100) * 50}%`,

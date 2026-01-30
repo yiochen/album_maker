@@ -37,6 +37,11 @@ declare global {
              * Wait for the app to be fully loaded
              */
             waitForAppReady(): Chainable<void>;
+
+            /**
+             * Get the interaction layer (for drag/drop operations)
+             */
+            getInteractionLayer(): Chainable<JQuery<HTMLElement>>;
         }
     }
 }
@@ -105,6 +110,11 @@ Cypress.Commands.add('getCanvas', () => {
 // Get canvas layer
 Cypress.Commands.add('getCanvasLayer', () => {
     return cy.get('[data-testid="canvas-layer"]');
+});
+
+// Get interaction layer (for drag/drop)
+Cypress.Commands.add('getInteractionLayer', () => {
+    return cy.get('[data-testid="interaction-layer"]');
 });
 
 export { };

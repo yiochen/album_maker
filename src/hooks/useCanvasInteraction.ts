@@ -233,14 +233,7 @@ export function useCanvasInteraction({
 
             // Current center in spread %
             const currentSpreadX = pageOffset + (start.element.position.x / 100 * 50); // Need CURRENT position, not start
-            // Wait, start.element is the OLD state. We need the current position from the store, 
-            // BUT we are updating it in real-time via onElementUpdate. 
-            // Ideally we should receive the *latest* pages prop to check ownership, 
-            // but strictly, we can calculate based on the last update we sent? 
-            // No, safest is to trust the `pages` prop if it's updated. 
-            // In the current architecture, 'pages' prop updates on every render.
-
-            // Let's find the current element in 'pages'
+            // Use the latest element state from the pages prop to determine the current position
             const currentPage = pages.find(p => p.id === start.pageId);
             const currentElement = currentPage?.elements.find(e => e.id === start.element.id);
 
