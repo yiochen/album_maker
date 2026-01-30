@@ -52,7 +52,7 @@ Or add a `netlify.toml`:
 
 ## Project Structure
 
-See [AGENT.md](./AGENT.md) for detailed architecture and development documentation.
+See [AGENTS.md](./AGENT.md) for detailed architecture and development documentation.
 
 ## Tech Stack
 

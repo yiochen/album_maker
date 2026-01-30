@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Page, AlbumSettings } from '../types';
 import { useCanvasThumbnail } from '../hooks/useCanvasThumbnail';
 import { spreadThumbnailDB, generateSpreadContentHash } from '../db';
@@ -12,6 +12,7 @@ interface PageNavigatorProps {
     onSpreadSelect: (spreadIndex: number) => void;
     onAddPages: () => void;
     onDeleteSpread: (leftPageId: string, rightPageId: string) => void;
+    onDeleteSpreads: (spreadIndices: number[]) => void;
 }
 
 export const PageNavigator: React.FC<PageNavigatorProps> = ({
@@ -23,6 +24,7 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
     onSpreadSelect,
     onAddPages,
     onDeleteSpread,
+    onDeleteSpreads,
 }) => {
     // Group pages into spreads (pairs)
     const spreads: [Page, Page | undefined][] = [];
@@ -32,6 +34,82 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
 
     const canAddMore = pages.length < maxPages;
 
+    // Multi-selection state
+    const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+    const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
+
+    // Clear selection when pages change (e.g., after deletion)
+    useEffect(() => {
+        setSelectedIndices(new Set());
+        setLastClickedIndex(null);
+    }, [pages.length]);
+
+    const handleSpreadClick = useCallback((spreadIndex: number, event: React.MouseEvent) => {
+        const isCtrlOrCmd = event.metaKey || event.ctrlKey;
+        const isShift = event.shiftKey;
+
+        if (isCtrlOrCmd) {
+            // Toggle individual selection
+            setSelectedIndices(prev => {
+                const next = new Set(prev);
+                if (next.has(spreadIndex)) {
+                    next.delete(spreadIndex);
+                } else {
+                    next.add(spreadIndex);
+                }
+                return next;
+            });
+            setLastClickedIndex(spreadIndex);
+        } else if (isShift && lastClickedIndex !== null) {
+            // Range selection
+            const start = Math.min(lastClickedIndex, spreadIndex);
+            const end = Math.max(lastClickedIndex, spreadIndex);
+            setSelectedIndices(prev => {
+                const next = new Set(prev);
+                for (let i = start; i <= end; i++) {
+                    next.add(i);
+                }
+                return next;
+            });
+        } else {
+            // Normal click - navigate to spread
+            onSpreadSelect(spreadIndex);
+            setLastClickedIndex(spreadIndex);
+        }
+    }, [lastClickedIndex, onSpreadSelect]);
+
+    const handleCheckboxChange = useCallback((spreadIndex: number, checked: boolean) => {
+        setSelectedIndices(prev => {
+            const next = new Set(prev);
+            if (checked) {
+                next.add(spreadIndex);
+            } else {
+                next.delete(spreadIndex);
+            }
+            return next;
+        });
+        setLastClickedIndex(spreadIndex);
+    }, []);
+
+    const handleDeleteSelected = useCallback(() => {
+        if (selectedIndices.size === 0) return;
+
+        // Cannot delete all spreads
+        if (selectedIndices.size >= spreads.length) {
+            alert('Cannot delete all spreads. At least one spread must remain.');
+            return;
+        }
+
+        if (window.confirm(`Delete ${selectedIndices.size} spread(s) (${selectedIndices.size * 2} pages)?`)) {
+            onDeleteSpreads(Array.from(selectedIndices));
+            setSelectedIndices(new Set());
+        }
+    }, [selectedIndices, spreads.length, onDeleteSpreads]);
+
+    const handleClearSelection = useCallback(() => {
+        setSelectedIndices(new Set());
+    }, []);
+
     return (
         <aside className="page-navigator" data-testid="page-navigator">
             <div className="page-navigator-header">
@@ -40,6 +118,28 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                     {pages.length} / {maxPages} pages
                 </span>
             </div>
+
+            {selectedIndices.size > 0 && (
+                <div className="page-navigator-actions" data-testid="selection-actions">
+                    <span className="selection-count" data-testid="selection-count">
+                        {selectedIndices.size} selected
+                    </span>
+                    <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={handleClearSelection}
+                        data-testid="clear-selection-button"
+                    >
+                        Clear
+                    </button>
+                    <button
+                        className="btn btn-danger btn-sm"
+                        onClick={handleDeleteSelected}
+                        data-testid="delete-selected-button"
+                    >
+                        Delete
+                    </button>
+                </div>
+            )}
 
             <div className="page-list">
                 {spreads.map((spread, spreadIndex) => (
@@ -51,8 +151,11 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                         albumId={albumId}
                         settings={settings}
                         isActive={spreadIndex === currentSpreadIndex}
+                        isSelected={selectedIndices.has(spreadIndex)}
                         canDelete={spreads.length > 1}
-                        onClick={() => onSpreadSelect(spreadIndex)}
+                        showCheckbox={true}
+                        onClick={(e) => handleSpreadClick(spreadIndex, e)}
+                        onCheckboxChange={(checked) => handleCheckboxChange(spreadIndex, checked)}
                         onDelete={() => {
                             if (spread[1]) {
                                 onDeleteSpread(spread[0].id, spread[1].id);
@@ -85,8 +188,11 @@ interface SpreadThumbnailProps {
     albumId: string;
     settings: AlbumSettings;
     isActive: boolean;
+    isSelected: boolean;
     canDelete: boolean;
-    onClick: () => void;
+    showCheckbox: boolean;
+    onClick: (e: React.MouseEvent) => void;
+    onCheckboxChange: (checked: boolean) => void;
     onDelete: () => void;
 }
 
@@ -97,8 +203,11 @@ const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
     albumId,
     settings,
     isActive,
+    isSelected,
     canDelete,
+    showCheckbox,
     onClick,
+    onCheckboxChange,
     onDelete,
 }) => {
     const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
@@ -183,16 +292,39 @@ const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
         }
     };
 
+    const handleCheckboxClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+    };
+
+    const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onCheckboxChange(e.target.checked);
+    };
+
     return (
         <div
             ref={containerRef}
-            className={`spread-thumbnail ${isActive ? 'active' : ''}`}
+            className={`spread-thumbnail ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''}`}
             onClick={onClick}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onClick()}
+            onKeyDown={(e) => e.key === 'Enter' && onClick(e as unknown as React.MouseEvent)}
             data-testid="spread-thumbnail"
         >
+            {showCheckbox && (
+                <label
+                    className="spread-thumbnail-checkbox"
+                    onClick={handleCheckboxClick}
+                    data-testid="spread-checkbox-label"
+                >
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={handleCheckboxChange}
+                        data-testid="spread-checkbox"
+                    />
+                </label>
+            )}
+
             <div className="spread-thumbnail-content">
                 {thumbnailUrl ? (
                     <img

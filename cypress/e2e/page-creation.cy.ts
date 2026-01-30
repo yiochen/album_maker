@@ -114,4 +114,112 @@ describe('Page Creation', () => {
             }
         });
     });
+
+    describe('Multi-Select Spread Deletion', () => {
+        beforeEach(() => {
+            // Ensure we have at least 3 spreads for testing
+            cy.get('[data-testid="spread-thumbnail"]').then(($spreads) => {
+                const needed = 3 - $spreads.length;
+                for (let i = 0; i < needed; i++) {
+                    cy.get('[data-testid="add-pages-button"]').click();
+                }
+            });
+        });
+
+        it('should select a spread via checkbox', () => {
+            cy.get('[data-testid="spread-checkbox"]').first().check();
+            cy.get('[data-testid="spread-thumbnail"]').first().should('have.class', 'selected');
+            cy.get('[data-testid="selection-count"]').should('contain', '1 selected');
+        });
+
+        it('should toggle selection with Ctrl+Click', () => {
+            // Select first spread
+            cy.get('[data-testid="spread-thumbnail"]').eq(0).click({ metaKey: true });
+            cy.get('[data-testid="spread-thumbnail"]').eq(0).should('have.class', 'selected');
+
+            // Select second spread
+            cy.get('[data-testid="spread-thumbnail"]').eq(1).click({ metaKey: true });
+            cy.get('[data-testid="spread-thumbnail"]').eq(1).should('have.class', 'selected');
+            cy.get('[data-testid="selection-count"]').should('contain', '2 selected');
+
+            // Deselect first spread
+            cy.get('[data-testid="spread-thumbnail"]').eq(0).click({ metaKey: true });
+            cy.get('[data-testid="spread-thumbnail"]').eq(0).should('not.have.class', 'selected');
+            cy.get('[data-testid="selection-count"]').should('contain', '1 selected');
+        });
+
+        it('should select range with Shift+Click', () => {
+            // Click first spread
+            cy.get('[data-testid="spread-thumbnail"]').eq(0).click({ metaKey: true });
+
+            // Shift+click third spread
+            cy.get('[data-testid="spread-thumbnail"]').eq(2).click({ shiftKey: true });
+
+            // All three should be selected
+            cy.get('[data-testid="spread-thumbnail"]').eq(0).should('have.class', 'selected');
+            cy.get('[data-testid="spread-thumbnail"]').eq(1).should('have.class', 'selected');
+            cy.get('[data-testid="spread-thumbnail"]').eq(2).should('have.class', 'selected');
+            cy.get('[data-testid="selection-count"]').should('contain', '3 selected');
+        });
+
+        it('should delete selected spreads', () => {
+            cy.get('[data-testid="spread-thumbnail"]').then(($spreads) => {
+                const initialCount = $spreads.length;
+
+                // Select first two spreads
+                cy.get('[data-testid="spread-checkbox"]').eq(0).check();
+                cy.get('[data-testid="spread-checkbox"]').eq(1).check();
+
+                // Stub confirm
+                cy.window().then((win) => {
+                    cy.stub(win, 'confirm').returns(true);
+                });
+
+                // Click delete selected
+                cy.get('[data-testid="delete-selected-button"]').click();
+
+                // Should have 2 fewer spreads
+                cy.get('[data-testid="spread-thumbnail"]').should('have.length', initialCount - 2);
+
+                // Selection actions should be hidden
+                cy.get('[data-testid="selection-actions"]').should('not.exist');
+            });
+        });
+
+        it('should clear selection when clicking Clear button', () => {
+            cy.get('[data-testid="spread-checkbox"]').first().check();
+            cy.get('[data-testid="selection-count"]').should('contain', '1 selected');
+
+            cy.get('[data-testid="clear-selection-button"]').click();
+
+            cy.get('[data-testid="selection-actions"]').should('not.exist');
+            cy.get('[data-testid="spread-thumbnail"]').first().should('not.have.class', 'selected');
+        });
+
+        it('should not allow deleting all spreads', () => {
+            // First reduce to exactly 1 spread
+            cy.get('[data-testid="spread-thumbnail"]').then(($spreads) => {
+                // Select all but leave one
+                for (let i = 1; i < $spreads.length; i++) {
+                    cy.get('[data-testid="spread-checkbox"]').eq(i).check();
+                }
+
+                cy.window().then((win) => {
+                    cy.stub(win, 'confirm').returns(true);
+                });
+
+                cy.get('[data-testid="delete-selected-button"]').click();
+            });
+
+            // Now try to select and delete the last one
+            cy.get('[data-testid="spread-checkbox"]').first().check();
+
+            cy.window().then((win) => {
+                cy.stub(win, 'alert').as('alertStub');
+            });
+
+            cy.get('[data-testid="delete-selected-button"]').click();
+            cy.get('@alertStub').should('have.been.calledWith', 'Cannot delete all spreads. At least one spread must remain.');
+        });
+    });
 });

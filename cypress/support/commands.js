@@ -1,5 +1,5 @@
 /// <reference types="cypress" />
-
+/* eslint-disable @typescript-eslint/no-namespace */
 // Wait for the app to be fully loaded
 Cypress.Commands.add('waitForAppReady', () => {
     // Wait for the main app container to be visible
@@ -60,4 +60,4 @@ Cypress.Commands.add('getCanvasLayer', () => {
 Cypress.Commands.add('getInteractionLayer', () => {
     return cy.get('[data-testid="interaction-layer"]');
 });
-export { };
+export {};

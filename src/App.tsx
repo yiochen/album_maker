@@ -237,6 +237,21 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     deletePage(rightPageId);
   }, [deletePage]);
 
+  // Handle multiple spread deletion
+  const handleDeleteSpreads = useCallback((spreadIndices: number[]) => {
+    // Sort in descending order to avoid index shifting issues
+    const sortedIndices = [...spreadIndices].sort((a, b) => b - a);
+
+    for (const spreadIndex of sortedIndices) {
+      const leftPageIndex = spreadIndex * 2;
+      const leftPage = album.pages[leftPageIndex];
+      const rightPage = album.pages[leftPageIndex + 1];
+
+      if (leftPage) deletePage(leftPage.id);
+      if (rightPage) deletePage(rightPage.id);
+    }
+  }, [album.pages, deletePage]);
+
   // Handle album selection
   const handleSelectAlbum = useCallback(async (id: string) => {
     const newAlbum = await albumStorage.loadAlbum(id);
@@ -349,6 +364,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           onSpreadSelect={setCurrentSpreadIndex}
           onAddPages={() => addPages(2)}
           onDeleteSpread={handleDeleteSpread}
+          onDeleteSpreads={handleDeleteSpreads}
         />
 
         <Canvas
