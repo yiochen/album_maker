@@ -6,6 +6,8 @@ interface PropertiesPanelProps {
     pages: Page[];  // Current spread (2 pages)
     settings: AlbumSettings;
     selectedElement: PageElement | null;
+    selectedPageId: string | null;
+    onTemplateChange: (pageId: string, templateId: string) => void;
     onElementUpdate: (updates: Partial<PageElement>) => void;
     onElementDelete: () => void;
 }
@@ -14,6 +16,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     pages,
     settings,
     selectedElement,
+    // selectedPageId,
+    // onTemplateChange,
     onElementUpdate,
     onElementDelete,
 }) => {

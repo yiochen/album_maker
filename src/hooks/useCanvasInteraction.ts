@@ -253,7 +253,7 @@ export function useCanvasInteraction({
                     // Target Page% = (Spread% - TargetOffset) * 2
 
                     // Wait, my manual calculation in handleMouseMove blindly updated page-relative coords
-                    // even if they went out of bounds (e.g. 150%). 
+                    // even if they went out of bounds (e.g. 150%).
                     // So we just need to re-normalize to the new page.
 
                     if (shouldBeRight) {
