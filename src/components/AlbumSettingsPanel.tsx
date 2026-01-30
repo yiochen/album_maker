@@ -106,9 +106,7 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
     };
 
     return (
-        <div className="album-settings-panel" data-testid="album-settings-panel">
-            <h3 className="panel-title" data-testid="settings-title">Album Settings</h3>
-
+        <div data-testid="album-settings-panel">
             <div className="settings-group">
                 <label className="settings-label">
                     <span>Page Size ({settings.unit})</span>

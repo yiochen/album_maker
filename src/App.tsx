@@ -20,6 +20,7 @@ import { Canvas } from './components/Canvas';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { ImagePool } from './components/ImagePool';
 import { AlbumSelector } from './components/AlbumSelector';
+import { Modal } from './components/Modal';
 import './index.css';
 
 const App: React.FC = () => {
@@ -285,6 +286,10 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     exportAlbumAsJson(album);
   }, [album]);
 
+  const handleSettingsClose = useCallback(() => {
+    setIsSettingsOpen(false);
+  }, []);
+
   // Early return if no pages
   if (currentSpread.length === 0) {
     return (
@@ -335,17 +340,6 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
       </div>
 
       <main className={`main-content ${isImagePoolOpen ? 'image-pool-open' : ''}`}>
-        {/* Settings Panel (left sidebar when open) */}
-        {isSettingsOpen && (
-          <aside className="settings-sidebar">
-            <AlbumSettingsPanel
-              settings={album.settings}
-              onSettingsChange={setSettings}
-              currentPageCount={album.pages.length}
-            />
-          </aside>
-        )}
-
         <PageNavigator
           pages={album.pages}
           currentSpreadIndex={currentSpreadIndex}
@@ -412,6 +406,20 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           />
         )}
       </main>
+
+      {isSettingsOpen && (
+        <Modal
+          title="Album Settings"
+          onClose={handleSettingsClose}
+          titleTestId="settings-title"
+        >
+          <AlbumSettingsPanel
+            settings={album.settings}
+            onSettingsChange={setSettings}
+            currentPageCount={album.pages.length}
+          />
+        </Modal>
+      )}
     </div>
   );
 };
