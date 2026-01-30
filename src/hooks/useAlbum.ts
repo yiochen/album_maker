@@ -4,7 +4,8 @@ import { useHistory } from './useHistory';
 import {
     UpdateElementCommand,
     AddElementCommand,
-    DeleteElementCommand
+    DeleteElementCommand,
+    MoveElementCommand
 } from '../commands/elementCommands';
 import {
     AddPageCommand,
@@ -119,6 +120,10 @@ export const useAlbum = (initialAlbum: Album) => {
         dispatch(new ClearPoolCommand());
     }, [dispatch]);
 
+    const moveElement = useCallback((fromPageId: string, toPageId: string, elementId: string) => {
+        dispatch(new MoveElementCommand(fromPageId, toPageId, elementId));
+    }, [dispatch]);
+
     return useMemo(
         () => ({
             album,
@@ -133,6 +138,7 @@ export const useAlbum = (initialAlbum: Album) => {
             addElement,
             updateElement,
             deleteElement,
+            moveElement,
             addToPool,
             removeFromPool,
             clearPool,
@@ -154,6 +160,7 @@ export const useAlbum = (initialAlbum: Album) => {
             addElement,
             updateElement,
             deleteElement,
+            moveElement,
             addToPool,
             removeFromPool,
             clearPool,

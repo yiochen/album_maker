@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Page, AlbumSettings } from '../types';
+import { useCanvasThumbnail } from '../hooks/useCanvasThumbnail';
+import { spreadThumbnailDB, generateSpreadContentHash } from '../db';
 
 interface PageNavigatorProps {
     pages: Page[];
-    currentSpreadIndex: number;  // Index of the spread (pairs of pages)
+    currentSpreadIndex: number;
     maxPages: number;
+    albumId: string;
+    settings: AlbumSettings;
     onSpreadSelect: (spreadIndex: number) => void;
     onAddPages: () => void;
     onDeleteSpread: (leftPageId: string, rightPageId: string) => void;
@@ -14,6 +18,8 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
     pages,
     currentSpreadIndex,
     maxPages,
+    albumId,
+    settings,
     onSpreadSelect,
     onAddPages,
     onDeleteSpread,
@@ -25,7 +31,6 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
     }
 
     const canAddMore = pages.length < maxPages;
-    const spreadCount = spreads.length;
 
     return (
         <aside className="page-navigator">
@@ -43,6 +48,8 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                         leftPage={spread[0]}
                         rightPage={spread[1]}
                         spreadIndex={spreadIndex}
+                        albumId={albumId}
+                        settings={settings}
                         isActive={spreadIndex === currentSpreadIndex}
                         canDelete={spreads.length > 1}
                         onClick={() => onSpreadSelect(spreadIndex)}
@@ -75,6 +82,8 @@ interface SpreadThumbnailProps {
     leftPage: Page;
     rightPage: Page | undefined;
     spreadIndex: number;
+    albumId: string;
+    settings: AlbumSettings;
     isActive: boolean;
     canDelete: boolean;
     onClick: () => void;
@@ -85,11 +94,88 @@ const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
     leftPage,
     rightPage,
     spreadIndex,
+    albumId,
+    settings,
     isActive,
     canDelete,
     onClick,
     onDelete,
 }) => {
+    const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+    const [isVisible, setIsVisible] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const { generateSpreadThumbnail } = useCanvasThumbnail();
+
+    // Lazy loading with IntersectionObserver
+    useEffect(() => {
+        const element = containerRef.current;
+        if (!element) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        setIsVisible(true);
+                    }
+                });
+            },
+            {
+                root: null,
+                rootMargin: '50px',
+                threshold: 0.1,
+            }
+        );
+
+        observer.observe(element);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, []);
+
+    // Generate thumbnail when visible
+    useEffect(() => {
+        if (!isVisible) return;
+
+        const pages = rightPage ? [leftPage, rightPage] : [leftPage];
+        const contentHash = generateSpreadContentHash(pages);
+
+        const loadThumbnail = async () => {
+            // Check cache first
+            try {
+                const cached = await spreadThumbnailDB.get(albumId, spreadIndex);
+                if (cached && cached.contentHash === contentHash) {
+                    setThumbnailUrl(cached.dataUrl);
+                    return;
+                }
+            } catch (error) {
+                console.warn('Failed to load cached thumbnail:', error);
+            }
+
+            // Generate new thumbnail
+            setIsLoading(true);
+            try {
+                const dataUrl = await generateSpreadThumbnail(pages, settings);
+                if (dataUrl) {
+                    setThumbnailUrl(dataUrl);
+                    // Cache the thumbnail
+                    try {
+                        await spreadThumbnailDB.set(albumId, spreadIndex, dataUrl, contentHash);
+                    } catch (error) {
+                        console.warn('Failed to cache thumbnail:', error);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to generate thumbnail:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadThumbnail();
+    }, [isVisible, leftPage, rightPage, spreadIndex, albumId, settings, generateSpreadThumbnail]);
+
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (window.confirm('Delete this spread (2 pages)?')) {
@@ -97,11 +183,9 @@ const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
         }
     };
 
-    const leftImage = leftPage.elements[0];
-    const rightImage = rightPage?.elements[0];
-
     return (
         <div
+            ref={containerRef}
             className={`spread-thumbnail ${isActive ? 'active' : ''}`}
             onClick={onClick}
             role="button"
@@ -110,29 +194,23 @@ const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
             data-testid={`spread-thumbnail-${spreadIndex}`}
         >
             <div className="spread-thumbnail-content">
-                <div className="spread-thumbnail-page">
-                    {leftImage ? (
-                        <img
-                            src={leftImage.thumbnailUrl || leftImage.imageUrl}
-                            alt="Left page"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                    ) : (
-                        <span className="spread-thumbnail-empty" />
-                    )}
-                </div>
-                <div className="spread-thumbnail-seam" />
-                <div className="spread-thumbnail-page">
-                    {rightImage ? (
-                        <img
-                            src={rightImage.thumbnailUrl || rightImage.imageUrl}
-                            alt="Right page"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                    ) : (
-                        <span className="spread-thumbnail-empty" />
-                    )}
-                </div>
+                {thumbnailUrl ? (
+                    <img
+                        src={thumbnailUrl}
+                        alt={`Spread ${spreadIndex + 1}`}
+                        className="spread-thumbnail-image"
+                    />
+                ) : isLoading ? (
+                    <div className="spread-thumbnail-loading">
+                        <div className="loading-spinner" />
+                    </div>
+                ) : (
+                    <div className="spread-thumbnail-placeholder">
+                        <div className="spread-thumbnail-page" />
+                        <div className="spread-thumbnail-seam" />
+                        <div className="spread-thumbnail-page" />
+                    </div>
+                )}
             </div>
 
             <span className="page-thumbnail-number">
