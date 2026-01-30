@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import type { Album, Page, PageElement, PoolImage, TemplateId, AlbumSettings } from './types';
+import type { Album, Page, PageElement, PoolImage } from './types';
 import { DEFAULT_ALBUM_SETTINGS } from './types';
 import { useAlbum } from './hooks/useAlbum';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -100,6 +100,10 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     updateElement,
     deleteElement,
     addToPool,
+    undo,
+    redo,
+    canUndo,
+    canRedo
   } = useAlbum(initialAlbum);
 
   // Auto-save to IndexedDB
@@ -145,6 +149,30 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     setSelectedPageId(null);
   }, [currentSpreadIndex]);
 
+  // Keyboard shortcuts for Undo/Redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        // Undo: Ctrl+Z or Meta+Z
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                // Redo: Ctrl+Shift+Z
+                if (canRedo) redo();
+            } else {
+                if (canUndo) undo();
+            }
+        }
+        // Redo: Ctrl+Y or Meta+Y
+        else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+             e.preventDefault();
+             if (canRedo) redo();
+        }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, canUndo, canRedo]);
+
   // Handle image drop on canvas
   const handleImageDrop = useCallback((pageId: string, image: PoolImage, position: { x: number; y: number }) => {
     const aspectRatio = image.width && image.height ? image.width / image.height : 1;
@@ -174,8 +202,8 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   }, [addElement]);
 
   // Handle element update
-  const handleElementUpdate = useCallback((pageId: string, elementId: string, updates: Partial<PageElement>) => {
-    updateElement(pageId, elementId, updates);
+  const handleElementUpdate = useCallback((pageId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => {
+    updateElement(pageId, elementId, updates, groupId);
   }, [updateElement]);
 
   // Handle element delete
@@ -261,6 +289,10 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
         onImport={handleImportAlbum}
         onExport={handleExportAlbum}
         onSettingsClick={() => setIsSettingsOpen(!isSettingsOpen)}
+        onUndo={undo}
+        onRedo={redo}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
 
       {/* Album selector bar */}
