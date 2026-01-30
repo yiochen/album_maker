@@ -102,8 +102,9 @@ describe('Page Creation', () => {
                     .clear()
                     .type(String(newMax));
 
-                // Close settings by clicking elsewhere
-                cy.get('[data-testid="page-navigator"]').click();
+                // Close settings by clicking the close button or overlay
+                cy.get('[data-testid="modal-close"]').click();
+                cy.get('[data-testid="modal-overlay"]').should('not.exist');
 
                 // Add one spread (should work)
                 cy.get('[data-testid="add-pages-button"]').should('not.be.disabled').click();
