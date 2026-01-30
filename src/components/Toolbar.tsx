@@ -72,6 +72,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     onChange={(e) => onAlbumNameChange(e.target.value)}
                     className="album-name-input"
                     placeholder="Album name..."
+                    data-testid="album-name-input"
                 />
             </div>
 

@@ -103,6 +103,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                         className="btn btn-primary btn-sm"
                         onClick={handleImportFromSource}
                         disabled={isLoading}
+                        data-testid="import-images-btn"
                     >
                         {isLoading ? (
                             <>
@@ -146,6 +147,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, image)}
                                 title={image.filename}
+                                data-testid={`pool-image-${image.id}`}
                             >
                                 <img
                                     src={image.thumbnailUrl || image.baseUrl}

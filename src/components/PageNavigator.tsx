@@ -59,6 +59,7 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                     onClick={onAddPages}
                     disabled={!canAddMore}
                     title={canAddMore ? 'Add 2 pages' : `Maximum ${maxPages} pages reached`}
+                    data-testid="add-page-btn"
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -106,6 +107,7 @@ const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
             role="button"
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && onClick()}
+            data-testid={`spread-thumbnail-${spreadIndex}`}
         >
             <div className="spread-thumbnail-content">
                 <div className="spread-thumbnail-page">

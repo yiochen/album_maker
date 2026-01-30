@@ -31,6 +31,8 @@ npm run dev
 | `npm run preview` | Preview production build |
 | `npm run lint` | Run ESLint |
 | `npx tsc --noEmit` | Type check without building |
+| `npm run cypress:open` | Open Cypress Test Runner |
+| `npm run cypress:run` | Run Cypress tests in headless mode |
 
 ## Netlify Deployment
 

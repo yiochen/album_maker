@@ -65,6 +65,7 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
             <button
                 className="album-selector-trigger"
                 onClick={() => setIsOpen(!isOpen)}
+                data-testid="album-selector-trigger"
             >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -89,6 +90,7 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
                         <button
                             className="btn btn-ghost btn-sm"
                             onClick={() => setIsCreating(true)}
+                            data-testid="create-new-album-btn"
                         >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -110,8 +112,9 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
                                     if (e.key === 'Escape') setIsCreating(false);
                                 }}
                                 autoFocus
+                                data-testid="new-album-name-input"
                             />
-                            <button className="btn btn-primary btn-sm" onClick={handleCreate}>
+                            <button className="btn btn-primary btn-sm" onClick={handleCreate} data-testid="create-album-confirm-btn">
                                 Create
                             </button>
                             <button className="btn btn-ghost btn-sm" onClick={() => setIsCreating(false)}>
@@ -134,6 +137,7 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
                                         onSelectAlbum(album.id);
                                         setIsOpen(false);
                                     }}
+                                    data-testid={`album-list-item-${album.id}`}
                                 >
                                     <div className="album-list-item-info">
                                         <span className="album-list-item-name">{album.name}</span>

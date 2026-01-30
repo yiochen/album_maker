@@ -127,7 +127,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     }, []);
 
     return (
-        <section className="canvas-container">
+        <section className="canvas-container" data-testid="canvas-container">
             <div
                 ref={viewportRef}
                 className="canvas-viewport"
@@ -146,9 +146,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                     onClick={handleCanvasClick}
+                    data-testid="canvas"
                 >
                     {/* Left page */}
-                    <div className="spread-page spread-page-left">
+                    <div className="spread-page spread-page-left" data-testid="canvas-page-left">
                         {pages[0] && pages[0].elements.map(element => (
                             <CanvasElement
                                 key={element.id}
@@ -169,7 +170,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     <div className="spread-seam" />
 
                     {/* Right page */}
-                    <div className="spread-page spread-page-right">
+                    <div className="spread-page spread-page-right" data-testid="canvas-page-right">
                         {pages[1] && pages[1].elements.map(element => (
                             <CanvasElement
                                 key={element.id}
@@ -475,6 +476,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
                 height: `${element.size.height}%`,
             }}
             onMouseDown={handleMouseDown}
+            data-testid={`canvas-element-${element.id}`}
         >
             <img
                 src={element.imageUrl}
