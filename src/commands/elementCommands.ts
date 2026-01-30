@@ -141,3 +141,77 @@ export class DeleteElementCommand implements Command<Album> {
         };
     }
 }
+
+export class MoveElementCommand implements Command<Album> {
+    readonly type = 'MOVE_ELEMENT';
+
+    constructor(
+        public readonly fromPageId: string,
+        public readonly toPageId: string,
+        public readonly elementId: string
+    ) { }
+
+    execute(state: Album): Album {
+        if (this.fromPageId === this.toPageId) return state;
+
+        const fromPage = state.pages.find(p => p.id === this.fromPageId);
+        if (!fromPage) return state;
+
+        const elementToMove = fromPage.elements.find(e => e.id === this.elementId);
+        if (!elementToMove) return state;
+
+        return {
+            ...state,
+            pages: state.pages.map(p => {
+                if (p.id === this.fromPageId) {
+                    return {
+                        ...p,
+                        elements: p.elements.filter(e => e.id !== this.elementId)
+                    };
+                }
+                if (p.id === this.toPageId) {
+                    return {
+                        ...p,
+                        elements: [...p.elements, elementToMove]
+                    };
+                }
+                return p;
+            }),
+            updatedAt: Date.now(),
+        };
+    }
+
+    undo(state: Album): Album {
+        if (this.fromPageId === this.toPageId) return state;
+
+        const fromPage = state.pages.find(p => p.id === this.toPageId);
+        if (!fromPage) return state;
+
+        const elementToMove = fromPage.elements.find(e => e.id === this.elementId);
+        if (!elementToMove) return state;
+
+        return {
+            ...state,
+            pages: state.pages.map(p => {
+                if (p.id === this.toPageId) {
+                    return {
+                        ...p,
+                        elements: p.elements.filter(e => e.id !== this.elementId)
+                    };
+                }
+                if (p.id === this.fromPageId) {
+                    return {
+                        ...p,
+                        elements: [...p.elements, elementToMove]
+                    };
+                }
+                return p;
+            }),
+            updatedAt: Date.now(),
+        };
+    }
+
+    merge(nextCommand: Command<Album>): Command<Album> | null {
+        return null;
+    }
+}
