@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "cypress:open": "cypress open",
-    "cypress:run": "cypress run"
+    "cypress:run": "cypress run",
+    "cypress:ci": "cross-env CYPRESS_visualRegressionFailSilently=true cypress run"
   },
   "dependencies": {
     "dexie": "^4.2.1",

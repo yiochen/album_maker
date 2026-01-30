@@ -17,7 +17,7 @@
     # We set CYPRESS_visualRegressionFailSilently=true to prevent deployment failures
     # due to minor rendering differences in the Netlify environment (Linux) vs local.
     # Functional failures will still stop the deploy.
-    run = "cross-env CYPRESS_visualRegressionFailSilently=true npm run cypress:run"
+    run = "npm run cypress:ci"
 
     # Use Electron browser which is bundled with Cypress
     browser = "electron"
