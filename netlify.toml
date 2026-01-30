@@ -1,0 +1,27 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[plugins]]
+  package = "netlify-plugin-cypress"
+
+  [plugins.inputs]
+    enable = true
+    # Run tests against the served application
+    # The plugin handles starting the server if we configure it or use 'start'
+    # But for Vite, we might want to just build and serve, or run against dev server.
+    # Standard plugin usage runs post-deployment against the URL,
+    # OR we can use 'start' to run a local server during build.
+
+    # We will use the 'build' mode of the plugin which runs after build, before deploy?
+    # Actually, let's configure it to simply run the existing cypress script if possible,
+    # or let it handle the serving.
+
+    # Simple configuration:
+    run = "npm run cypress:run"
+    start = "npm run dev"
+    wait-on = "http://localhost:5173"
+    wait-on-timeout = 60
+
+    # Don't record to dashboard unless key is provided (which it isn't)
+    record = false

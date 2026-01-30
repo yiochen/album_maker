@@ -1,0 +1,33 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  cypress-run:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: cypress-io/github-action@v6
+        with:
+          # Just install, don't run tests yet
+          runTests: false
+
+      # We need to install the specific browser or use the docker image.
+      # cypress-io/github-action uses a docker image with browsers by default.
+
+      - name: Cypress run
+        uses: cypress-io/github-action@v6
+        with:
+          build: npm run build
+          start: npm run dev
+          wait-on: 'http://localhost:5173'
+          # If snapshots are missing or different, this will fail
+          env: visualRegressionType=regression
+
+        env:
+          # Ensure visual regression plugin knows where to look
+          # (Should match local config)
+          CYPRESS_visualRegressionType: regression
