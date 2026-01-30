@@ -154,21 +154,21 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   // Keyboard shortcuts for Undo/Redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-        // Undo: Ctrl+Z or Meta+Z
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
-            e.preventDefault();
-            if (e.shiftKey) {
-                // Redo: Ctrl+Shift+Z
-                if (canRedo) redo();
-            } else {
-                if (canUndo) undo();
-            }
+      // Undo: Ctrl+Z or Meta+Z
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Redo: Ctrl+Shift+Z
+          if (canRedo) redo();
+        } else {
+          if (canUndo) undo();
         }
-        // Redo: Ctrl+Y or Meta+Y
-        else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
-             e.preventDefault();
-             if (canRedo) redo();
-        }
+      }
+      // Redo: Ctrl+Y or Meta+Y
+      else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        if (canRedo) redo();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -298,7 +298,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   }
 
   return (
-    <div className="app-container">
+    <div className="app-container" data-testid="album-editor">
       <Toolbar
         albumName={album.name}
         onAlbumNameChange={setName}
@@ -325,6 +325,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           className={`btn btn-ghost btn-icon ${isImagePoolOpen ? 'active' : ''}`}
           onClick={() => setIsImagePoolOpen(!isImagePoolOpen)}
           title="Toggle Image Pool"
+          data-testid="toggle-image-pool-button"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />

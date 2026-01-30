@@ -77,9 +77,9 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
     }, [activeSource, onImport]);
 
     return (
-        <div className="image-pool">
+        <div className="image-pool" data-testid="image-pool">
             <div className="image-pool-header">
-                <span className="image-pool-title">
+                <span className="image-pool-title" data-testid="image-pool-title">
                     Image Pool
                     {images.length > 0 && (
                         <span className="text-muted" style={{ marginLeft: 'var(--space-2)' }}>
@@ -92,6 +92,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                         className="source-selector"
                         value={activeSourceId}
                         onChange={(e) => setActiveSourceId(e.target.value)}
+                        data-testid="source-selector"
                     >
                         {sources.map(source => (
                             <option key={source.id} value={source.id}>
@@ -103,6 +104,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                         className="btn btn-primary btn-sm"
                         onClick={handleImportFromSource}
                         disabled={isLoading}
+                        data-testid="import-button"
                     >
                         {isLoading ? (
                             <>
@@ -118,7 +120,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                             </>
                         )}
                     </button>
-                    <button className="btn btn-ghost btn-icon" onClick={onClose} title="Close">
+                    <button className="btn btn-ghost btn-icon" onClick={onClose} title="Close" data-testid="close-pool-button">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         </svg>
@@ -128,7 +130,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
 
             <div className="image-pool-content">
                 {images.length === 0 ? (
-                    <div className="pool-empty">
+                    <div className="pool-empty" data-testid="pool-empty">
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
                             <path d="M12 8v8M8 12h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -138,7 +140,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                         </span>
                     </div>
                 ) : (
-                    <div className="image-grid">
+                    <div className="image-grid" data-testid="image-grid">
                         {images.map(image => (
                             <div
                                 key={image.id}
@@ -146,6 +148,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, image)}
                                 title={image.filename}
+                                data-testid="pool-image"
                             >
                                 <img
                                     src={image.thumbnailUrl || image.baseUrl}

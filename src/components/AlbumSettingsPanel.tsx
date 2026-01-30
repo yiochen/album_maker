@@ -46,8 +46,8 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
     };
 
     return (
-        <div className="album-settings-panel">
-            <h3 className="panel-title">Album Settings</h3>
+        <div className="album-settings-panel" data-testid="album-settings-panel">
+            <h3 className="panel-title" data-testid="settings-title">Album Settings</h3>
 
             <div className="settings-group">
                 <label className="settings-label">
@@ -68,6 +68,7 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
                             value={settings.pageWidth}
                             onChange={handleWidthChange}
                             className="settings-input"
+                            data-testid="page-width-input"
                         />
                     </div>
 
@@ -83,6 +84,7 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
                                 value={settings.pageHeight}
                                 onChange={handleHeightChange}
                                 className="settings-input"
+                                data-testid="page-height-input"
                             />
                         </div>
                     )}
@@ -97,6 +99,7 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
                     value={settings.unit}
                     onChange={handleUnitChange}
                     className="settings-select"
+                    data-testid="unit-select"
                 >
                     <option value="inch">Inches</option>
                     <option value="cm">Centimeters</option>
@@ -109,6 +112,7 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
                         type="checkbox"
                         checked={settings.isSquare}
                         onChange={handleSquareToggle}
+                        data-testid="square-checkbox"
                     />
                     <span>Square pages</span>
                 </label>
@@ -126,8 +130,9 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
                     value={settings.maxPages}
                     onChange={handleMaxPagesChange}
                     className="settings-input"
+                    data-testid="max-pages-input"
                 />
-                <span className="text-muted settings-hint">
+                <span className="text-muted settings-hint" data-testid="page-count-hint">
                     Currently: {currentPageCount} pages
                 </span>
             </div>

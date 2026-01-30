@@ -192,7 +192,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         : null;
 
     return (
-        <section className="canvas-container">
+        <section className="canvas-container" data-testid="canvas-container">
             <div
                 ref={viewportRef}
                 className="canvas-viewport"
@@ -214,6 +214,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                         ref={canvasRef}
                         className={`canvas-layer ${isDragOver ? 'drop-active' : ''}`}
                         style={{ display: 'block' }}
+                        data-testid="canvas-layer"
                     />
 
                     {/* Interaction Layer */}
@@ -262,6 +263,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                                         data-handle={handle}
                                         data-element-id={selectedElement.id}
                                         style={{ pointerEvents: 'auto' }}
+                                        data-testid={`resize-handle-${handle}`}
                                     />
                                 ))}
                             </div>

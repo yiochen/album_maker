@@ -28,7 +28,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     canRedo,
 }) => {
     return (
-        <header className="toolbar">
+        <header className="toolbar" data-testid="toolbar">
             <div className="toolbar-left">
                 <div className="history-controls" style={{ display: 'flex', gap: '4px', marginRight: '12px' }}>
                     <button
@@ -59,6 +59,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     className="btn btn-ghost btn-icon"
                     onClick={onSettingsClick}
                     title="Album Settings"
+                    data-testid="settings-button"
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="2" />
@@ -72,6 +73,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     onChange={(e) => onAlbumNameChange(e.target.value)}
                     className="album-name-input"
                     placeholder="Album name..."
+                    data-testid="album-name-input"
                 />
             </div>
 
@@ -92,10 +94,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             </div>
 
             <div className="toolbar-right">
-                <button className="btn btn-ghost" onClick={onImport}>
+                <button className="btn btn-ghost" onClick={onImport} data-testid="import-album-button">
                     Import
                 </button>
-                <button className="btn btn-ghost" onClick={onExport}>
+                <button className="btn btn-ghost" onClick={onExport} data-testid="export-album-button">
                     Export
                 </button>
             </div>
