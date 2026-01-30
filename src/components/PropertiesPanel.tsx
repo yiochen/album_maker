@@ -1,14 +1,11 @@
 import React from 'react';
-import type { Page, PageElement, TemplateId, AlbumSettings } from '../types';
-import { getTemplateList, getTemplate } from '../templates/pageTemplates';
+import type { Page, PageElement, AlbumSettings } from '../types';
 import { percentToUnit } from '../utils/snapping';
 
 interface PropertiesPanelProps {
     pages: Page[];  // Current spread (2 pages)
     settings: AlbumSettings;
     selectedElement: PageElement | null;
-    selectedPageId: string | null;
-    onTemplateChange: (pageId: string, templateId: TemplateId) => void;
     onElementUpdate: (updates: Partial<PageElement>) => void;
     onElementDelete: () => void;
 }
@@ -17,13 +14,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     pages,
     settings,
     selectedElement,
-    selectedPageId,
-    onTemplateChange,
     onElementUpdate,
     onElementDelete,
 }) => {
-    const currentPage = pages.find(p => p.id === selectedPageId) || pages[0];
-
     return (
         <aside className="properties-panel">
             <div className="properties-header">
@@ -117,8 +110,8 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     onDelete,
 }) => {
     // Calculate size in physical units
-    const widthInUnits = percentToUnit(element.size.width, settings.pageWidth, settings.unit);
-    const heightInUnits = percentToUnit(element.size.height, settings.pageHeight, settings.unit);
+    const widthInUnits = percentToUnit(element.size.width, settings.pageWidth);
+    const heightInUnits = percentToUnit(element.size.height, settings.pageHeight);
 
     const handlePositionChange = (axis: 'x' | 'y', value: string) => {
         const numValue = parseFloat(value) || 0;

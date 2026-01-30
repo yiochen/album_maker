@@ -15,6 +15,15 @@ export interface ThumbnailCacheRecord {
     size: number; // thumbnail size
 }
 
+export interface SpreadThumbnailRecord {
+    id: string;           // albumId-spreadIndex
+    albumId: string;
+    spreadIndex: number;
+    dataUrl: string;      // Base64 data URL
+    contentHash: string;  // Hash of spread content for cache invalidation
+    timestamp: number;
+}
+
 export interface SettingsRecord {
     key: string;
     value: string;
@@ -24,6 +33,7 @@ export interface SettingsRecord {
 class AlbumDatabase extends Dexie {
     albums!: Table<AlbumRecord, string>;
     thumbnailCache!: Table<ThumbnailCacheRecord, string>;
+    spreadThumbnails!: Table<SpreadThumbnailRecord, string>;
     settings!: Table<SettingsRecord, string>;
 
     constructor() {
@@ -32,6 +42,14 @@ class AlbumDatabase extends Dexie {
         this.version(1).stores({
             albums: 'id, name, lastModified',
             thumbnailCache: 'url, timestamp',
+            settings: 'key',
+        });
+
+        // Version 2: Add spread thumbnails
+        this.version(2).stores({
+            albums: 'id, name, lastModified',
+            thumbnailCache: 'url, timestamp',
+            spreadThumbnails: 'id, albumId, spreadIndex, timestamp',
             settings: 'key',
         });
     }
@@ -132,3 +150,64 @@ export const settingsDB = {
         await db.settings.delete(key);
     },
 };
+
+// Helper functions for spread thumbnails
+export const spreadThumbnailDB = {
+    async get(albumId: string, spreadIndex: number): Promise<SpreadThumbnailRecord | null> {
+        const id = `${albumId}-${spreadIndex}`;
+        const record = await db.spreadThumbnails.get(id);
+        return record ?? null;
+    },
+
+    async set(
+        albumId: string,
+        spreadIndex: number,
+        dataUrl: string,
+        contentHash: string
+    ): Promise<void> {
+        const id = `${albumId}-${spreadIndex}`;
+        await db.spreadThumbnails.put({
+            id,
+            albumId,
+            spreadIndex,
+            dataUrl,
+            contentHash,
+            timestamp: Date.now(),
+        });
+    },
+
+    async delete(albumId: string, spreadIndex: number): Promise<void> {
+        const id = `${albumId}-${spreadIndex}`;
+        await db.spreadThumbnails.delete(id);
+    },
+
+    async deleteForAlbum(albumId: string): Promise<number> {
+        return db.spreadThumbnails.where('albumId').equals(albumId).delete();
+    },
+
+    async clear(): Promise<void> {
+        await db.spreadThumbnails.clear();
+    },
+
+    async getAllForAlbum(albumId: string): Promise<SpreadThumbnailRecord[]> {
+        return db.spreadThumbnails.where('albumId').equals(albumId).toArray();
+    },
+};
+
+// Generate a simple hash from spread content for cache invalidation
+export function generateSpreadContentHash(pages: Array<{ elements: Array<{ id: string; position: { x: number; y: number }; size: { width: number; height: number } }> }>): string {
+    const content = pages.map(page =>
+        page.elements.map(e =>
+            `${e.id}:${e.position.x.toFixed(1)},${e.position.y.toFixed(1)}:${e.size.width.toFixed(1)},${e.size.height.toFixed(1)}`
+        ).join('|')
+    ).join('||');
+
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+        const char = content.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return hash.toString(36);
+}

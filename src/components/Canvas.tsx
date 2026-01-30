@@ -1,10 +1,11 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import type { Page, PageElement, PoolImage, AlbumSettings, SnapEdge } from '../types';
-import { calculateSnap, calculateResizeSnap, getActiveSnapLines } from '../utils/snapping';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import * as fabric from 'fabric';
+import type { Page, PageElement, PoolImage, AlbumSettings } from '../types';
+import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 
 interface CanvasProps {
-    pages: Page[];  // Two pages for a spread
-    pageIndex: number;  // Index of left page in spread
+    pages: Page[];
+    pageIndex: number;
     settings: AlbumSettings;
     selectedElementId: string | null;
     isSnappingEnabled: boolean;
@@ -12,6 +13,22 @@ interface CanvasProps {
     onElementUpdate: (pageId: string, elementId: string, updates: Partial<PageElement>) => void;
     onElementDelete: (pageId: string, elementId: string) => void;
     onImageDrop: (pageId: string, image: PoolImage, position: { x: number; y: number }) => void;
+    // New props from master
+    onMoveElementToPage?: (fromPageId: string, toPageId: string, elementId: string) => void;
+    onCanvasChange?: (dataUrl: string) => void;
+}
+
+const PPI = 96;
+
+interface CustomFabricObject extends fabric.Object {
+    data?: {
+        id: string;
+        pageId: string;
+    };
+}
+
+interface ExtendedFabricObject extends fabric.Object {
+    isMoving?: boolean;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -24,42 +41,258 @@ export const Canvas: React.FC<CanvasProps> = ({
     onElementUpdate,
     onElementDelete,
     onImageDrop,
+    onCanvasChange,
 }) => {
+    const canvasElRef = useRef<HTMLCanvasElement>(null);
+    const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const loadingIds = useRef<Set<string>>(new Set());
+    const snapLinesRef = useRef<fabric.Line[]>([]);
+
+    // Refs for callbacks
+    const onElementSelectRef = useRef(onElementSelect);
+    const onElementUpdateRef = useRef(onElementUpdate);
+    const onElementDeleteRef = useRef(onElementDelete);
+    const onImageDropRef = useRef(onImageDrop);
+    const onCanvasChangeRef = useRef(onCanvasChange);
+    const pagesRef = useRef(pages);
+    const settingsRef = useRef(settings);
+    const isSnappingEnabledRef = useRef(isSnappingEnabled);
+
+    useEffect(() => {
+        onElementSelectRef.current = onElementSelect;
+        onElementUpdateRef.current = onElementUpdate;
+        onElementDeleteRef.current = onElementDelete;
+        onImageDropRef.current = onImageDrop;
+        onCanvasChangeRef.current = onCanvasChange;
+        pagesRef.current = pages;
+        settingsRef.current = settings;
+        isSnappingEnabledRef.current = isSnappingEnabled;
+    }, [onElementSelect, onElementUpdate, onElementDelete, onImageDrop, onCanvasChange, pages, settings, isSnappingEnabled]);
+
     const [zoom, setZoom] = useState(100);
     const [isDragOver, setIsDragOver] = useState(false);
-    const [activeSnapLines, setActiveSnapLines] = useState<SnapEdge[]>([]);
-    const canvasRef = useRef<HTMLDivElement>(null);
-    const viewportRef = useRef<HTMLDivElement>(null);
+    const [hasSelection, setHasSelection] = useState(false);
 
-    // Calculate aspect ratio for the spread (2x width, 1x height)
-    const spreadAspectRatio = (settings.pageWidth * 2) / settings.pageHeight;
+    const canvasWidth = settings.pageWidth * 2 * PPI;
+    const canvasHeight = settings.pageHeight * PPI;
 
-    // Fit canvas to viewport (both width and height)
-    const fitToViewport = useCallback(() => {
-        if (!viewportRef.current || !canvasRef.current) return;
+    const isObjectMoving = (obj: fabric.Object) => {
+        return (obj as ExtendedFabricObject).isMoving;
+    };
 
-        const viewport = viewportRef.current;
-        const canvas = canvasRef.current;
+    // Initialize Fabric Canvas
+    useEffect(() => {
+        if (!canvasElRef.current || fabricCanvasRef.current) return;
 
-        // Get viewport dimensions (with some padding)
-        const padding = 64; // 32px on each side
-        const availableWidth = viewport.clientWidth - padding;
-        const availableHeight = viewport.clientHeight - padding;
+        const canvas = new fabric.Canvas(canvasElRef.current, {
+            preserveObjectStacking: true,
+            selection: true,
+            backgroundColor: '#f0f0f0',
+            width: canvasWidth,
+            height: canvasHeight,
+        });
 
-        // Get canvas natural size (at 100% zoom)
-        const canvasWidth = canvas.offsetWidth;
-        const canvasHeight = canvas.offsetHeight;
+        fabricCanvasRef.current = canvas;
 
-        // Calculate zoom to fit both dimensions
-        const zoomToFitWidth = (availableWidth / canvasWidth) * 100;
-        const zoomToFitHeight = (availableHeight / canvasHeight) * 100;
+        const seam = new fabric.Line([canvasWidth / 2, 0, canvasWidth / 2, canvasHeight], {
+            stroke: '#ccc',
+            strokeWidth: 2,
+            selectable: false,
+            evented: false,
+            strokeDashArray: [5, 5],
+        });
+        (seam as CustomFabricObject).data = { id: 'seam', pageId: '' };
+        canvas.add(seam);
+        canvas.sendObjectToBack(seam);
 
-        // Use the smaller zoom to fit both dimensions
-        const fitZoom = Math.min(zoomToFitWidth, zoomToFitHeight, 100);
+        const setMoving = (e: { target?: fabric.Object }) => { if(e.target) (e.target as ExtendedFabricObject).isMoving = true; };
+        canvas.on('object:moving', setMoving);
+        canvas.on('object:scaling', setMoving);
+        canvas.on('object:rotating', setMoving);
+        canvas.on('mouse:up', () => {
+            canvas.getObjects().forEach(o => (o as ExtendedFabricObject).isMoving = false);
+            snapLinesRef.current.forEach(line => canvas.remove(line));
+            snapLinesRef.current = [];
+            canvas.requestRenderAll();
 
-        setZoom(Math.max(25, Math.round(fitZoom)));
+            // Generate thumbnail
+            if (onCanvasChangeRef.current) {
+                const dataUrl = canvas.toDataURL({ format: 'jpeg', quality: 0.5, multiplier: 0.2 });
+                onCanvasChangeRef.current(dataUrl);
+            }
+        });
+
+        canvas.on('mouse:down', () => {
+            containerRef.current?.focus();
+        });
+
+        // Event Listeners
+        const handleSelection = (e: { selected: fabric.Object[] }) => {
+            setHasSelection(true);
+            const selected = e.selected || [];
+            if (selected.length === 1) {
+                const obj = selected[0] as CustomFabricObject;
+                if (obj.data?.id) {
+                    onElementSelectRef.current(obj.data.id);
+                }
+            } else if (selected.length > 1) {
+                const obj = selected[0] as CustomFabricObject;
+                if (obj.data?.id) {
+                    onElementSelectRef.current(obj.data.id);
+                }
+            } else {
+                onElementSelectRef.current(null);
+            }
+        };
+
+        const handleSelectionCleared = () => {
+            setHasSelection(false);
+            onElementSelectRef.current(null);
+        };
+
+        canvas.on('selection:created', handleSelection);
+        canvas.on('selection:updated', handleSelection);
+        canvas.on('selection:cleared', handleSelectionCleared);
+
+        // Movement with Snapping
+        canvas.on('object:moving', (e) => {
+            const obj = e.target as CustomFabricObject;
+            if (!obj || !obj.data) return;
+
+            snapLinesRef.current.forEach(line => canvas.remove(line));
+            snapLinesRef.current = [];
+
+            const percentX = (obj.left! / canvasWidth) * 100;
+            const percentY = (obj.top! / canvasHeight) * 100;
+            const percentW = (obj.getScaledWidth() / canvasWidth) * 100;
+            const percentH = (obj.getScaledHeight() / canvasHeight) * 100;
+
+            let newLeft = obj.left!;
+            let newTop = obj.top!;
+
+            if (isSnappingEnabledRef.current) {
+                const snapResult = calculateSnap(
+                    { x: percentX, y: percentY },
+                    { width: percentW, height: percentH }
+                );
+
+                if (snapResult.snappedEdges.length > 0) {
+                    newLeft = (snapResult.position.x / 100) * canvasWidth;
+                    newTop = (snapResult.position.y / 100) * canvasHeight;
+
+                    const activeLines = getActiveSnapLines(snapResult.snappedEdges);
+                    activeLines.forEach(line => {
+                         let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+                         if (line.orientation === 'vertical') {
+                             x1 = x2 = (line.position / 100) * canvasWidth;
+                             y1 = 0;
+                             y2 = canvasHeight;
+                         } else {
+                             y1 = y2 = (line.position / 100) * canvasHeight;
+                             x1 = 0;
+                             x2 = canvasWidth;
+                         }
+
+                         const fabricLine = new fabric.Line([x1, y1, x2, y2], {
+                             stroke: '#ff00ff',
+                             strokeWidth: 1,
+                             selectable: false,
+                             evented: false,
+                             strokeDashArray: [4, 4],
+                         });
+                         canvas.add(fabricLine);
+                         snapLinesRef.current.push(fabricLine);
+                    });
+                }
+            }
+
+            obj.left = newLeft;
+            obj.top = newTop;
+
+            const pageId = obj.data.pageId;
+            const pages = pagesRef.current;
+            const isRightPage = pages[1] && pages[1].id === pageId;
+
+            const pageWidth = canvasWidth / 2;
+            const minX = isRightPage ? pageWidth : 0;
+            const maxX = (isRightPage ? canvasWidth : pageWidth) - (obj.getScaledWidth() || 0);
+            const minY = 0;
+            const maxY = canvasHeight - (obj.getScaledHeight() || 0);
+
+            if (obj.left < minX) obj.left = minX;
+            if (obj.left > maxX) obj.left = maxX;
+            if (obj.top < minY) obj.top = minY;
+            if (obj.top > maxY) obj.top = maxY;
+        });
+
+        canvas.on('object:modified', (e) => {
+            const obj = e.target as CustomFabricObject;
+            if (!obj || !obj.data) return;
+
+            snapLinesRef.current.forEach(line => canvas.remove(line));
+            snapLinesRef.current = [];
+
+            const pageId = obj.data.pageId;
+            const pages = pagesRef.current;
+            const isRightPage = pages[1] && pages[1].id === pageId;
+
+            const pageWidth = canvasWidth / 2;
+            const offsetLeft = isRightPage ? pageWidth : 0;
+
+            const relativeLeft = (obj.left! - offsetLeft);
+            const percentX = (relativeLeft / pageWidth) * 100;
+            const percentY = (obj.top! / canvasHeight) * 100;
+
+            const percentW = (obj.getScaledWidth() / pageWidth) * 100;
+            const percentH = (obj.getScaledHeight() / canvasHeight) * 100;
+
+            onElementUpdateRef.current(pageId, obj.data.id, {
+                position: { x: percentX, y: percentY },
+                size: { width: percentW, height: percentH },
+            });
+
+            // Generate thumbnail
+            if (onCanvasChangeRef.current) {
+                const dataUrl = canvas.toDataURL({ format: 'jpeg', quality: 0.5, multiplier: 0.2 });
+                onCanvasChangeRef.current(dataUrl);
+            }
+        });
+
+        return () => {
+            canvas.dispose();
+            fabricCanvasRef.current = null;
+        };
+    }, [canvasWidth, canvasHeight]);
+
+    // Keyboard Events
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            // Ignore if input is focused, unless it's inside the canvas container (Fabric's hidden textarea)
+            if (['INPUT', 'TEXTAREA'].includes(target.tagName) && !target.closest('.canvas-container')) {
+                return;
+            }
+
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                const canvas = fabricCanvasRef.current;
+                if (!canvas) return;
+
+                const activeObj = canvas.getActiveObject() as CustomFabricObject;
+                if (activeObj && activeObj.data) {
+                    onElementDeleteRef.current(activeObj.data.pageId, activeObj.data.id);
+                    canvas.discardActiveObject();
+                    canvas.requestRenderAll();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+    // Drag and Drop
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
@@ -79,7 +312,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         try {
             const image: PoolImage = JSON.parse(imageData);
-            const rect = canvasRef.current?.getBoundingClientRect();
+            const rect = wrapperRef.current?.getBoundingClientRect();
             if (!rect) return;
 
             // Calculate drop position as percentage of spread
@@ -88,121 +321,208 @@ export const Canvas: React.FC<CanvasProps> = ({
 
             // Determine which page (left or right) based on x position
             const isRightPage = x > 50;
-            const targetPage = pages[isRightPage ? 1 : 0];
+            const targetPage = pagesRef.current[isRightPage ? 1 : 0];
 
             if (targetPage) {
                 // Adjust x for the target page (0-100% within that page)
                 const adjustedX = isRightPage ? (x - 50) * 2 : x * 2;
-                onImageDrop(targetPage.id, image, { x: adjustedX, y });
+                onImageDropRef.current(targetPage.id, image, { x: adjustedX, y });
             }
         } catch (error) {
             console.error('Failed to parse dropped image data:', error);
         }
-    }, [onImageDrop, pages]);
-
-    const handleCanvasClick = useCallback((e: React.MouseEvent) => {
-        if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('spread-page')) {
-            onElementSelect(null);
-        }
-    }, [onElementSelect]);
-
-    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (selectedElementId) {
-                // Find which page contains this element
-                for (const page of pages) {
-                    if (page.elements.some(el => el.id === selectedElementId)) {
-                        onElementDelete(page.id, selectedElementId);
-                        break;
-                    }
-                }
-            }
-        } else if (e.key === 'Escape') {
-            onElementSelect(null);
-        }
-    }, [selectedElementId, onElementSelect, onElementDelete, pages]);
-
-    const clearSnapLines = useCallback(() => {
-        setActiveSnapLines([]);
     }, []);
 
+    // Sync State to Fabric
+    useEffect(() => {
+        const canvas = fabricCanvasRef.current;
+        if (!canvas) return;
+
+        const currentObjects = canvas.getObjects() as CustomFabricObject[];
+        const validIds = new Set<string>();
+        const elementsToLoad: { element: PageElement, pageId: string, left: number, top: number, width: number, height: number }[] = [];
+
+        [pages[0], pages[1]].forEach((page, i) => {
+            if (!page) return;
+            const pageOffsetX = i * (canvasWidth / 2);
+
+            page.elements.forEach(element => {
+                validIds.add(element.id);
+
+                const existingObj = currentObjects.find(o => o.data?.id === element.id);
+
+                const targetLeft = pageOffsetX + (element.position.x / 100) * (canvasWidth / 2);
+                const targetTop = (element.position.y / 100) * canvasHeight;
+                const targetWidth = (element.size.width / 100) * (canvasWidth / 2);
+                const targetHeight = (element.size.height / 100) * canvasHeight;
+
+                if (existingObj) {
+                     if (!isObjectMoving(existingObj)) {
+                        let modified = false;
+                        if (existingObj instanceof fabric.Image) {
+                            const img = existingObj;
+                            const newScaleX = targetWidth / (img.width || 1);
+                            const newScaleY = targetHeight / (img.height || 1);
+
+                            if (Math.abs(img.left! - targetLeft) > 0.5) { img.set('left', targetLeft); modified = true; }
+                            if (Math.abs(img.top! - targetTop) > 0.5) { img.set('top', targetTop); modified = true; }
+                            if (Math.abs((img.scaleX || 1) - newScaleX) > 0.001) { img.set('scaleX', newScaleX); modified = true; }
+                            if (Math.abs((img.scaleY || 1) - newScaleY) > 0.001) { img.set('scaleY', newScaleY); modified = true; }
+
+                            if (modified) img.setCoords();
+                        }
+                     }
+                } else {
+                    if (!loadingIds.current.has(element.id)) {
+                        elementsToLoad.push({ element, pageId: page.id, left: targetLeft, top: targetTop, width: targetWidth, height: targetHeight });
+                    }
+                }
+            });
+        });
+
+        const objectsToRemove = currentObjects.filter(obj => {
+            const data = obj.data;
+            if (data?.id === 'seam') return false;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (obj instanceof fabric.Line && (obj as any).stroke === '#ff00ff') return false;
+            if (data?.id && !validIds.has(data.id)) return true;
+            return false;
+        });
+
+        objectsToRemove.forEach(obj => canvas.remove(obj));
+        if (objectsToRemove.length > 0) canvas.requestRenderAll();
+
+        elementsToLoad.forEach(async (task) => {
+            const { element, pageId, left, top, width, height } = task;
+
+            loadingIds.current.add(element.id);
+            try {
+                const img = await fabric.Image.fromURL(element.imageUrl, {
+                    crossOrigin: 'anonymous'
+                });
+
+                if (!fabricCanvasRef.current) return;
+
+                img.set({
+                    left: left,
+                    top: top,
+                    originX: 'left',
+                    originY: 'top',
+                    scaleX: width / (img.width || 1),
+                    scaleY: height / (img.height || 1),
+                    data: { id: element.id, pageId: pageId },
+                    lockRotation: true,
+                    cornerStyle: 'circle',
+                    cornerColor: 'white',
+                    cornerStrokeColor: '#333',
+                    borderColor: '#333',
+                    transparentCorners: false,
+                });
+
+                canvas.add(img);
+
+                if (selectedElementId === element.id) {
+                    canvas.setActiveObject(img);
+                }
+                canvas.requestRenderAll();
+
+            } catch (err) {
+                console.error("Failed to load image", element.imageUrl, err);
+            } finally {
+                loadingIds.current.delete(element.id);
+            }
+        });
+
+        canvas.requestRenderAll();
+
+    }, [pages, canvasWidth, canvasHeight, selectedElementId]);
+
+    // Update selection
+    useEffect(() => {
+        const canvas = fabricCanvasRef.current;
+        if (!canvas) return;
+
+        const activeObj = canvas.getActiveObject() as CustomFabricObject;
+
+        if (selectedElementId) {
+            if (!activeObj || activeObj.data?.id !== selectedElementId) {
+                const target = (canvas.getObjects() as CustomFabricObject[]).find(o => o.data?.id === selectedElementId);
+                if (target) {
+                    canvas.setActiveObject(target);
+                    canvas.requestRenderAll();
+                }
+            }
+        } else {
+            if (activeObj) {
+                canvas.discardActiveObject();
+                canvas.requestRenderAll();
+            }
+        }
+    }, [selectedElementId]);
+
+    const fitToViewport = useCallback(() => {
+        if (!containerRef.current) return;
+
+        const viewport = containerRef.current;
+        const padding = 64;
+        const availableWidth = viewport.clientWidth - padding;
+        const availableHeight = viewport.clientHeight - padding;
+
+        const zoomToFitWidth = (availableWidth / canvasWidth) * 100;
+        const zoomToFitHeight = (availableHeight / canvasHeight) * 100;
+
+        const fitZoom = Math.min(zoomToFitWidth, zoomToFitHeight, 100);
+        setZoom(Math.max(25, Math.round(fitZoom)));
+    }, [canvasWidth, canvasHeight]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => fitToViewport(), 0);
+        window.addEventListener('resize', fitToViewport);
+        return () => {
+            window.removeEventListener('resize', fitToViewport);
+            clearTimeout(timer);
+        };
+    }, [fitToViewport]);
+
+    const canvasStyle = {
+        transform: `scale(${zoom / 100})`,
+        transformOrigin: 'center center',
+    };
+
     return (
-        <section className="canvas-container">
+        <section
+            className="canvas-container"
+            data-testid="canvas-container"
+            data-has-selection={hasSelection}
+        >
             <div
-                ref={viewportRef}
+                ref={containerRef}
                 className="canvas-viewport"
-                onKeyDown={handleKeyDown}
+                data-testid="canvas-viewport"
                 tabIndex={0}
+                style={{ outline: 'none', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
             >
                 <div
-                    ref={canvasRef}
-                    className={`canvas spread-canvas ${isDragOver ? 'drop-active' : ''}`}
-                    style={{
-                        transform: `scale(${zoom / 100})`,
-                        transformOrigin: 'center center',
-                        aspectRatio: `${spreadAspectRatio}`,
-                    }}
+                    ref={wrapperRef}
+                    style={canvasStyle}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
-                    onClick={handleCanvasClick}
+                    className={isDragOver ? 'drop-active' : ''}
+                    data-testid="interaction-layer"
                 >
-                    {/* Left page */}
-                    <div className="spread-page spread-page-left">
-                        {pages[0] && pages[0].elements.map(element => (
-                            <CanvasElement
-                                key={element.id}
-                                element={element}
-                                pageId={pages[0].id}
-                                isSelected={element.id === selectedElementId}
-                                isSnappingEnabled={isSnappingEnabled}
-                                pageOffset={0}
-                                onSelect={() => onElementSelect(element.id)}
-                                onUpdate={(updates) => onElementUpdate(pages[0].id, element.id, updates)}
-                                onSnapLinesChange={setActiveSnapLines}
-                                onDragEnd={clearSnapLines}
-                            />
-                        ))}
-                    </div>
-
-                    {/* Center seam */}
-                    <div className="spread-seam" />
-
-                    {/* Right page */}
-                    <div className="spread-page spread-page-right">
-                        {pages[1] && pages[1].elements.map(element => (
-                            <CanvasElement
-                                key={element.id}
-                                element={element}
-                                pageId={pages[1].id}
-                                isSelected={element.id === selectedElementId}
-                                isSnappingEnabled={isSnappingEnabled}
-                                pageOffset={50}
-                                onSelect={() => onElementSelect(element.id)}
-                                onUpdate={(updates) => onElementUpdate(pages[1].id, element.id, updates)}
-                                onSnapLinesChange={setActiveSnapLines}
-                                onDragEnd={clearSnapLines}
-                            />
-                        ))}
-                    </div>
-
-                    {/* Snap indicator lines */}
-                    {activeSnapLines.map((edge, i) => (
-                        <SnapIndicator key={`${edge}-${i}`} edge={edge} />
-                    ))}
-
-                    {/* Empty state placeholder */}
+                    <canvas ref={canvasElRef} data-testid="canvas-layer" />
                     {pages.every(p => p.elements.length === 0) && (
-                        <div className="canvas-placeholder">
-                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <div className="canvas-placeholder" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', textAlign: 'center', width: '100%' }}>
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ margin: '0 auto', display: 'block', opacity: 0.3 }}>
                                 <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
                                 <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
                                 <path d="M21 15L16 10L11 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                             </svg>
-                            <span className="canvas-placeholder-text">
+                            <span className="canvas-placeholder-text" style={{ display: 'block', marginTop: '1rem', opacity: 0.5 }}>
                                 Drag images here from the image pool
                             </span>
-                            <span className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>
+                            <span className="text-muted" style={{ display: 'block', fontSize: '0.875rem', marginTop: '0.5rem', opacity: 0.4 }}>
                                 Pages {pageIndex + 1} - {pageIndex + 2}
                             </span>
                         </div>
@@ -243,253 +563,5 @@ export const Canvas: React.FC<CanvasProps> = ({
                 </button>
             </div>
         </section>
-    );
-};
-
-// Snap indicator line component
-const SnapIndicator: React.FC<{ edge: SnapEdge }> = ({ edge }) => {
-    const getStyle = (): React.CSSProperties => {
-        switch (edge) {
-            case 'left':
-                return { left: 0, top: 0, width: '2px', height: '100%' };
-            case 'right':
-                return { right: 0, top: 0, width: '2px', height: '100%' };
-            case 'top':
-                return { left: 0, top: 0, height: '2px', width: '100%' };
-            case 'bottom':
-                return { left: 0, bottom: 0, height: '2px', width: '100%' };
-            case 'seam':
-                return { left: '50%', top: 0, width: '2px', height: '100%', transform: 'translateX(-50%)' };
-            case 'left-center-v':
-                return { left: '25%', top: 0, width: '2px', height: '100%', transform: 'translateX(-50%)' };
-            case 'right-center-v':
-                return { left: '75%', top: 0, width: '2px', height: '100%', transform: 'translateX(-50%)' };
-            case 'left-center-h':
-            case 'right-center-h':
-                return { left: 0, top: '50%', height: '2px', width: '100%', transform: 'translateY(-50%)' };
-            default:
-                return {};
-        }
-    };
-
-    return <div className="snap-indicator" style={getStyle()} />;
-};
-
-// Resize handle positions
-const RESIZE_HANDLES = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'] as const;
-type ResizeHandle = typeof RESIZE_HANDLES[number];
-
-interface CanvasElementProps {
-    element: PageElement;
-    pageId: string;
-    isSelected: boolean;
-    isSnappingEnabled: boolean;
-    pageOffset: number; // 0 for left page, 50 for right page
-    onSelect: () => void;
-    onUpdate: (updates: Partial<PageElement>) => void;
-    onSnapLinesChange: (edges: SnapEdge[]) => void;
-    onDragEnd: () => void;
-}
-
-const CanvasElement: React.FC<CanvasElementProps> = ({
-    element,
-    pageId,
-    isSelected,
-    isSnappingEnabled,
-    pageOffset,
-    onSelect,
-    onUpdate,
-    onSnapLinesChange,
-    onDragEnd,
-}) => {
-    const [isDragging, setIsDragging] = useState(false);
-    const [isResizing, setIsResizing] = useState(false);
-    const [resizeHandle, setResizeHandle] = useState<ResizeHandle | null>(null);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0, elemX: 0, elemY: 0, elemW: 0, elemH: 0 });
-    const elementRef = useRef<HTMLDivElement>(null);
-
-    // Convert element position from page-relative to spread-relative for display
-    const spreadX = pageOffset + (element.position.x / 2);
-    const spreadWidth = element.size.width / 2;
-
-    const handleMouseDown = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        onSelect();
-
-        if ((e.target as HTMLElement).classList.contains('resize-handle')) {
-            return; // Let resize handler handle this
-        }
-
-        setIsDragging(true);
-        setDragStart({
-            x: e.clientX,
-            y: e.clientY,
-            elemX: element.position.x,
-            elemY: element.position.y,
-            elemW: element.size.width,
-            elemH: element.size.height,
-        });
-    }, [element.position, element.size, onSelect]);
-
-    const handleResizeStart = useCallback((e: React.MouseEvent, handle: ResizeHandle) => {
-        e.stopPropagation();
-        e.preventDefault();
-        onSelect();
-        setIsResizing(true);
-        setResizeHandle(handle);
-        setDragStart({
-            x: e.clientX,
-            y: e.clientY,
-            elemX: element.position.x,
-            elemY: element.position.y,
-            elemW: element.size.width,
-            elemH: element.size.height,
-        });
-    }, [element.position, element.size, onSelect]);
-
-    const handleMouseMove = useCallback((e: MouseEvent) => {
-        if (!elementRef.current?.parentElement?.parentElement) return;
-
-        const spread = elementRef.current.parentElement.parentElement;
-        const rect = spread.getBoundingClientRect();
-
-        // Calculate movement in spread percentage
-        const deltaXPercent = ((e.clientX - dragStart.x) / rect.width) * 100;
-        const deltaYPercent = ((e.clientY - dragStart.y) / rect.height) * 100;
-
-        if (isDragging) {
-            // Convert to page-relative (multiply by 2 since spread is 2x page width)
-            let newX = dragStart.elemX + deltaXPercent * 2;
-            let newY = dragStart.elemY + deltaYPercent;
-
-            // Clamp to page bounds (0-100%)
-            newX = Math.max(0, Math.min(100 - element.size.width, newX));
-            newY = Math.max(0, Math.min(100 - element.size.height, newY));
-
-            // Apply snapping if enabled
-            if (isSnappingEnabled) {
-                // Convert to spread coordinates for snapping
-                const spreadPos = {
-                    x: pageOffset + newX / 2,
-                    y: newY,
-                };
-                const spreadSize = {
-                    width: element.size.width / 2,
-                    height: element.size.height,
-                };
-                const snapResult = calculateSnap(spreadPos, spreadSize);
-
-                if (snapResult.snappedEdges.length > 0) {
-                    // Convert back to page coordinates
-                    newX = (snapResult.position.x - pageOffset) * 2;
-                    newY = snapResult.position.y;
-                    onSnapLinesChange(snapResult.snappedEdges);
-                } else {
-                    onSnapLinesChange([]);
-                }
-            }
-
-            onUpdate({
-                position: { x: newX, y: newY },
-                snapConstraints: undefined, // Clear constraints during drag
-            });
-        } else if (isResizing && resizeHandle) {
-            let newX = dragStart.elemX;
-            let newY = dragStart.elemY;
-            let newWidth = dragStart.elemW;
-            let newHeight = dragStart.elemH;
-
-            // Handle resize based on which handle is being dragged
-            if (resizeHandle.includes('e')) {
-                newWidth = dragStart.elemW + deltaXPercent * 2;
-            }
-            if (resizeHandle.includes('w')) {
-                const widthChange = deltaXPercent * 2;
-                newX = dragStart.elemX + widthChange;
-                newWidth = dragStart.elemW - widthChange;
-            }
-            if (resizeHandle.includes('s')) {
-                newHeight = dragStart.elemH + deltaYPercent;
-            }
-            if (resizeHandle.includes('n')) {
-                const heightChange = deltaYPercent;
-                newY = dragStart.elemY + heightChange;
-                newHeight = dragStart.elemH - heightChange;
-            }
-
-            // Enforce minimum size
-            newWidth = Math.max(5, newWidth);
-            newHeight = Math.max(5, newHeight);
-
-            // Keep aspect ratio if locked
-            if (element.lockAspectRatio && element.originalAspectRatio) {
-                if (resizeHandle.includes('e') || resizeHandle.includes('w')) {
-                    newHeight = newWidth / element.originalAspectRatio;
-                } else {
-                    newWidth = newHeight * element.originalAspectRatio;
-                }
-            }
-
-            // Clamp to bounds
-            newX = Math.max(0, newX);
-            newY = Math.max(0, newY);
-            if (newX + newWidth > 100) newWidth = 100 - newX;
-            if (newY + newHeight > 100) newHeight = 100 - newY;
-
-            onUpdate({
-                position: { x: newX, y: newY },
-                size: { width: newWidth, height: newHeight },
-            });
-        }
-    }, [isDragging, isResizing, resizeHandle, dragStart, element, pageOffset, isSnappingEnabled, onUpdate, onSnapLinesChange]);
-
-    const handleMouseUp = useCallback(() => {
-        if (isDragging || isResizing) {
-            onDragEnd();
-        }
-        setIsDragging(false);
-        setIsResizing(false);
-        setResizeHandle(null);
-    }, [isDragging, isResizing, onDragEnd]);
-
-    // Attach global mouse listeners
-    useEffect(() => {
-        if (isDragging || isResizing) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-            return () => {
-                window.removeEventListener('mousemove', handleMouseMove);
-                window.removeEventListener('mouseup', handleMouseUp);
-            };
-        }
-    }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
-
-    return (
-        <div
-            ref={elementRef}
-            className={`canvas-element ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
-            style={{
-                left: `${element.position.x}%`,
-                top: `${element.position.y}%`,
-                width: `${element.size.width}%`,
-                height: `${element.size.height}%`,
-            }}
-            onMouseDown={handleMouseDown}
-        >
-            <img
-                src={element.imageUrl}
-                alt="Album element"
-                draggable={false}
-            />
-
-            {/* Resize handles - only show when selected */}
-            {isSelected && RESIZE_HANDLES.map(handle => (
-                <div
-                    key={handle}
-                    className={`resize-handle resize-handle-${handle}`}
-                    onMouseDown={(e) => handleResizeStart(e, handle)}
-                />
-            ))}
-        </div>
     );
 };

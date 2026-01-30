@@ -31,6 +31,9 @@ npm run dev
 | `npm run preview` | Preview production build |
 | `npm run lint` | Run ESLint |
 | `npx tsc --noEmit` | Type check without building |
+| `npm run cy:open` | Open Cypress Test Runner (GUI) |
+| `npm run cy:run` | Run Cypress tests headlessly |
+| `npm run test:e2e` | Start dev server and run Cypress tests |
 
 ## Netlify Deployment
 

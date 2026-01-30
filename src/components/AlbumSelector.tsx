@@ -28,7 +28,8 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
 
     useEffect(() => {
         loadAlbums();
-    }, [loadAlbums]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Handle create
     const handleCreate = () => {

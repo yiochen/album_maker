@@ -166,7 +166,7 @@ export const importAlbumFromJson = (): Promise<Album> => {
                 await albumStorage.setCurrentAlbumId(album.id);
 
                 resolve(album);
-            } catch (error) {
+            } catch {
                 reject(new Error('Failed to parse album file'));
             }
         };

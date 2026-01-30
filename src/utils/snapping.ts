@@ -223,8 +223,7 @@ export function getActiveSnapLines(snappedEdges: SnapEdge[]): SnapLine[] {
  * Recompute element position based on snap constraints when page size changes
  */
 export function recomputePositionFromConstraints(
-    constraints: SnapConstraints,
-    size: Size
+    constraints: SnapConstraints
 ): Position {
     const targets = getSnapTargets();
     let x = 0;
@@ -252,8 +251,7 @@ export function recomputePositionFromConstraints(
  */
 export function percentToUnit(
     percent: number,
-    totalSize: number,
-    unit: 'inch' | 'cm'
+    totalSize: number
 ): number {
     const value = (percent / 100) * totalSize;
     return Math.round(value * 100) / 100;

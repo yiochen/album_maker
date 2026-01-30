@@ -11,6 +11,7 @@ import {
   loadFromLocalStorage,
   clearLocalStorage,
 } from './services/storage';
+import { spreadThumbnailDB, generateSpreadContentHash } from './db';
 import { initializeSources } from './sources';
 import { Toolbar } from './components/Toolbar';
 import { AlbumSettingsPanel } from './components/AlbumSettingsPanel';
@@ -95,10 +96,10 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     setSettings,
     addPages,
     deletePage,
-    updatePage,
     addElement,
     updateElement,
     deleteElement,
+    moveElement,
     addToPool,
     undo,
     redo,
@@ -136,15 +137,14 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   }, [currentSpread, selectedElementId]);
 
   // Ensure currentSpreadIndex is valid when pages change
-  useEffect(() => {
-    const maxSpreadIndex = Math.max(0, Math.floor((album.pages.length - 1) / 2));
-    if (currentSpreadIndex > maxSpreadIndex) {
-      setCurrentSpreadIndex(maxSpreadIndex);
-    }
-  }, [album.pages.length, currentSpreadIndex]);
+  const maxSpreadIndex = Math.max(0, Math.floor((album.pages.length - 1) / 2));
+  if (currentSpreadIndex > maxSpreadIndex) {
+    setCurrentSpreadIndex(maxSpreadIndex);
+  }
 
   // Clear selection when switching spreads
   useEffect(() => {
+    // eslint-disable-next-line
     setSelectedElementId(null);
     setSelectedPageId(null);
   }, [currentSpreadIndex]);
@@ -213,6 +213,22 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     setSelectedPageId(null);
   }, [deleteElement]);
 
+  const handleCanvasChange = useCallback(async (dataUrl: string) => {
+    if (!album) return;
+
+    const startIndex = currentSpreadIndex * 2;
+    const pages = album.pages.slice(startIndex, startIndex + 2);
+
+    if (pages.length === 0) return;
+
+    const contentHash = generateSpreadContentHash(pages);
+    try {
+      await spreadThumbnailDB.set(album.id, currentSpreadIndex, dataUrl, contentHash);
+    } catch (error) {
+      console.warn('Failed to save thumbnail:', error);
+    }
+  }, [album, currentSpreadIndex]);
+
   // Handle spread delete (delete both pages)
   const handleDeleteSpread = useCallback((leftPageId: string, rightPageId: string) => {
     deletePage(leftPageId);
@@ -280,7 +296,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   }
 
   return (
-    <div className="app-container">
+    <div className="app-container" data-testid="album-editor">
       <Toolbar
         albumName={album.name}
         onAlbumNameChange={setName}
@@ -307,6 +323,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           className={`btn btn-ghost btn-icon ${isImagePoolOpen ? 'active' : ''}`}
           onClick={() => setIsImagePoolOpen(!isImagePoolOpen)}
           title="Toggle Image Pool"
+          data-testid="toggle-image-pool-button"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
@@ -332,6 +349,8 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           pages={album.pages}
           currentSpreadIndex={currentSpreadIndex}
           maxPages={album.settings.maxPages}
+          albumId={album.id}
+          settings={album.settings}
           onSpreadSelect={setCurrentSpreadIndex}
           onAddPages={() => addPages(2)}
           onDeleteSpread={handleDeleteSpread}
@@ -360,16 +379,14 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           onElementUpdate={handleElementUpdate}
           onElementDelete={handleElementDelete}
           onImageDrop={handleImageDrop}
+          onMoveElementToPage={moveElement}
+          onCanvasChange={handleCanvasChange}
         />
 
         <PropertiesPanel
           pages={currentSpread}
           settings={album.settings}
           selectedElement={selectedElement}
-          selectedPageId={selectedPageId}
-          onTemplateChange={(pageId, templateId) => {
-            updatePage(pageId, { templateId });
-          }}
           onElementUpdate={(updates) => {
             if (selectedElementId && selectedPageId) {
               handleElementUpdate(selectedPageId, selectedElementId, updates);
