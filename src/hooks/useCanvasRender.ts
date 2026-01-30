@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import type { Page, AlbumSettings } from '../types';
 import { imageCache } from '../services/imageCache';
 
@@ -15,13 +15,12 @@ interface UseCanvasRenderProps {
 export function useCanvasRender({
     canvasRef,
     pages,
-    settings,
-    zoom,
     width,
     height,
     onRenderComplete
 }: UseCanvasRenderProps) {
     const requestRef = useRef<number | undefined>(undefined);
+    const [tick, setTick] = useState(0);
 
     const render = useCallback(async () => {
         const canvas = canvasRef.current;
@@ -95,7 +94,7 @@ export function useCanvasRender({
                 if (img) {
                     try {
                         ctx.drawImage(img, x, y, w, h);
-                    } catch (e) {
+                    } catch {
                         // Fallback/Error state
                         ctx.fillStyle = '#f3f4f6';
                         ctx.fillRect(x, y, w, h);
@@ -108,12 +107,12 @@ export function useCanvasRender({
                     // Trigger load (cache service handles deduplication)
                     imageCache.loadImage(element.imageUrl).then(() => {
                         // Trigger re-render when image loads
-                        // In a real loop this happens next frame. 
-                        // Here we might need to force update if not polling.
-                        // But since we use requestAnimationFrame, we just need to request another frame.
-                        requestAnimationFrame(render);
+                        setTick((t: number) => t + 1);
                     });
                 }
+
+                // Use tick to force re-render (dependency)
+                void tick;
 
                 // Draw selection border if needed handled by DOM overlay
             }
@@ -125,7 +124,7 @@ export function useCanvasRender({
             onRenderComplete();
         }
 
-    }, [canvasRef, pages, width, height, onRenderComplete]);
+    }, [canvasRef, pages, width, height, onRenderComplete, tick]);
 
     // Animation loop
     useEffect(() => {

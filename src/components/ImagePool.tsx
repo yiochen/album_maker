@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { PoolImage } from '../types';
-import { PhotoSource, SourceImage, getAllSources, getSource } from '../sources';
+import { SourceImage, getAllSources, getSource } from '../sources';
 
 interface ImagePoolProps {
     images: PoolImage[];

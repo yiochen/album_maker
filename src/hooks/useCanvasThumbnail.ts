@@ -104,7 +104,7 @@ export function useCanvasThumbnail() {
                     const h = (element.size.height / 100) * height;
 
                     ctx.drawImage(img, x, y, w, h);
-                } catch (error) {
+                } catch {
                     // Draw placeholder for failed images
                     const x = offsetX + (element.position.x / 100) * pageWidth;
                     const y = (element.position.y / 100) * height;
@@ -175,7 +175,7 @@ export function useCanvasThumbnail() {
                     const h = (element.size.height / 100) * height;
 
                     ctx.drawImage(img, x, y, w, h);
-                } catch (error) {
+                } catch {
                     const x = offsetX + (element.position.x / 100) * pageWidth;
                     const y = (element.position.y / 100) * height;
                     const w = (element.size.width / 100) * pageWidth;

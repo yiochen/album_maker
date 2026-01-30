@@ -27,6 +27,7 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
     }, []);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         loadAlbums();
     }, [loadAlbums]);
 

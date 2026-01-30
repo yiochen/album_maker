@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import type { PhotoSource, SourceImage, FetchImagesResult, FetchImagesOptions, SourceAlbum, InitializableSource } from './types';
 

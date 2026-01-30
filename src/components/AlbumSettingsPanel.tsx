@@ -19,14 +19,17 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
 
     // Sync local state when settings change externally
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setWidthValue(String(settings.pageWidth));
     }, [settings.pageWidth]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setHeightValue(String(settings.pageHeight));
     }, [settings.pageHeight]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMaxPagesValue(String(settings.maxPages));
     }, [settings.maxPages]);
 

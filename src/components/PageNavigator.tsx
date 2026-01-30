@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Page, AlbumSettings } from '../types';
 import { useCanvasThumbnail } from '../hooks/useCanvasThumbnail';
 import { spreadThumbnailDB, generateSpreadContentHash } from '../db';

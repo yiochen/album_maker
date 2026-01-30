@@ -4,11 +4,9 @@ import { calculateSnap } from '../utils/snapping';
 
 interface UseCanvasInteractionProps {
     pages: Page[];
-    settings: any; // AlbumSettings
     isSnappingEnabled: boolean;
     onElementSelect: (id: string | null) => void;
     onElementUpdate: (pageId: string, elementId: string, updates: Partial<PageElement>) => void;
-    onElementDelete: (pageId: string, elementId: string) => void;
     onMoveElementToPage?: (fromPageId: string, toPageId: string, elementId: string) => void;
     onImageDrop: (pageId: string, image: PoolImage, position: { x: number; y: number }) => void;
     onSnapLinesChange: (lines: SnapEdge[]) => void;
@@ -17,11 +15,9 @@ interface UseCanvasInteractionProps {
 
 export function useCanvasInteraction({
     pages,
-    settings,
     isSnappingEnabled,
     onElementSelect,
     onElementUpdate,
-    onElementDelete,
     onMoveElementToPage,
     onImageDrop,
     onSnapLinesChange,
@@ -232,7 +228,7 @@ export function useCanvasInteraction({
             const pageOffset = pageIdx * 50; // 0 or 50
 
             // Current center in spread %
-            const currentSpreadX = pageOffset + (start.element.position.x / 100 * 50); // Need CURRENT position, not start
+            // Need CURRENT position, not start
             // Use the latest element state from the pages prop to determine the current position
             const currentPage = pages.find(p => p.id === start.pageId);
             const currentElement = currentPage?.elements.find(e => e.id === start.element.id);
@@ -291,7 +287,7 @@ export function useCanvasInteraction({
         if (onInteractionEnd) {
             onInteractionEnd();
         }
-    }, [isDragging, isResizing, pages, onMoveElementToPage, onElementUpdate, onSnapLinesChange, onInteractionEnd]);
+    }, [isDragging, pages, onMoveElementToPage, onElementUpdate, onSnapLinesChange, onInteractionEnd]);
 
 
     // Handle Drop

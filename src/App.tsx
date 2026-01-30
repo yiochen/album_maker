@@ -96,7 +96,6 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     setSettings,
     addPages,
     deletePage,
-    updatePage,
     addElement,
     updateElement,
     deleteElement,
@@ -141,12 +140,14 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   useEffect(() => {
     const maxSpreadIndex = Math.max(0, Math.floor((album.pages.length - 1) / 2));
     if (currentSpreadIndex > maxSpreadIndex) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentSpreadIndex(maxSpreadIndex);
     }
   }, [album.pages.length, currentSpreadIndex]);
 
   // Clear selection when switching spreads
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedElementId(null);
     setSelectedPageId(null);
   }, [currentSpreadIndex]);
@@ -360,7 +361,6 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
 
         <Canvas
           pages={currentSpread}
-          pageIndex={currentSpreadIndex * 2}
           settings={album.settings}
           selectedElementId={selectedElementId}
           isSnappingEnabled={isSnappingEnabled}
@@ -389,10 +389,6 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           pages={currentSpread}
           settings={album.settings}
           selectedElement={selectedElement}
-          selectedPageId={selectedPageId}
-          onTemplateChange={(pageId, templateId) => {
-            updatePage(pageId, { templateId });
-          }}
           onElementUpdate={(updates) => {
             if (selectedElementId && selectedPageId) {
               handleElementUpdate(selectedPageId, selectedElementId, updates);

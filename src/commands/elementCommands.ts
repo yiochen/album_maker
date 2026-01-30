@@ -211,7 +211,7 @@ export class MoveElementCommand implements Command<Album> {
         };
     }
 
-    merge(nextCommand: Command<Album>): Command<Album> | null {
+    merge(): Command<Album> | null {
         return null;
     }
 }

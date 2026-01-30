@@ -5,7 +5,6 @@ import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
 
 interface CanvasProps {
     pages: Page[];
-    pageIndex: number;
     settings: AlbumSettings;
     selectedElementId: string | null;
     isSnappingEnabled: boolean;
@@ -19,7 +18,6 @@ interface CanvasProps {
 
 export const Canvas: React.FC<CanvasProps> = ({
     pages,
-    pageIndex,
     settings,
     selectedElementId,
     isSnappingEnabled,
@@ -52,11 +50,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         handleDrop: handleInteractionDrop,
     } = useCanvasInteraction({
         pages,
-        settings,
         isSnappingEnabled,
         onElementSelect,
         onElementUpdate,
-        onElementDelete,
         onMoveElementToPage,
         onImageDrop,
         onSnapLinesChange: setActiveSnapLines,
@@ -120,6 +116,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         // settings.pageWidth is "100%" (logical)
         const logicalWidth = settings.pageWidth * 2;
         const logicalHeight = settings.pageHeight;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setRenderSize({
             width: logicalWidth * (zoom / 100),
             height: logicalHeight * (zoom / 100)
