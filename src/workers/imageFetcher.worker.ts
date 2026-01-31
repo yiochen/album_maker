@@ -18,7 +18,7 @@ interface FetchResponse {
 self.onmessage = async (event: MessageEvent<FetchRequest | FetchRequest[]>) => {
     const requests = Array.isArray(event.data) ? event.data : [event.data];
 
-    for (const request of requests) {
+    await Promise.all(requests.map(async (request) => {
         try {
             const response = await fetch(request.url);
 
@@ -44,7 +44,7 @@ self.onmessage = async (event: MessageEvent<FetchRequest | FetchRequest[]>) => {
 
             self.postMessage(result);
         }
-    }
+    }));
 };
 
 // Export type for TypeScript
