@@ -26,15 +26,6 @@ export interface SnapConstraints {
   vertical?: SnapConstraint;   // y-axis snap
 }
 
-// Default album settings
-export const DEFAULT_ALBUM_SETTINGS: AlbumSettings = {
-  pageWidth: 8,
-  pageHeight: 10,
-  unit: 'inch',
-  isSquare: false,
-  maxPages: 40,
-};
-
 // Album and page related types
 export interface Album {
   id: string;

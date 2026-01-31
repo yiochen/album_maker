@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { PoolImage } from '../types';
+import { APP_CONFIG } from '../config';
 import { SourceImage, getAllSources, getSource } from '../sources';
 
 interface ImagePoolProps {
@@ -23,14 +24,15 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
         e.dataTransfer.effectAllowed = 'copy';
 
         // Create drag preview
+        const size = APP_CONFIG.DRAG_PREVIEW_SIZE;
         const preview = document.createElement('div');
-        preview.style.width = '80px';
-        preview.style.height = '80px';
+        preview.style.width = `${size}px`;
+        preview.style.height = `${size}px`;
         preview.style.background = `url(${image.thumbnailUrl || image.baseUrl}) center/cover`;
         preview.style.borderRadius = '8px';
         preview.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
         document.body.appendChild(preview);
-        e.dataTransfer.setDragImage(preview, 40, 40);
+        e.dataTransfer.setDragImage(preview, size / 2, size / 2);
 
         setTimeout(() => document.body.removeChild(preview), 0);
     }, []);
@@ -59,7 +61,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                 sourceId: activeSource.id,
                 sourceImageId: img.id,
                 baseUrl: activeSource.getFullUrl(img),
-                thumbnailUrl: activeSource.getThumbnailUrl(img, 200),
+                thumbnailUrl: activeSource.getThumbnailUrl(img, APP_CONFIG.THUMBNAIL_SIZE),
                 filename: img.filename,
                 mimeType: img.mimeType,
                 width: img.width,
