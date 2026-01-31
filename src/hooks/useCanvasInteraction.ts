@@ -6,7 +6,7 @@ interface UseCanvasInteractionProps {
     pages: Page[];
     isSnappingEnabled: boolean;
     onElementSelect: (id: string | null) => void;
-    onElementUpdate: (pageId: string, elementId: string, updates: Partial<PageElement>) => void;
+    onElementUpdate: (pageId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => void;
     onMoveElementToPage?: (fromPageId: string, toPageId: string, elementId: string) => void;
     onImageDrop: (pageId: string, image: PoolImage, position: { x: number; y: number }) => void;
     onSnapLinesChange: (lines: SnapEdge[]) => void;
@@ -27,6 +27,7 @@ export function useCanvasInteraction({
     const [isResizing, setIsResizing] = useState(false);
     const [resizeHandle, setResizeHandle] = useState<string | null>(null);
     const [activeElementId, setActiveElementId] = useState<string | null>(null);
+    const dragGroupIdRef = useRef<string | null>(null);
 
     // interaction start state
     const dragStartRef = useRef<{
@@ -107,6 +108,7 @@ export function useCanvasInteraction({
                         pageId: found.pageId,
                         element: found.element
                     };
+                    dragGroupIdRef.current = crypto.randomUUID();
                     return;
                 }
             }
@@ -129,6 +131,7 @@ export function useCanvasInteraction({
                 pageId: hit.pageId,
                 element: hit.element
             };
+            dragGroupIdRef.current = crypto.randomUUID();
         } else {
             onElementSelect(null);
             setActiveElementId(null);
@@ -176,9 +179,15 @@ export function useCanvasInteraction({
                 }
             }
 
-            onElementUpdate(start.pageId, start.element.id, {
-                position: { x: newX, y: newY }
-            });
+            onElementUpdate(
+                start.pageId,
+                start.element.id,
+                {
+                    position: { x: newX, y: newY },
+                    snapConstraints: undefined, // Clear constraints during drag
+                },
+                dragGroupIdRef.current || undefined
+            );
         } else if (isResizing && resizeHandle) {
             let newX = start.elemX;
             let newY = start.elemY;
@@ -213,14 +222,20 @@ export function useCanvasInteraction({
                 }
             }
 
-            onElementUpdate(start.pageId, start.element.id, {
-                position: { x: newX, y: newY },
-                size: { width: newWidth, height: newHeight }
-            });
+            onElementUpdate(
+                start.pageId,
+                start.element.id,
+                {
+                    position: { x: newX, y: newY },
+                    size: { width: newWidth, height: newHeight }
+                },
+                dragGroupIdRef.current || undefined
+            );
         }
     }, [isDragging, isResizing, resizeHandle, pages, isSnappingEnabled, onElementUpdate, onSnapLinesChange]);
 
     const handleMouseUp = useCallback(() => {
+        dragGroupIdRef.current = null;
         if (isDragging && dragStartRef.current) {
             // Handle page transfer
             const start = dragStartRef.current;
