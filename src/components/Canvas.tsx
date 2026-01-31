@@ -99,6 +99,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                     className={isDragOver ? 'drop-active' : ''}
+                    data-testid="interaction-layer"
                 >
                     <canvas ref={canvasElRef} data-testid="canvas-layer" />
                     {spread.elements.length === 0 && (

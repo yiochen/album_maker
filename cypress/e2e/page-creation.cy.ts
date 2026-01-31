@@ -83,7 +83,7 @@ describe('Page Creation', () => {
     });
 
     it('should show page count in header', () => {
-        cy.get('[data-testid="page-count"]').should('contain', 'pages');
+        cy.get('[data-testid="page-count"]').should('contain', 'spreads');
     });
 
     it('should respect max pages limit', () => {
