@@ -12,12 +12,39 @@ interface CanvasProps {
     onElementSelect: (elementId: string | null) => void;
     onElementUpdate: (pageId: string, elementId: string, updates: Partial<PageElement>) => void;
     onElementDelete: (pageId: string, elementId: string) => void;
-    onImageDrop: (pageId: string, image: PoolImage, position: { x: number; y: number }) => void;
+    onImageDrop: (pageId: string, image: PoolImage, position: { x: number; y: number }, pagePixelDimensions: { width: number; height: number }) => void;
     onMoveElementToPage?: (fromPageId: string, toPageId: string, elementId: string) => void;
     onCanvasChange?: (dataUrl: string) => void;
 }
 
-const PPI = 96;
+/** Pixels per inch - 300 is standard print resolution */
+const PPI = 300;
+
+/**
+ * Base sizes for UI controls at 100% zoom.
+ * These are scaled inversely to zoom to maintain consistent visual size.
+ */
+const BASE_UI_SIZES = {
+    cornerSize: 10,
+    borderWidth: 1,
+    seamStrokeWidth: 2,
+    seamDash: 5,
+    snapLineStrokeWidth: 1,
+    snapLineDash: 4,
+};
+
+/** Calculate zoom-compensated sizes for UI controls */
+const getZoomCompensatedSizes = (zoomPercent: number) => {
+    const inverseScale = 100 / zoomPercent;
+    return {
+        cornerSize: BASE_UI_SIZES.cornerSize * inverseScale,
+        borderScaleFactor: BASE_UI_SIZES.borderWidth * inverseScale,
+        seamStrokeWidth: BASE_UI_SIZES.seamStrokeWidth * inverseScale,
+        seamDash: BASE_UI_SIZES.seamDash * inverseScale,
+        snapLineStrokeWidth: BASE_UI_SIZES.snapLineStrokeWidth * inverseScale,
+        snapLineDash: BASE_UI_SIZES.snapLineDash * inverseScale,
+    };
+};
 
 interface CustomFabricObject extends fabric.Object {
     data?: {
@@ -48,6 +75,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     const wrapperRef = useRef<HTMLDivElement>(null);
     const loadingIds = useRef<Set<string>>(new Set());
     const snapLinesRef = useRef<fabric.Line[]>([]);
+    const seamRef = useRef<fabric.Line | null>(null);
+    const zoomRef = useRef(100);
 
     // Refs for callbacks
     const onElementSelectRef = useRef(onElementSelect);
@@ -106,6 +135,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             strokeDashArray: [5, 5],
         });
         (seam as CustomFabricObject).data = { id: 'seam', pageId: '' };
+        seamRef.current = seam;
         canvas.add(seam);
         canvas.sendObjectToBack(seam);
 
@@ -185,6 +215,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     newTop = (snapResult.position.y / 100) * canvasHeight;
 
                     const activeLines = getActiveSnapLines(snapResult.snappedEdges);
+                    const uiSizes = getZoomCompensatedSizes(zoomRef.current);
                     activeLines.forEach(line => {
                         let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
                         if (line.orientation === 'vertical') {
@@ -199,10 +230,10 @@ export const Canvas: React.FC<CanvasProps> = ({
 
                         const fabricLine = new fabric.Line([x1, y1, x2, y2], {
                             stroke: '#ff00ff',
-                            strokeWidth: 1,
+                            strokeWidth: uiSizes.snapLineStrokeWidth,
                             selectable: false,
                             evented: false,
-                            strokeDashArray: [4, 4],
+                            strokeDashArray: [uiSizes.snapLineDash, uiSizes.snapLineDash],
                         });
                         canvas.add(fabricLine);
                         snapLinesRef.current.push(fabricLine);
@@ -328,12 +359,15 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (targetPage) {
                 // Adjust x for the target page (0-100% within that page)
                 const adjustedX = isRightPage ? (x - 50) * 2 : x * 2;
-                onImageDropRef.current(targetPage.id, image, { x: adjustedX, y });
+                // Pass page pixel dimensions so the handler can calculate proper element size
+                const pagePixelWidth = canvasWidth / 2; // Each page is half the spread
+                const pagePixelHeight = canvasHeight;
+                onImageDropRef.current(targetPage.id, image, { x: adjustedX, y }, { width: pagePixelWidth, height: pagePixelHeight });
             }
         } catch (err) {
             console.error('Failed to parse dropped item', err);
         }
-    }, []);
+    }, [canvasWidth, canvasHeight]);
 
     // Sync State to Fabric
     useEffect(() => {
@@ -405,6 +439,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
                 if (!fabricCanvasRef.current) return;
 
+                const uiSizes = getZoomCompensatedSizes(zoom);
                 img.set({
                     left: left,
                     top: top,
@@ -419,6 +454,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                     cornerStrokeColor: '#333',
                     borderColor: '#333',
                     transparentCorners: false,
+                    // Zoom-compensated control sizes
+                    cornerSize: uiSizes.cornerSize,
+                    borderScaleFactor: uiSizes.borderScaleFactor,
                 });
 
                 canvas.add(img);
@@ -437,7 +475,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         canvas.requestRenderAll();
 
-    }, [pages, canvasWidth, canvasHeight, selectedElementId]);
+    }, [pages, canvasWidth, canvasHeight, selectedElementId, zoom]);
 
     // Update selection
     useEffect(() => {
@@ -485,6 +523,49 @@ export const Canvas: React.FC<CanvasProps> = ({
             clearTimeout(timer);
         };
     }, [fitToViewport]);
+
+    // Update UI control sizes inversely to zoom so they appear consistent
+    useEffect(() => {
+        const canvas = fabricCanvasRef.current;
+        if (!canvas) return;
+
+        // Update ref for use in event callbacks
+        zoomRef.current = zoom;
+
+        const uiSizes = getZoomCompensatedSizes(zoom);
+
+        // Update seam line
+        if (seamRef.current) {
+            seamRef.current.set({
+                strokeWidth: uiSizes.seamStrokeWidth,
+                strokeDashArray: [uiSizes.seamDash, uiSizes.seamDash],
+            });
+        }
+
+        // Update existing snap lines
+        snapLinesRef.current.forEach(line => {
+            line.set({
+                strokeWidth: uiSizes.snapLineStrokeWidth,
+                strokeDashArray: [uiSizes.snapLineDash, uiSizes.snapLineDash],
+            });
+        });
+
+        // Update all object control sizes
+        canvas.getObjects().forEach(obj => {
+            const customObj = obj as CustomFabricObject;
+            // Skip seam and snap lines (they're handled above)
+            if (customObj.data?.id === 'seam') return;
+            if (obj instanceof fabric.Line && (obj as fabric.Line).stroke === '#ff00ff') return;
+
+            obj.set({
+                cornerSize: uiSizes.cornerSize,
+                borderScaleFactor: uiSizes.borderScaleFactor,
+            });
+            obj.setCoords();
+        });
+
+        canvas.requestRenderAll();
+    }, [zoom]);
 
     const canvasStyle = {
         transform: `scale(${zoom / 100})`,

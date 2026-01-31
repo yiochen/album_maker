@@ -176,8 +176,35 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   }, [undo, redo, canUndo, canRedo]);
 
   // Handle image drop on canvas
-  const handleImageDrop = useCallback((pageId: string, image: PoolImage, position: { x: number; y: number }) => {
-    const aspectRatio = image.width && image.height ? image.width / image.height : 1;
+  const handleImageDrop = useCallback((
+    pageId: string,
+    image: PoolImage,
+    position: { x: number; y: number },
+    pagePixelDimensions: { width: number; height: number }
+  ) => {
+    const imageWidth = image.width || 300; // Default to 300px if unknown
+    const imageHeight = image.height || 300;
+    const aspectRatio = imageWidth / imageHeight;
+
+    // Calculate element size as percentage of page pixel dimensions
+    // The image should appear at its natural pixel size relative to the page
+    const widthPercent = (imageWidth / pagePixelDimensions.width) * 100;
+    const heightPercent = (imageHeight / pagePixelDimensions.height) * 100;
+
+    // Cap at 80% of page size to prevent images larger than the page
+    const maxSizePercent = 80;
+    let finalWidthPercent = widthPercent;
+    let finalHeightPercent = heightPercent;
+
+    if (finalWidthPercent > maxSizePercent || finalHeightPercent > maxSizePercent) {
+      const scale = Math.min(maxSizePercent / finalWidthPercent, maxSizePercent / finalHeightPercent);
+      finalWidthPercent *= scale;
+      finalHeightPercent *= scale;
+    }
+
+    // Calculate position offset so the cursor is at the center of the dropped image
+    const halfWidthPercent = finalWidthPercent / 2;
+    const halfHeightPercent = finalHeightPercent / 2;
 
     const newElement: PageElement = {
       id: crypto.randomUUID(),
@@ -187,12 +214,12 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
       sourceId: image.sourceId,
       sourceImageId: image.sourceImageId,
       position: {
-        x: Math.max(0, position.x - 15),
-        y: Math.max(0, position.y - 15),
+        x: Math.max(0, Math.min(100 - finalWidthPercent, position.x - halfWidthPercent)),
+        y: Math.max(0, Math.min(100 - finalHeightPercent, position.y - halfHeightPercent)),
       },
       size: {
-        width: 30,
-        height: 30 / aspectRatio,
+        width: finalWidthPercent,
+        height: finalHeightPercent,
       },
       originalAspectRatio: aspectRatio,
       lockAspectRatio: true,

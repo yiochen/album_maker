@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "cy:open": "cypress open",
     "cy:run": "cypress run",
-    "test:e2e": "start-server-and-test dev http://localhost:5173 cy:run"
+    "test:e2e": "start-server-and-test dev http://localhost:5173 cy:run",
+    "clean-port": "kill -9 $(lsof -t -i:5173)"
   },
   "dependencies": {
     "dexie": "^4.2.1",
