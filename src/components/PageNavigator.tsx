@@ -39,14 +39,14 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
     const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
 
     // Clear selection when pages change (e.g., after deletion)
-    // Using setTimeout to avoid "setState during render" warnings when caused by parent updates
-    useEffect(() => {
-        const timer = setTimeout(() => {
+    const [prevPageLength, setPrevPageLength] = useState(pages.length);
+    if (prevPageLength !== pages.length) {
+        setPrevPageLength(pages.length);
+        if (selectedIndices.size > 0) {
             setSelectedIndices(new Set());
             setLastClickedIndex(null);
-        }, 0);
-        return () => clearTimeout(timer);
-    }, [pages.length]);
+        }
+    }
 
     const handleSpreadClick = useCallback((spreadIndex: number, event: React.MouseEvent) => {
         const isCtrlOrCmd = event.metaKey || event.ctrlKey;
