@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import type { Album, Page, PageElement, PoolImage, TemplateId } from './types';
+import type { Album, PageElement, PoolImage, TemplateId } from './types';
 import { DEFAULT_ALBUM_SETTINGS } from './types';
 import { useAlbum } from './hooks/useAlbum';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -95,13 +95,12 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     setAlbum,
     setName,
     setSettings,
-    addPages,
-    deletePage,
+    addSpreads,
+    deleteSpread,
     addElement,
     updateElement,
-    updatePage,
+    updateSpread,
     deleteElement,
-    moveElement,
     addToPool,
     undo,
     redo,
@@ -120,26 +119,19 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSnappingEnabled, setIsSnappingEnabled] = useState(true);
 
-  // Get current spread (pair of pages)
+  // Get current spread
   const currentSpread = useMemo(() => {
-    const leftIndex = currentSpreadIndex * 2;
-    const left = album.pages[leftIndex];
-    const right = album.pages[leftIndex + 1];
-    return [left, right].filter(Boolean) as Page[];
-  }, [album.pages, currentSpreadIndex]);
+    return album.spreads[currentSpreadIndex];
+  }, [album.spreads, currentSpreadIndex]);
 
   // Selected element
   const selectedElement = useMemo(() => {
-    if (!selectedElementId) return null;
-    for (const page of currentSpread) {
-      const element = page.elements.find(e => e.id === selectedElementId);
-      if (element) return element;
-    }
-    return null;
+    if (!selectedElementId || !currentSpread) return null;
+    return currentSpread.elements.find(e => e.id === selectedElementId) || null;
   }, [currentSpread, selectedElementId]);
 
-  // Ensure currentSpreadIndex is valid when pages change
-  const maxSpreadIndex = Math.max(0, Math.floor((album.pages.length - 1) / 2));
+  // Ensure currentSpreadIndex is valid when spreads change
+  const maxSpreadIndex = Math.max(0, album.spreads.length - 1);
   if (currentSpreadIndex > maxSpreadIndex) {
     setCurrentSpreadIndex(maxSpreadIndex);
   }
@@ -176,35 +168,20 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
   }, [undo, redo, canUndo, canRedo]);
 
   // Handle image drop on canvas
+  // Handle image drop on canvas - using Absolute Coordinates
   const handleImageDrop = useCallback((
-    pageId: string,
+    spreadId: string,
     image: PoolImage,
     position: { x: number; y: number },
-    pagePixelDimensions: { width: number; height: number }
+    // pagePixelDimensions is deprecated/unused in absolute mode
   ) => {
-    const imageWidth = image.width || 300; // Default to 300px if unknown
-    const imageHeight = image.height || 300;
+    const imageWidth = image.width || 300;
+    const imageHeight = image.height || (imageWidth / 1); // Default to square if height missing
     const aspectRatio = imageWidth / imageHeight;
 
-    // Calculate element size as percentage of page pixel dimensions
-    // The image should appear at its natural pixel size relative to the page
-    const widthPercent = (imageWidth / pagePixelDimensions.width) * 100;
-    const heightPercent = (imageHeight / pagePixelDimensions.height) * 100;
-
-    // Cap at 80% of page size to prevent images larger than the page
-    const maxSizePercent = 80;
-    let finalWidthPercent = widthPercent;
-    let finalHeightPercent = heightPercent;
-
-    if (finalWidthPercent > maxSizePercent || finalHeightPercent > maxSizePercent) {
-      const scale = Math.min(maxSizePercent / finalWidthPercent, maxSizePercent / finalHeightPercent);
-      finalWidthPercent *= scale;
-      finalHeightPercent *= scale;
-    }
-
-    // Calculate position offset so the cursor is at the center of the dropped image
-    const halfWidthPercent = finalWidthPercent / 2;
-    const halfHeightPercent = finalHeightPercent / 2;
+    // Center image at drop position
+    const halfWidth = imageWidth / 2;
+    const halfHeight = imageHeight / 2;
 
     const newElement: PageElement = {
       id: crypto.randomUUID(),
@@ -214,70 +191,60 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
       sourceId: image.sourceId,
       sourceImageId: image.sourceImageId,
       position: {
-        x: Math.max(0, Math.min(100 - finalWidthPercent, position.x - halfWidthPercent)),
-        y: Math.max(0, Math.min(100 - finalHeightPercent, position.y - halfHeightPercent)),
+        x: position.x - halfWidth,
+        y: position.y - halfHeight,
       },
       size: {
-        width: finalWidthPercent,
-        height: finalHeightPercent,
+        width: imageWidth,
+        height: imageHeight,
       },
       originalAspectRatio: aspectRatio,
       lockAspectRatio: true,
     };
 
-    addElement(pageId, newElement);
+    addElement(spreadId, newElement);
     setSelectedElementId(newElement.id);
-    setSelectedPageId(pageId);
+    setSelectedPageId(spreadId); // renaming state var later? keeping 'selectedPageId' as 'selectedSpreadId' for now
   }, [addElement]);
 
   // Handle element update
-  const handleElementUpdate = useCallback((pageId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => {
-    updateElement(pageId, elementId, updates, groupId);
+  const handleElementUpdate = useCallback((spreadId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => {
+    updateElement(spreadId, elementId, updates, groupId);
   }, [updateElement]);
 
   // Handle element delete
-  const handleElementDelete = useCallback((pageId: string, elementId: string) => {
-    deleteElement(pageId, elementId);
+  const handleElementDelete = useCallback((spreadId: string, elementId: string) => {
+    deleteElement(spreadId, elementId);
     setSelectedElementId(null);
     setSelectedPageId(null);
   }, [deleteElement]);
 
   const handleCanvasChange = useCallback(async (dataUrl: string) => {
-    if (!album) return;
+    if (!album || !currentSpread) return;
 
-    const startIndex = currentSpreadIndex * 2;
-    const pages = album.pages.slice(startIndex, startIndex + 2);
-
-    if (pages.length === 0) return;
-
-    const contentHash = generateSpreadContentHash(pages);
+    // Use current spread for hashing
+    const contentHash = generateSpreadContentHash(currentSpread);
     try {
-      await spreadThumbnailDB.set(album.id, currentSpreadIndex, dataUrl, contentHash);
+      await spreadThumbnailDB.set(album.id, currentSpread.id, dataUrl, contentHash);
     } catch (error) {
       console.warn('Failed to save thumbnail:', error);
     }
-  }, [album, currentSpreadIndex]);
+  }, [album, currentSpread]);
 
-  // Handle spread delete (delete both pages)
-  const handleDeleteSpread = useCallback((leftPageId: string, rightPageId: string) => {
-    deletePage(leftPageId);
-    deletePage(rightPageId);
-  }, [deletePage]);
+  // Handle spread delete
+  const handleDeleteSpread = useCallback((spreadId: string) => {
+    deleteSpread(spreadId);
+  }, [deleteSpread]);
 
   // Handle multiple spread deletion
   const handleDeleteSpreads = useCallback((spreadIndices: number[]) => {
-    // Sort in descending order to avoid index shifting issues
     const sortedIndices = [...spreadIndices].sort((a, b) => b - a);
 
     for (const spreadIndex of sortedIndices) {
-      const leftPageIndex = spreadIndex * 2;
-      const leftPage = album.pages[leftPageIndex];
-      const rightPage = album.pages[leftPageIndex + 1];
-
-      if (leftPage) deletePage(leftPage.id);
-      if (rightPage) deletePage(rightPage.id);
+      const spread = album.spreads[spreadIndex];
+      if (spread) deleteSpread(spread.id);
     }
-  }, [album.pages, deletePage]);
+  }, [album.spreads, deleteSpread]);
 
   // Handle album selection
   const handleSelectAlbum = useCallback(async (id: string) => {
@@ -332,12 +299,12 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     setIsSettingsOpen(false);
   }, []);
 
-  // Early return if no pages
-  if (currentSpread.length === 0) {
+  // Early return if no spreads
+  if (!currentSpread) {
     return (
       <div className="app-container">
         <div className="loading-screen">
-          <span>No pages in album</span>
+          <span>No spreads in album</span>
         </div>
       </div>
     );
@@ -383,33 +350,26 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
 
       <main className={`main-content ${isImagePoolOpen ? 'image-pool-open' : ''}`}>
         <PageNavigator
-          pages={album.pages}
+          spreads={album.spreads}
           currentSpreadIndex={currentSpreadIndex}
-          maxPages={album.settings.maxPages}
+          maxSpreads={album.settings.maxPages / 2} // Conversion?
           albumId={album.id}
           settings={album.settings}
           onSpreadSelect={setCurrentSpreadIndex}
-          onAddPages={() => addPages(2)}
+          onAddSpread={() => addSpreads(1)}
           onDeleteSpread={handleDeleteSpread}
           onDeleteSpreads={handleDeleteSpreads}
         />
 
         <Canvas
-          pages={currentSpread}
-          pageIndex={currentSpreadIndex * 2}
+          spread={currentSpread}
           settings={album.settings}
           selectedElementId={selectedElementId}
           isSnappingEnabled={isSnappingEnabled}
           onElementSelect={(id) => {
             setSelectedElementId(id);
             if (id) {
-              // Find which page contains this element
-              for (const page of currentSpread) {
-                if (page.elements.some(e => e.id === id)) {
-                  setSelectedPageId(page.id);
-                  break;
-                }
-              }
+              setSelectedPageId(currentSpread.id);
             } else {
               setSelectedPageId(null);
             }
@@ -417,17 +377,16 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           onElementUpdate={handleElementUpdate}
           onElementDelete={handleElementDelete}
           onImageDrop={handleImageDrop}
-          onMoveElementToPage={moveElement}
           onCanvasChange={handleCanvasChange}
         />
 
         <PropertiesPanel
-          pages={currentSpread}
+          spread={currentSpread}
           settings={album.settings}
           selectedElement={selectedElement}
           selectedPageId={selectedPageId}
-          onTemplateChange={(pageId, templateId) => {
-            updatePage(pageId, { templateId: templateId as TemplateId });
+          onTemplateChange={(spreadId, templateId) => {
+            updateSpread(spreadId, { templateId: templateId as TemplateId });
           }}
           onElementUpdate={(updates) => {
             if (selectedElementId && selectedPageId) {
@@ -459,7 +418,7 @@ const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           <AlbumSettingsPanel
             settings={album.settings}
             onSettingsChange={setSettings}
-            currentPageCount={album.pages.length}
+            currentPageCount={album.spreads.length}
           />
         </Modal>
       )}

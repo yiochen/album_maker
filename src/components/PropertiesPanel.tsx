@@ -1,19 +1,21 @@
 import React from 'react';
-import type { Page, PageElement, AlbumSettings } from '../types';
-import { percentToUnit } from '../utils/snapping';
+import type { Spread, PageElement, AlbumSettings } from '../types';
+// Remove import { percentToUnit } from '../utils/snapping'; - Implementing unit conversion locally or using updated utils
 
 interface PropertiesPanelProps {
-    pages: Page[];  // Current spread (2 pages)
+    spread: Spread;
     settings: AlbumSettings;
     selectedElement: PageElement | null;
     selectedPageId: string | null;
-    onTemplateChange: (pageId: string, templateId: string) => void;
+    onTemplateChange: (spreadId: string, templateId: string) => void;
     onElementUpdate: (updates: Partial<PageElement>) => void;
     onElementDelete: () => void;
 }
 
+const PPI = 300;
+
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
-    pages,
+    spread,
     settings,
     selectedElement,
     // selectedPageId,
@@ -40,7 +42,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     />
                 ) : (
                     <SpreadProperties
-                        pages={pages}
+                        spread={spread}
                         settings={settings}
                     />
                 )}
@@ -50,16 +52,14 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 };
 
 interface SpreadPropertiesProps {
-    pages: Page[];
+    spread: Spread;
     settings: AlbumSettings;
 }
 
 const SpreadProperties: React.FC<SpreadPropertiesProps> = ({
-    pages,
+    spread,
     settings,
 }) => {
-    const totalElements = pages.reduce((sum, p) => sum + p.elements.length, 0);
-
     return (
         <>
             <div className="property-section">
@@ -82,19 +82,7 @@ const SpreadProperties: React.FC<SpreadPropertiesProps> = ({
                 <h3 className="property-section-title">Spread Info</h3>
                 <div className="property-row">
                     <span className="property-label">Total Elements</span>
-                    <span style={{ color: 'var(--color-text-primary)' }}>{totalElements}</span>
-                </div>
-                <div className="property-row">
-                    <span className="property-label">Left Page</span>
-                    <span style={{ color: 'var(--color-text-primary)' }}>
-                        {pages[0]?.elements.length || 0} elements
-                    </span>
-                </div>
-                <div className="property-row">
-                    <span className="property-label">Right Page</span>
-                    <span style={{ color: 'var(--color-text-primary)' }}>
-                        {pages[1]?.elements.length || 0} elements
-                    </span>
+                    <span style={{ color: 'var(--color-text-primary)' }}>{spread.elements.length}</span>
                 </div>
             </div>
         </>
@@ -114,51 +102,76 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     onUpdate,
     onDelete,
 }) => {
-    // Calculate size in physical units
-    const widthInUnits = percentToUnit(element.size.width, settings.pageWidth);
-    const heightInUnits = percentToUnit(element.size.height, settings.pageHeight);
+    // Conversion Helper: Pixels to Units (Inch/CM)
+    const pxToUnit = (px: number) => {
+        // We assume settings.unit is 'inch' for now.
+        // Even if 'cm', we normally base strictly on PPI=300 unless we have conversion logic.
+        // settings.pageWidth is in 'settings.unit'.
+        // Canvas pixel scale is 300 PPI.
+
+        const inches = px / PPI;
+        if (settings.unit === 'cm') {
+            return inches * 2.54;
+        }
+        return inches;
+    };
+
+    const unitToPx = (unitVal: number) => {
+        let inches = unitVal;
+        if (settings.unit === 'cm') {
+            inches = unitVal / 2.54;
+        }
+        return inches * PPI;
+    };
+
+    const widthInUnits = pxToUnit(element.size.width);
+    const heightInUnits = pxToUnit(element.size.height);
+    const xInUnits = pxToUnit(element.position.x);
+    const yInUnits = pxToUnit(element.position.y);
 
     const handlePositionChange = (axis: 'x' | 'y', value: string) => {
         const numValue = parseFloat(value) || 0;
+        const pxValue = unitToPx(numValue);
         onUpdate({
             position: {
                 ...element.position,
-                [axis]: Math.max(0, Math.min(100, numValue)),
+                [axis]: pxValue,
             },
-            snapConstraints: undefined, // Clear snap constraints on manual edit
+            snapConstraints: undefined,
         });
     };
 
     const handleSizeChange = (dimension: 'width' | 'height', value: string) => {
         const numValue = parseFloat(value) || 0;
-        let newWidth = dimension === 'width' ? numValue : element.size.width;
-        let newHeight = dimension === 'height' ? numValue : element.size.height;
+        let newPx = unitToPx(numValue);
+        newPx = Math.max(1, newPx); // Safety 1px min
+
+        let newWidth = dimension === 'width' ? newPx : element.size.width;
+        let newHeight = dimension === 'height' ? newPx : element.size.height;
 
         // Enforce aspect ratio if locked
-        if (element.lockAspectRatio && element.originalAspectRatio) {
+        if (element.lockAspectRatio) {
+            const currentRatio = element.size.width / element.size.height;
             if (dimension === 'width') {
-                newHeight = newWidth / element.originalAspectRatio;
+                newHeight = newWidth / currentRatio;
             } else {
-                newWidth = newHeight * element.originalAspectRatio;
+                // Height changed
+                newWidth = newHeight * currentRatio;
             }
         }
 
         onUpdate({
             size: {
-                width: Math.max(1, Math.min(100, newWidth)),
-                height: Math.max(1, Math.min(100, newHeight)),
+                width: newWidth,
+                height: newHeight,
             },
         });
     };
 
-    const handleAspectRatioToggle = () => {
-        const newLocked = !element.lockAspectRatio;
+    const handleAspectRatioToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newLocked = e.target.checked;
         onUpdate({
             lockAspectRatio: newLocked,
-            // Store current aspect ratio when locking
-            originalAspectRatio: newLocked
-                ? element.size.width / element.size.height
-                : element.originalAspectRatio,
         });
     };
 
@@ -170,58 +183,12 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                 </h3>
                 <div className="property-row">
                     <span className="property-label">Width</span>
-                    <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
-                        {widthInUnits.toFixed(2)} {settings.unit}
-                    </span>
-                </div>
-                <div className="property-row">
-                    <span className="property-label">Height</span>
-                    <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
-                        {heightInUnits.toFixed(2)} {settings.unit}
-                    </span>
-                </div>
-            </div>
-
-            <div className="property-section">
-                <h3 className="property-section-title">Position (%)</h3>
-                <div className="property-row">
-                    <span className="property-label">X</span>
                     <input
                         type="number"
                         className="property-input"
-                        value={element.position.x.toFixed(1)}
-                        onChange={(e) => handlePositionChange('x', e.target.value)}
-                        min={0}
-                        max={100}
-                        step={0.5}
-                    />
-                </div>
-                <div className="property-row">
-                    <span className="property-label">Y</span>
-                    <input
-                        type="number"
-                        className="property-input"
-                        value={element.position.y.toFixed(1)}
-                        onChange={(e) => handlePositionChange('y', e.target.value)}
-                        min={0}
-                        max={100}
-                        step={0.5}
-                    />
-                </div>
-            </div>
-
-            <div className="property-section">
-                <h3 className="property-section-title">Size (%)</h3>
-                <div className="property-row">
-                    <span className="property-label">Width</span>
-                    <input
-                        type="number"
-                        className="property-input"
-                        value={element.size.width.toFixed(1)}
+                        value={widthInUnits.toFixed(2)}
                         onChange={(e) => handleSizeChange('width', e.target.value)}
-                        min={1}
-                        max={100}
-                        step={0.5}
+                        step={0.1}
                     />
                 </div>
                 <div className="property-row">
@@ -229,11 +196,9 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                     <input
                         type="number"
                         className="property-input"
-                        value={element.size.height.toFixed(1)}
+                        value={heightInUnits.toFixed(2)}
                         onChange={(e) => handleSizeChange('height', e.target.value)}
-                        min={1}
-                        max={100}
-                        step={0.5}
+                        step={0.1}
                     />
                 </div>
 
@@ -249,31 +214,67 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
             </div>
 
             <div className="property-section">
+                <h3 className="property-section-title">Position ({settings.unit})</h3>
+                <div className="property-row">
+                    <span className="property-label">X</span>
+                    <input
+                        type="number"
+                        className="property-input"
+                        value={xInUnits.toFixed(2)}
+                        onChange={(e) => handlePositionChange('x', e.target.value)}
+                        step={0.1}
+                    />
+                </div>
+                <div className="property-row">
+                    <span className="property-label">Y</span>
+                    <input
+                        type="number"
+                        className="property-input"
+                        value={yInUnits.toFixed(2)}
+                        onChange={(e) => handlePositionChange('y', e.target.value)}
+                        step={0.1}
+                    />
+                </div>
+            </div>
+
+            <div className="property-section">
                 <h3 className="property-section-title">Quick Actions</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                     <button
                         className="btn btn-secondary"
-                        onClick={() => onUpdate({
-                            position: { x: 0, y: 0 },
-                            size: { width: 100, height: 100 },
-                            snapConstraints: undefined,
-                        })}
-                    >
-                        Fill Page
-                    </button>
-                    <button
-                        className="btn btn-secondary"
                         onClick={() => {
-                            const size = Math.min(element.size.width, element.size.height);
+                            // Center in spread
+                            const spreadWidthPx = settings.pageWidth * 2 * PPI;
+                            const spreadHeightPx = settings.pageHeight * PPI;
+
+                            const x = (spreadWidthPx - element.size.width) / 2;
+                            const y = (spreadHeightPx - element.size.height) / 2;
+
                             onUpdate({
-                                position: { x: (100 - size) / 2, y: (100 - size) / 2 },
-                                size: { width: size, height: size },
+                                position: { x, y },
                                 snapConstraints: undefined,
                             });
                         }}
                     >
-                        Center Square
+                        Center on Spread
                     </button>
+                    {element.originalAspectRatio && (
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => {
+                                // Reset to "reasonable" size (e.g. 50% of page width)
+                                const spreadWidthPx = settings.pageWidth * 2 * PPI;
+                                const targetWidth = spreadWidthPx * 0.25; // Quarter spread width?
+                                const targetHeight = targetWidth / element.originalAspectRatio!;
+                                onUpdate({
+                                    size: { width: targetWidth, height: targetHeight },
+                                    snapConstraints: undefined,
+                                });
+                            }}
+                        >
+                            Reset Image Size
+                        </button>
+                    )}
                     <button
                         className="btn btn-secondary"
                         onClick={onDelete}

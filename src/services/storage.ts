@@ -1,4 +1,4 @@
-import type { Album, Page, TemplateId } from '../types';
+import type { Album, Spread, TemplateId } from '../types';
 import { DEFAULT_ALBUM_SETTINGS } from '../types';
 import { albumDB, settingsDB } from '../db';
 
@@ -15,13 +15,13 @@ export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
         settings: { ...DEFAULT_ALBUM_SETTINGS },
         createdAt: now,
         updatedAt: now,
-        pages: [createNewPage(), createNewPage()], // Start with one spread (2 pages)
+        spreads: [createNewSpread()], // Start with one spread
         imagePool: [],
     };
 };
 
-// Create a new empty page
-export const createNewPage = (templateId: TemplateId = 'fullpage'): Page => {
+// Create a new empty spread
+export const createNewSpread = (templateId: TemplateId = 'fullpage'): Spread => {
     return {
         id: crypto.randomUUID(),
         templateId,

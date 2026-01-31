@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import type { Album, Page, PageElement, PoolImage, TemplateId, AlbumSettings } from '../types';
+import type { Album, Spread, PageElement, PoolImage, TemplateId, AlbumSettings } from '../types';
 import { useHistory } from './useHistory';
 import {
     UpdateElementCommand,
@@ -8,12 +8,12 @@ import {
     MoveElementCommand
 } from '../commands/elementCommands';
 import {
-    AddPageCommand,
-    AddPagesCommand,
-    DeletePageCommand,
-    ReorderPagesCommand,
-    UpdatePageCommand
-} from '../commands/pageCommands';
+    AddSpreadCommand,
+    AddSpreadsCommand,
+    DeleteSpreadCommand,
+    ReorderSpreadsCommand,
+    UpdateSpreadCommand
+} from '../commands/spreadCommands';
 import {
     SetAlbumNameCommand,
     SetSettingsCommand
@@ -45,47 +45,47 @@ export const useAlbum = (initialAlbum: Album) => {
         dispatch(new SetSettingsCommand(settings, oldValues));
     }, [dispatch, album.settings]);
 
-    const addPage = useCallback((templateId?: TemplateId) => {
-        dispatch(new AddPageCommand(templateId));
+    const addSpread = useCallback((templateId?: TemplateId) => {
+        dispatch(new AddSpreadCommand(templateId));
     }, [dispatch]);
 
-    const addPages = useCallback((count: number = 2, templateId?: TemplateId) => {
-        dispatch(new AddPagesCommand(count, templateId));
+    const addSpreads = useCallback((count: number = 1, templateId?: TemplateId) => {
+        dispatch(new AddSpreadsCommand(count, templateId));
     }, [dispatch]);
 
-    const deletePage = useCallback((pageId: string) => {
-        const index = album.pages.findIndex(p => p.id === pageId);
+    const deleteSpread = useCallback((spreadId: string) => {
+        const index = album.spreads.findIndex(s => s.id === spreadId);
         if (index === -1) return;
-        const page = album.pages[index];
-        dispatch(new DeletePageCommand(pageId, page, index));
-    }, [dispatch, album.pages]);
+        const spread = album.spreads[index];
+        dispatch(new DeleteSpreadCommand(spreadId, spread, index));
+    }, [dispatch, album.spreads]);
 
-    const reorderPages = useCallback((fromIndex: number, toIndex: number) => {
-        dispatch(new ReorderPagesCommand(fromIndex, toIndex));
+    const reorderSpreads = useCallback((fromIndex: number, toIndex: number) => {
+        dispatch(new ReorderSpreadsCommand(fromIndex, toIndex));
     }, [dispatch]);
 
-    const updatePage = useCallback((pageId: string, updates: Partial<Page>) => {
-        const page = album.pages.find(p => p.id === pageId);
-        if (!page) return;
+    const updateSpread = useCallback((spreadId: string, updates: Partial<Spread>) => {
+        const spread = album.spreads.find(s => s.id === spreadId);
+        if (!spread) return;
 
-        const oldValues: Partial<Page> = {};
-        for (const key of Object.keys(updates) as Array<keyof Page>) {
+        const oldValues: Partial<Spread> = {};
+        for (const key of Object.keys(updates) as Array<keyof Spread>) {
             // @ts-expect-error - Partial types handling
-            oldValues[key] = page[key];
+            oldValues[key] = spread[key];
         }
 
-        dispatch(new UpdatePageCommand(pageId, updates, oldValues));
-    }, [dispatch, album.pages]);
+        dispatch(new UpdateSpreadCommand(spreadId, updates, oldValues));
+    }, [dispatch, album.spreads]);
 
-    const addElement = useCallback((pageId: string, element: PageElement) => {
-        dispatch(new AddElementCommand(pageId, element));
+    const addElement = useCallback((spreadId: string, element: PageElement) => {
+        dispatch(new AddElementCommand(spreadId, element));
     }, [dispatch]);
 
     const updateElement = useCallback(
-        (pageId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => {
-            const page = album.pages.find(p => p.id === pageId);
-            if (!page) return;
-            const element = page.elements.find(e => e.id === elementId);
+        (spreadId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => {
+            const spread = album.spreads.find(s => s.id === spreadId);
+            if (!spread) return;
+            const element = spread.elements.find(e => e.id === elementId);
             if (!element) return;
 
             const oldValues: Partial<PageElement> = {};
@@ -94,19 +94,19 @@ export const useAlbum = (initialAlbum: Album) => {
                 oldValues[key] = element[key];
             }
 
-            dispatch(new UpdateElementCommand(pageId, elementId, updates, oldValues, groupId));
+            dispatch(new UpdateElementCommand(spreadId, elementId, updates, oldValues, groupId));
         },
-        [dispatch, album.pages]
+        [dispatch, album.spreads]
     );
 
-    const deleteElement = useCallback((pageId: string, elementId: string) => {
-        const page = album.pages.find(p => p.id === pageId);
-        if (!page) return;
-        const element = page.elements.find(e => e.id === elementId);
+    const deleteElement = useCallback((spreadId: string, elementId: string) => {
+        const spread = album.spreads.find(s => s.id === spreadId);
+        if (!spread) return;
+        const element = spread.elements.find(e => e.id === elementId);
         if (!element) return;
 
-        dispatch(new DeleteElementCommand(pageId, element));
-    }, [dispatch, album.pages]);
+        dispatch(new DeleteElementCommand(spreadId, element));
+    }, [dispatch, album.spreads]);
 
     const addToPool = useCallback((images: PoolImage[]) => {
         dispatch(new AddToPoolCommand(images));
@@ -120,9 +120,21 @@ export const useAlbum = (initialAlbum: Album) => {
         dispatch(new ClearPoolCommand());
     }, [dispatch]);
 
-    const moveElement = useCallback((fromPageId: string, toPageId: string, elementId: string) => {
-        dispatch(new MoveElementCommand(fromPageId, toPageId, elementId));
-    }, [dispatch]);
+    const moveElement = useCallback((fromSpreadId: string, toSpreadId: string, elementId: string, updates?: Partial<PageElement>) => {
+        let oldValues: Partial<PageElement> | undefined;
+        if (updates) {
+            const spread = album.spreads.find(s => s.id === fromSpreadId);
+            const el = spread?.elements.find(e => e.id === elementId);
+            if (el) {
+                oldValues = {};
+                for (const key of Object.keys(updates) as Array<keyof PageElement>) {
+                    // @ts-expect-error - Partial types handling
+                    oldValues[key] = el[key];
+                }
+            }
+        }
+        dispatch(new MoveElementCommand(fromSpreadId, toSpreadId, elementId, updates, oldValues));
+    }, [dispatch, album.spreads]);
 
     return useMemo(
         () => ({
@@ -130,11 +142,11 @@ export const useAlbum = (initialAlbum: Album) => {
             setAlbum,
             setName,
             setSettings,
-            addPage,
-            addPages,
-            deletePage,
-            reorderPages,
-            updatePage,
+            addSpread,
+            addSpreads,
+            deleteSpread,
+            reorderSpreads,
+            updateSpread,
             addElement,
             updateElement,
             deleteElement,
@@ -152,11 +164,11 @@ export const useAlbum = (initialAlbum: Album) => {
             setAlbum,
             setName,
             setSettings,
-            addPage,
-            addPages,
-            deletePage,
-            reorderPages,
-            updatePage,
+            addSpread,
+            addSpreads,
+            deleteSpread,
+            reorderSpreads,
+            updateSpread,
             addElement,
             updateElement,
             deleteElement,

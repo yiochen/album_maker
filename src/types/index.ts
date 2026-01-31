@@ -42,7 +42,7 @@ export interface Album {
   settings: AlbumSettings;
   createdAt: number;
   updatedAt: number;
-  pages: Page[];
+  spreads: Spread[];
   imagePool: PoolImage[];
 }
 
@@ -55,8 +55,8 @@ export interface AlbumMetadata {
   thumbnailUrl?: string;
 }
 
-export interface Page {
-  id: string;
+export interface Spread {
+  id: string; // ID of the spread (can be same as left page ID)
   templateId: TemplateId;
   elements: PageElement[];
   background?: string;
@@ -69,8 +69,8 @@ export interface PageElement {
   thumbnailUrl: string;
   sourceId: string;
   sourceImageId: string;
-  position: Position;
-  size: Size;
+  position: Position; // Absolute coordinates in pixels
+  size: Size; // Absolute dimensions in pixels
   crop?: CropArea;
   lockAspectRatio?: boolean;
   snapConstraints?: SnapConstraints;
@@ -166,15 +166,15 @@ export type AlbumAction =
   | { type: 'SET_ALBUM'; payload: Album }
   | { type: 'SET_NAME'; payload: string }
   | { type: 'SET_SETTINGS'; payload: Partial<AlbumSettings> }
-  | { type: 'ADD_PAGE'; payload?: { templateId?: TemplateId } }
-  | { type: 'ADD_PAGES'; payload?: { count?: number; templateId?: TemplateId } }
-  | { type: 'DELETE_PAGE'; payload: string }
-  | { type: 'REORDER_PAGES'; payload: { fromIndex: number; toIndex: number } }
-  | { type: 'UPDATE_PAGE'; payload: { pageId: string; updates: Partial<Page> } }
-  | { type: 'ADD_ELEMENT'; payload: { pageId: string; element: PageElement } }
-  | { type: 'UPDATE_ELEMENT'; payload: { pageId: string; elementId: string; updates: Partial<PageElement> } }
-  | { type: 'DELETE_ELEMENT'; payload: { pageId: string; elementId: string } }
-  | { type: 'MOVE_ELEMENT'; payload: { fromPageId: string; toPageId: string; elementId: string } }
+  | { type: 'ADD_SPREAD'; payload?: { templateId?: TemplateId } }
+  | { type: 'ADD_SPREADS'; payload?: { count?: number; templateId?: TemplateId } }
+  | { type: 'DELETE_SPREAD'; payload: string }
+  | { type: 'REORDER_SPREADS'; payload: { fromIndex: number; toIndex: number } }
+  | { type: 'UPDATE_SPREAD'; payload: { spreadId: string; updates: Partial<Spread> } }
+  | { type: 'ADD_ELEMENT'; payload: { spreadId: string; element: PageElement } }
+  | { type: 'UPDATE_ELEMENT'; payload: { spreadId: string; elementId: string; updates: Partial<PageElement> } }
+  | { type: 'DELETE_ELEMENT'; payload: { spreadId: string; elementId: string } }
+  | { type: 'MOVE_ELEMENT'; payload: { fromSpreadId: string; toSpreadId: string; elementId: string } }
   | { type: 'ADD_TO_POOL'; payload: PoolImage[] }
   | { type: 'REMOVE_FROM_POOL'; payload: string }
   | { type: 'CLEAR_POOL' };

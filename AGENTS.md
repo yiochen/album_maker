@@ -25,6 +25,18 @@ The application is structured into modular layers. Please refer to the `AGENTS.m
 - **[Sources](src/sources/AGENTS.md)**: Plugin system for image providers (Google Photos, etc.).
 - **[Workers](src/workers/AGENTS.md)**: Web Workers for background tasks.
 
+## Core Concepts
+
+### Spread Model
+The application operates on **Spreads** (typically 2 pages side-by-side) as the fundamental unit of design. While previously using "Pages", the datamodel and UI now focus on Spreads to enable seamless cross-page designing.
+
+### Absolute Coordinate System
+Elements are positioned using **Absolute Pixels** (at 300 PPI) relative to the top-left of the Spread.
+-   **Resolution**: 300 PPI (Pixels Per Inch) is the base resolution.
+-   **Storage**: Database stores `x`, `y`, `width`, `height` in pixels.
+-   **Display**: UI converts these to user-friendly units (Inches, CM) for display and editing.
+-   **Zoom**: Canvas scaling is purely visual; underlying data remains absolute.
+
 ## Directory Structure & Quick Links
 
 ```

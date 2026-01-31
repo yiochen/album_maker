@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import type { Page, AlbumSettings } from '../types';
+import type { Spread, AlbumSettings } from '../types';
 
 interface ThumbnailOptions {
     width: number;
@@ -11,8 +11,10 @@ const DEFAULT_OPTIONS: ThumbnailOptions = {
     height: 125,  // 8:5 aspect ratio for spread
 };
 
+const PPI = 300;
+
 /**
- * Hook to generate thumbnail images from spread pages using HTML Canvas
+ * Hook to generate thumbnail images from spread using HTML Canvas
  */
 export function useCanvasThumbnail() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -47,16 +49,23 @@ export function useCanvasThumbnail() {
         });
     }, []);
 
-    // Generate thumbnail for a spread (two pages)
+    // Generate thumbnail for a spread
     const generateSpreadThumbnail = useCallback(async (
-        pages: Page[],
+        spread: Spread | Spread[], // Support array for transition, but prefer single Spread
         settings: AlbumSettings,
         options: Partial<ThumbnailOptions> = {}
     ): Promise<string | null> => {
+        // Handle array shim if needed (though we should move to passing single spread)
+        const targetSpread = Array.isArray(spread) ? spread[0] : spread;
+        if (!targetSpread) return null;
+
         const opts = { ...DEFAULT_OPTIONS, ...options };
 
         // Calculate aspect ratio from settings
-        const spreadAspect = (settings.pageWidth * 2) / settings.pageHeight;
+        const spreadRealWidth = settings.pageWidth * 2 * PPI;
+        const spreadRealHeight = settings.pageHeight * PPI;
+        const spreadAspect = spreadRealWidth / spreadRealHeight;
+
         let width = opts.width;
         let height = Math.round(width / spreadAspect);
 
@@ -69,6 +78,9 @@ export function useCanvasThumbnail() {
         const canvas = getCanvas(width, height);
         const ctx = canvas.getContext('2d');
         if (!ctx) return null;
+
+        // Calculate scale factor (Thumbnail Px / Real Px)
+        const scale = width / spreadRealWidth;
 
         // Clear canvas with white background
         ctx.fillStyle = '#ffffff';
@@ -84,38 +96,24 @@ export function useCanvasThumbnail() {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Draw elements from both pages
-        const pageWidth = width / 2;
+        // Draw elements
+        for (const element of targetSpread.elements) {
+            if (element.type !== 'image') continue;
 
-        for (let pageIdx = 0; pageIdx < pages.length && pageIdx < 2; pageIdx++) {
-            const page = pages[pageIdx];
-            const offsetX = pageIdx * pageWidth;
+            const x = element.position.x * scale;
+            const y = element.position.y * scale;
+            const w = element.size.width * scale;
+            const h = element.size.height * scale;
 
-            for (const element of page.elements) {
-                if (element.type !== 'image') continue;
-
-                try {
-                    const img = await loadImage(element.thumbnailUrl || element.imageUrl);
-
-                    // Convert page-relative coordinates to canvas coordinates
-                    const x = offsetX + (element.position.x / 100) * pageWidth;
-                    const y = (element.position.y / 100) * height;
-                    const w = (element.size.width / 100) * pageWidth;
-                    const h = (element.size.height / 100) * height;
-
-                    ctx.drawImage(img, x, y, w, h);
-                } catch {
-                    // Draw placeholder for failed images
-                    const x = offsetX + (element.position.x / 100) * pageWidth;
-                    const y = (element.position.y / 100) * height;
-                    const w = (element.size.width / 100) * pageWidth;
-                    const h = (element.size.height / 100) * height;
-
-                    ctx.fillStyle = '#f0f0f0';
-                    ctx.fillRect(x, y, w, h);
-                    ctx.strokeStyle = '#cccccc';
-                    ctx.strokeRect(x, y, w, h);
-                }
+            try {
+                const img = await loadImage(element.thumbnailUrl || element.imageUrl);
+                ctx.drawImage(img, x, y, w, h);
+            } catch {
+                // Placeholder
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(x, y, w, h);
+                ctx.strokeStyle = '#cccccc';
+                ctx.strokeRect(x, y, w, h);
             }
         }
 
@@ -123,18 +121,27 @@ export function useCanvasThumbnail() {
         return canvas.toDataURL('image/jpeg', 0.7);
     }, [getCanvas, loadImage]);
 
-    // Generate thumbnail as Blob for IndexedDB storage
+    // Generate thumbnail as Blob
     const generateSpreadThumbnailBlob = useCallback(async (
-        pages: Page[],
+        spread: Spread | Spread[],
         settings: AlbumSettings,
         options: Partial<ThumbnailOptions> = {}
     ): Promise<Blob | null> => {
+        // Handle array shim
+        const targetSpread = Array.isArray(spread) ? spread[0] : spread;
+        if (!targetSpread) return null;
+
         const opts = { ...DEFAULT_OPTIONS, ...options };
 
-        const spreadAspect = (settings.pageWidth * 2) / settings.pageHeight;
+        // Calculate aspect ratio from settings
+        const spreadRealWidth = settings.pageWidth * 2 * PPI;
+        const spreadRealHeight = settings.pageHeight * PPI;
+        const spreadAspect = spreadRealWidth / spreadRealHeight;
+
         let width = opts.width;
         let height = Math.round(width / spreadAspect);
 
+        // Ensure height doesn't exceed max
         if (height > opts.height) {
             height = opts.height;
             width = Math.round(height * spreadAspect);
@@ -144,10 +151,14 @@ export function useCanvasThumbnail() {
         const ctx = canvas.getContext('2d');
         if (!ctx) return null;
 
-        // Same drawing logic as above
+        // Calculate scale factor
+        const scale = width / spreadRealWidth;
+
+        // Clear canvas with white background
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, width, height);
 
+        // Seam
         const seamX = width / 2;
         ctx.strokeStyle = '#cccccc';
         ctx.setLineDash([4, 4]);
@@ -157,33 +168,21 @@ export function useCanvasThumbnail() {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        const pageWidth = width / 2;
+        // Draw elements
+        for (const element of targetSpread.elements) {
+            if (element.type !== 'image') continue;
 
-        for (let pageIdx = 0; pageIdx < pages.length && pageIdx < 2; pageIdx++) {
-            const page = pages[pageIdx];
-            const offsetX = pageIdx * pageWidth;
+            const x = element.position.x * scale;
+            const y = element.position.y * scale;
+            const w = element.size.width * scale;
+            const h = element.size.height * scale;
 
-            for (const element of page.elements) {
-                if (element.type !== 'image') continue;
-
-                try {
-                    const img = await loadImage(element.thumbnailUrl || element.imageUrl);
-
-                    const x = offsetX + (element.position.x / 100) * pageWidth;
-                    const y = (element.position.y / 100) * height;
-                    const w = (element.size.width / 100) * pageWidth;
-                    const h = (element.size.height / 100) * height;
-
-                    ctx.drawImage(img, x, y, w, h);
-                } catch {
-                    const x = offsetX + (element.position.x / 100) * pageWidth;
-                    const y = (element.position.y / 100) * height;
-                    const w = (element.size.width / 100) * pageWidth;
-                    const h = (element.size.height / 100) * height;
-
-                    ctx.fillStyle = '#f0f0f0';
-                    ctx.fillRect(x, y, w, h);
-                }
+            try {
+                const img = await loadImage(element.thumbnailUrl || element.imageUrl);
+                ctx.drawImage(img, x, y, w, h);
+            } catch {
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(x, y, w, h);
             }
         }
 

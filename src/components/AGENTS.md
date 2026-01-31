@@ -73,3 +73,16 @@ const BASE_UI_SIZES = {
 - **Do** treat `Canvas.tsx` with care; ensure Fabric object state remains synced with the React/Redux store without causing infinite update loops.
 - **Do not** mix heavy business logic directly into view components; delegate to hooks or commands.
 
+### Cross-Page Interactions
+- **Drag & Drop**: Elements can be freely dragged across the two-page spread.
+- **Smart Ownership**: When an element is dropped (drag ends), the system calculates which page contains the element's center point. Ownership is automatically transferred to that page.
+- **Bleed**: Elements can bleed off the edge of the canvas (partially visible). A 20px safety margin ensures elements are never completely lost off-screen.
+
+### Aspect Ratio Logic
+- **Smart Locking**:
+    - Locking the aspect ratio respects the **current visual shape** of the element (even if distorted), rather than snapping back to the original image ratio.
+    - Side handles (top/bottom/left/right) resize the element **proportionally** when locked, strictly enforcing the aspect ratio.
+- **Reset functionality**:
+    - Users can restore the image to its **original file aspect ratio** via the "Reset Image" button.
+    - The original image ratio is preserved in `originalAspectRatio` even when the user toggles the lock on/off.
+

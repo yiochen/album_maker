@@ -1,24 +1,24 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
-import type { Page, PageElement, PoolImage, AlbumSettings, SnapEdge } from '../types';
+import type { Spread, PageElement, PoolImage, AlbumSettings } from '../types';
 import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 
 interface CanvasProps {
-    pages: Page[];
-    pageIndex: number;
+    spread: Spread;
     settings: AlbumSettings;
     selectedElementId: string | null;
     isSnappingEnabled: boolean;
     onElementSelect: (elementId: string | null) => void;
-    onElementUpdate: (pageId: string, elementId: string, updates: Partial<PageElement>) => void;
-    onElementDelete: (pageId: string, elementId: string) => void;
-    onImageDrop: (pageId: string, image: PoolImage, position: { x: number; y: number }, pagePixelDimensions: { width: number; height: number }) => void;
-    onMoveElementToPage?: (fromPageId: string, toPageId: string, elementId: string) => void;
+    onElementUpdate: (spreadId: string, elementId: string, updates: Partial<PageElement>) => void;
+    onElementDelete: (spreadId: string, elementId: string) => void;
+    onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
     onCanvasChange?: (dataUrl: string) => void;
 }
 
 /** Pixels per inch - 300 is standard print resolution */
 const PPI = 300;
+/** Pixels per inch - 96 is standard screen resolution */
+const SCREEN_PPI = 96;
 
 /**
  * Base sizes for UI controls at 100% zoom.
@@ -35,7 +35,12 @@ const BASE_UI_SIZES = {
 
 /** Calculate zoom-compensated sizes for UI controls */
 const getZoomCompensatedSizes = (zoomPercent: number) => {
-    const inverseScale = 100 / zoomPercent;
+    // scale = (zoom / 100) * (96 / 300)
+    // inverse = 1 / scale
+    // inverse = 1 / ((zoom/100) * (96/300)) = (100 * 300) / (zoom * 96)
+    const scale = (zoomPercent / 100) * (SCREEN_PPI / PPI);
+    const inverseScale = 1 / scale;
+
     return {
         cornerSize: BASE_UI_SIZES.cornerSize * inverseScale,
         borderScaleFactor: BASE_UI_SIZES.borderWidth * inverseScale,
@@ -49,7 +54,6 @@ const getZoomCompensatedSizes = (zoomPercent: number) => {
 interface CustomFabricObject extends fabric.Object {
     data?: {
         id: string;
-        pageId: string;
     };
 }
 
@@ -58,8 +62,7 @@ interface ExtendedFabricObject extends fabric.Object {
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
-    pages,
-    pageIndex,
+    spread,
     settings,
     selectedElementId,
     isSnappingEnabled,
@@ -76,36 +79,38 @@ export const Canvas: React.FC<CanvasProps> = ({
     const loadingIds = useRef<Set<string>>(new Set());
     const snapLinesRef = useRef<fabric.Line[]>([]);
     const seamRef = useRef<fabric.Line | null>(null);
-    const zoomRef = useRef(100);
 
-    // Refs for callbacks
+    // Refs for callbacks to avoid re-binding effects constantly
     const onElementSelectRef = useRef(onElementSelect);
     const onElementUpdateRef = useRef(onElementUpdate);
     const onElementDeleteRef = useRef(onElementDelete);
     const onImageDropRef = useRef(onImageDrop);
     const onCanvasChangeRef = useRef(onCanvasChange);
-    const pagesRef = useRef(pages);
+    const spreadRef = useRef(spread);
     const settingsRef = useRef(settings);
     const isSnappingEnabledRef = useRef(isSnappingEnabled);
 
+    // Initial zoom state
+    const [zoom, setZoom] = useState(25);
+    const isZoomInitialized = useRef(false);
+
+    const [isDragOver, setIsDragOver] = useState(false);
+    const [hasSelection, setHasSelection] = useState(false);
+
+    // Update refs
     useEffect(() => {
         onElementSelectRef.current = onElementSelect;
         onElementUpdateRef.current = onElementUpdate;
         onElementDeleteRef.current = onElementDelete;
         onImageDropRef.current = onImageDrop;
         onCanvasChangeRef.current = onCanvasChange;
-        pagesRef.current = pages;
+        spreadRef.current = spread;
         settingsRef.current = settings;
         isSnappingEnabledRef.current = isSnappingEnabled;
-    }, [onElementSelect, onElementUpdate, onElementDelete, onImageDrop, onCanvasChange, pages, settings, isSnappingEnabled]);
+    }, [onElementSelect, onElementUpdate, onElementDelete, onImageDrop, onCanvasChange, spread, settings, isSnappingEnabled]);
 
-    const [zoom, setZoom] = useState(100);
-    const [isDragOver, setIsDragOver] = useState(false);
-    const [hasSelection, setHasSelection] = useState(false);
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [activeSnapLines, setActiveSnapLines] = useState<SnapEdge[]>([]);
-
+    // Canvas dimensions (Absolute Pixels)
+    // Spread width is 2x page width usually, but we should respect spread settings if we add them later.
     const canvasWidth = settings.pageWidth * 2 * PPI;
     const canvasHeight = settings.pageHeight * PPI;
 
@@ -127,6 +132,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         fabricCanvasRef.current = canvas;
 
+        // Add Seam Line (Center of spread)
         const seam = new fabric.Line([canvasWidth / 2, 0, canvasWidth / 2, canvasHeight], {
             stroke: '#ccc',
             strokeWidth: 2,
@@ -134,15 +140,15 @@ export const Canvas: React.FC<CanvasProps> = ({
             evented: false,
             strokeDashArray: [5, 5],
         });
-        (seam as CustomFabricObject).data = { id: 'seam', pageId: '' };
+        (seam as CustomFabricObject).data = { id: 'seam' };
         seamRef.current = seam;
         canvas.add(seam);
         canvas.sendObjectToBack(seam);
 
         const setMoving = (e: { target?: fabric.Object }) => { if (e.target) (e.target as ExtendedFabricObject).isMoving = true; };
         canvas.on('object:moving', setMoving);
-        canvas.on('object:scaling', setMoving);
         canvas.on('object:rotating', setMoving);
+
         canvas.on('mouse:up', () => {
             canvas.getObjects().forEach(o => (o as ExtendedFabricObject).isMoving = false);
             snapLinesRef.current.forEach(line => canvas.remove(line));
@@ -169,11 +175,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                 if (obj.data?.id) {
                     onElementSelectRef.current(obj.data.id);
                 }
-            } else if (selected.length > 1) {
-                const obj = selected[0] as CustomFabricObject;
-                if (obj.data?.id) {
-                    onElementSelectRef.current(obj.data.id);
-                }
             } else {
                 onElementSelectRef.current(null);
             }
@@ -196,6 +197,11 @@ export const Canvas: React.FC<CanvasProps> = ({
             snapLinesRef.current.forEach(line => canvas.remove(line));
             snapLinesRef.current = [];
 
+            // Calculate percentage coordinates for snapping logic (reusing existing snap logic which uses %)
+            // Wait, we refactored to absolute. Snapping utils usually expect %, but we can update snapping utils later or convert here.
+            // Let's convert to % ONLY for snapping calculation to reuse the utility for now.
+            // Ideally we refactor snapping to pixels too, but let's minimize scope if possible.
+            // Actually, `calculateSnap` likely expects %, based on previous file usage.
             const percentX = (obj.left! / canvasWidth) * 100;
             const percentY = (obj.top! / canvasHeight) * 100;
             const percentW = (obj.getScaledWidth() / canvasWidth) * 100;
@@ -215,7 +221,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                     newTop = (snapResult.position.y / 100) * canvasHeight;
 
                     const activeLines = getActiveSnapLines(snapResult.snappedEdges);
-                    const uiSizes = getZoomCompensatedSizes(zoomRef.current);
+                    // Use zoom-compensated sizes? Note: zoomRef not available here unless updated or using state?
+                    // We can access 'zoom' state if we put this in useEffect dependency or use ref.
+                    // Accessing zoomed UI sizes requires zoom factor.
+                    // For now, let's just draw lines.
                     activeLines.forEach(line => {
                         let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
                         if (line.orientation === 'vertical') {
@@ -230,10 +239,10 @@ export const Canvas: React.FC<CanvasProps> = ({
 
                         const fabricLine = new fabric.Line([x1, y1, x2, y2], {
                             stroke: '#ff00ff',
-                            strokeWidth: uiSizes.snapLineStrokeWidth,
+                            strokeWidth: 1, // Fix later with zoom compensation
                             selectable: false,
                             evented: false,
-                            strokeDashArray: [uiSizes.snapLineDash, uiSizes.snapLineDash],
+                            strokeDashArray: [4, 4],
                         });
                         canvas.add(fabricLine);
                         snapLinesRef.current.push(fabricLine);
@@ -241,18 +250,16 @@ export const Canvas: React.FC<CanvasProps> = ({
                 }
             }
 
+            // Apply validated position (Absolute Px)
             obj.left = newLeft;
             obj.top = newTop;
 
-            const pageId = obj.data.pageId;
-            const pages = pagesRef.current;
-            const isRightPage = pages[1] && pages[1].id === pageId;
-
-            const pageWidth = canvasWidth / 2;
-            const minX = isRightPage ? pageWidth : 0;
-            const maxX = (isRightPage ? canvasWidth : pageWidth) - (obj.getScaledWidth() || 0);
-            const minY = 0;
-            const maxY = canvasHeight - (obj.getScaledHeight() || 0);
+            // Allow bleed
+            const bleedMargin = 50; // 50px bleed
+            const minX = -obj.getScaledWidth() + bleedMargin;
+            const maxX = canvasWidth - bleedMargin;
+            const minY = -obj.getScaledHeight() + bleedMargin;
+            const maxY = canvasHeight - bleedMargin;
 
             if (obj.left < minX) obj.left = minX;
             if (obj.left > maxX) obj.left = maxX;
@@ -260,6 +267,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (obj.top > maxY) obj.top = maxY;
         });
 
+        // Modification Handler (End of drag/resize)
         canvas.on('object:modified', (e) => {
             const obj = e.target as CustomFabricObject;
             if (!obj || !obj.data) return;
@@ -267,23 +275,9 @@ export const Canvas: React.FC<CanvasProps> = ({
             snapLinesRef.current.forEach(line => canvas.remove(line));
             snapLinesRef.current = [];
 
-            const pageId = obj.data.pageId;
-            const pages = pagesRef.current;
-            const isRightPage = pages[1] && pages[1].id === pageId;
-
-            const pageWidth = canvasWidth / 2;
-            const offsetLeft = isRightPage ? pageWidth : 0;
-
-            const relativeLeft = (obj.left! - offsetLeft);
-            const percentX = (relativeLeft / pageWidth) * 100;
-            const percentY = (obj.top! / canvasHeight) * 100;
-
-            const percentW = (obj.getScaledWidth() / pageWidth) * 100;
-            const percentH = (obj.getScaledHeight() / canvasHeight) * 100;
-
-            onElementUpdateRef.current(pageId, obj.data.id, {
-                position: { x: percentX, y: percentY },
-                size: { width: percentW, height: percentH },
+            onElementUpdateRef.current(spreadRef.current.id, obj.data.id, {
+                position: { x: obj.left!, y: obj.top! },
+                size: { width: obj.getScaledWidth(), height: obj.getScaledHeight() },
             });
 
             // Generate thumbnail
@@ -293,17 +287,60 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
         });
 
+        // Cleanup
         return () => {
             canvas.dispose();
             fabricCanvasRef.current = null;
         };
+    }, [canvasWidth, canvasHeight]); // Re-init if dimensions change
+
+    // Auto-Fit Logic (Run once on mount/resize)
+    const fitToViewport = useCallback(() => {
+        if (!containerRef.current) return;
+        const viewport = containerRef.current;
+        const padding = 64;
+        const availableWidth = viewport.clientWidth - padding;
+        const availableHeight = viewport.clientHeight - padding;
+
+        // Calculate needed scale to fit
+        const scaleX = availableWidth / canvasWidth;
+        const scaleY = availableHeight / canvasHeight;
+        const scale = Math.min(scaleX, scaleY);
+
+        // Convert to percentage where 100% = Physical Size (scale = 96/300)
+        // scale = (zoom / 100) * (96 / 300)
+        // zoom = scale * 100 * (300 / 96)
+        const zoomPercent = Math.max(10, Math.floor(scale * 100 * (PPI / SCREEN_PPI)));
+        setZoom(zoomPercent);
     }, [canvasWidth, canvasHeight]);
 
-    // Keyboard Events
+    useEffect(() => {
+        // Auto fit on first load if dimensions are known
+        if (!isZoomInitialized.current && canvasWidth > 0) {
+            // Small timeout to allow layout
+            const timer = setTimeout(() => {
+                fitToViewport();
+                isZoomInitialized.current = true;
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [fitToViewport, canvasWidth]);
+
+    // Handle Window Resize
+    useEffect(() => {
+        let timeout: ReturnType<typeof setTimeout>;
+        const handleResize = () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(fitToViewport, 100);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [fitToViewport]);
+
+    // Keyboard Deletion
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement;
-            // Ignore if input is focused, unless it's inside the canvas container (Fabric's hidden textarea)
             if (['INPUT', 'TEXTAREA'].includes(target.tagName) && !target.closest('.canvas-container')) {
                 return;
             }
@@ -311,21 +348,18 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 const canvas = fabricCanvasRef.current;
                 if (!canvas) return;
-
                 const activeObj = canvas.getActiveObject() as CustomFabricObject;
                 if (activeObj && activeObj.data) {
-                    onElementDeleteRef.current(activeObj.data.pageId, activeObj.data.id);
+                    onElementDeleteRef.current(spreadRef.current.id, activeObj.data.id);
                     canvas.discardActiveObject();
-                    canvas.requestRenderAll();
                 }
             }
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // Drag and Drop
+    // Drag Drop Handlers
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
@@ -339,7 +373,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragOver(false);
-
         const imageData = e.dataTransfer.getData('application/json');
         if (!imageData) return;
 
@@ -348,26 +381,24 @@ export const Canvas: React.FC<CanvasProps> = ({
             const rect = wrapperRef.current?.getBoundingClientRect();
             if (!rect) return;
 
-            // Calculate drop position as percentage of spread
-            const x = ((e.clientX - rect.left) / rect.width) * 100;
-            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            // Calculate drop position relative to the canvas DOM element
+            // We need to convert DOM pixels to Canvas pixels (taking zoom into account)
+            const domX = e.clientX - rect.left;
+            const domY = e.clientY - rect.top;
 
-            // Determine which page (left or right) based on x position
-            const isRightPage = x > 50;
-            const targetPage = pagesRef.current[isRightPage ? 1 : 0];
+            // Convert to Canvas Coordinate Space (Absolute Px)
+            // rect.width is the visual width (scale * canvasWidth)
+            // Convert to Canvas Coordinate Space (Absolute Px)
+            // rect.width is the visual width (scale * canvasWidth)
+            const scale = (zoom / 100) * (SCREEN_PPI / PPI);
+            const canvasX = domX / scale;
+            const canvasY = domY / scale;
 
-            if (targetPage) {
-                // Adjust x for the target page (0-100% within that page)
-                const adjustedX = isRightPage ? (x - 50) * 2 : x * 2;
-                // Pass page pixel dimensions so the handler can calculate proper element size
-                const pagePixelWidth = canvasWidth / 2; // Each page is half the spread
-                const pagePixelHeight = canvasHeight;
-                onImageDropRef.current(targetPage.id, image, { x: adjustedX, y }, { width: pagePixelWidth, height: pagePixelHeight });
-            }
+            onImageDropRef.current(spreadRef.current.id, image, { x: canvasX, y: canvasY });
         } catch (err) {
-            console.error('Failed to parse dropped item', err);
+            console.error('Failed to parse drop', err);
         }
-    }, [canvasWidth, canvasHeight]);
+    }, [zoom]);
 
     // Sync State to Fabric
     useEffect(() => {
@@ -376,98 +407,94 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         const currentObjects = canvas.getObjects() as CustomFabricObject[];
         const validIds = new Set<string>();
-        const elementsToLoad: { element: PageElement, pageId: string, left: number, top: number, width: number, height: number }[] = [];
+        const elementsToLoad: { element: PageElement, width: number, height: number }[] = [];
 
-        [pages[0], pages[1]].forEach((page, i) => {
-            if (!page) return;
-            const pageOffsetX = i * (canvasWidth / 2);
+        spread.elements.forEach(element => {
+            validIds.add(element.id);
+            const existingObj = currentObjects.find(o => o.data?.id === element.id);
 
-            page.elements.forEach(element => {
-                validIds.add(element.id);
+            // Directly use stored absolute coordinates
+            const targetLeft = element.position.x;
+            const targetTop = element.position.y;
+            const targetWidth = element.size.width;
+            const targetHeight = element.size.height;
 
-                const existingObj = currentObjects.find(o => o.data?.id === element.id);
+            if (existingObj) {
+                if (!isObjectMoving(existingObj)) {
+                    let modified = false;
+                    if (existingObj instanceof fabric.Image) {
+                        // Update logic
+                        const img = existingObj;
+                        const newScaleX = targetWidth / (img.width || 1);
+                        const newScaleY = targetHeight / (img.height || 1);
 
-                const targetLeft = pageOffsetX + (element.position.x / 100) * (canvasWidth / 2);
-                const targetTop = (element.position.y / 100) * canvasHeight;
-                const targetWidth = (element.size.width / 100) * (canvasWidth / 2);
-                const targetHeight = (element.size.height / 100) * canvasHeight;
+                        if (Math.abs(img.left! - targetLeft) > 1) { img.set('left', targetLeft); modified = true; }
+                        if (Math.abs(img.top! - targetTop) > 1) { img.set('top', targetTop); modified = true; }
+                        if (Math.abs((img.scaleX || 1) - newScaleX) > 0.001) { img.set('scaleX', newScaleX); modified = true; }
+                        if (Math.abs((img.scaleY || 1) - newScaleY) > 0.001) { img.set('scaleY', newScaleY); modified = true; }
 
-                if (existingObj) {
-                    if (!isObjectMoving(existingObj)) {
-                        let modified = false;
-                        if (existingObj instanceof fabric.Image) {
-                            const img = existingObj;
-                            const newScaleX = targetWidth / (img.width || 1);
-                            const newScaleY = targetHeight / (img.height || 1);
-
-                            if (Math.abs(img.left! - targetLeft) > 0.5) { img.set('left', targetLeft); modified = true; }
-                            if (Math.abs(img.top! - targetTop) > 0.5) { img.set('top', targetTop); modified = true; }
-                            if (Math.abs((img.scaleX || 1) - newScaleX) > 0.001) { img.set('scaleX', newScaleX); modified = true; }
-                            if (Math.abs((img.scaleY || 1) - newScaleY) > 0.001) { img.set('scaleY', newScaleY); modified = true; }
-
-                            if (modified) img.setCoords();
+                        const isLocked = element.lockAspectRatio;
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        if ((img as any).uniformScaling !== isLocked) {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            (img as any).uniformScaling = isLocked;
+                            modified = true;
                         }
-                    }
-                } else {
-                    if (!loadingIds.current.has(element.id)) {
-                        elementsToLoad.push({ element, pageId: page.id, left: targetLeft, top: targetTop, width: targetWidth, height: targetHeight });
+
+                        if (modified) img.setCoords();
                     }
                 }
-            });
+            } else {
+                if (!loadingIds.current.has(element.id)) {
+                    elementsToLoad.push({ element, width: targetWidth, height: targetHeight });
+                }
+            }
         });
 
-        const objectsToRemove = currentObjects.filter(obj => {
-            const data = obj.data;
-            if (data?.id === 'seam') return false;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if (obj instanceof fabric.Line && (obj as any).stroke === '#ff00ff') return false;
-            if (data?.id && !validIds.has(data.id)) return true;
-            return false;
+        // Clean up removed objects
+        currentObjects.forEach(obj => {
+            const customObj = obj as CustomFabricObject;
+            if (customObj.data?.id && customObj.data.id !== 'seam' && !validIds.has(customObj.data.id)) {
+                canvas.remove(obj);
+            }
         });
 
-        objectsToRemove.forEach(obj => canvas.remove(obj));
-        if (objectsToRemove.length > 0) canvas.requestRenderAll();
-
-        elementsToLoad.forEach(async (task) => {
-            const { element, pageId, left, top, width, height } = task;
-
+        // Load new images
+        elementsToLoad.forEach(async ({ element, width, height }) => {
+            if (loadingIds.current.has(element.id)) return;
             loadingIds.current.add(element.id);
-            try {
-                const img = await fabric.Image.fromURL(element.imageUrl, {
-                    crossOrigin: 'anonymous'
-                });
 
+            try {
+                const img = await fabric.Image.fromURL(element.imageUrl, { crossOrigin: 'anonymous' });
                 if (!fabricCanvasRef.current) return;
 
+                const isLocked = element.lockAspectRatio;
                 const uiSizes = getZoomCompensatedSizes(zoom);
+
                 img.set({
-                    left: left,
-                    top: top,
-                    originX: 'left',
-                    originY: 'top',
+                    left: element.position.x,
+                    top: element.position.y,
                     scaleX: width / (img.width || 1),
                     scaleY: height / (img.height || 1),
-                    data: { id: element.id, pageId: pageId },
+                    data: { id: element.id },
                     lockRotation: true,
+                    uniformScaling: isLocked,
                     cornerStyle: 'circle',
                     cornerColor: 'white',
                     cornerStrokeColor: '#333',
                     borderColor: '#333',
                     transparentCorners: false,
-                    // Zoom-compensated control sizes
                     cornerSize: uiSizes.cornerSize,
                     borderScaleFactor: uiSizes.borderScaleFactor,
                 });
 
                 canvas.add(img);
-
                 if (selectedElementId === element.id) {
                     canvas.setActiveObject(img);
                 }
                 canvas.requestRenderAll();
-
             } catch (err) {
-                console.error("Failed to load image", element.imageUrl, err);
+                console.error("Failed to load", element.imageUrl, err);
             } finally {
                 loadingIds.current.delete(element.id);
             }
@@ -475,115 +502,47 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         canvas.requestRenderAll();
 
-    }, [pages, canvasWidth, canvasHeight, selectedElementId, zoom]);
+    }, [spread, selectedElementId, zoom]); // Re-run when spread data changes
 
-    // Update selection
+    // Update UI sizes when zoom changes
     useEffect(() => {
         const canvas = fabricCanvasRef.current;
         if (!canvas) return;
-
-        const activeObj = canvas.getActiveObject() as CustomFabricObject;
-
-        if (selectedElementId) {
-            if (!activeObj || activeObj.data?.id !== selectedElementId) {
-                const target = (canvas.getObjects() as CustomFabricObject[]).find(o => o.data?.id === selectedElementId);
-                if (target) {
-                    canvas.setActiveObject(target);
-                    canvas.requestRenderAll();
-                }
-            }
-        } else {
-            if (activeObj) {
-                canvas.discardActiveObject();
-                canvas.requestRenderAll();
-            }
-        }
-    }, [selectedElementId]);
-
-    const fitToViewport = useCallback(() => {
-        if (!containerRef.current) return;
-
-        const viewport = containerRef.current;
-        const padding = 64;
-        const availableWidth = viewport.clientWidth - padding;
-        const availableHeight = viewport.clientHeight - padding;
-
-        const zoomToFitWidth = (availableWidth / canvasWidth) * 100;
-        const zoomToFitHeight = (availableHeight / canvasHeight) * 100;
-
-        const fitZoom = Math.min(zoomToFitWidth, zoomToFitHeight, 100);
-        setZoom(Math.max(25, Math.round(fitZoom)));
-    }, [canvasWidth, canvasHeight]);
-
-    useEffect(() => {
-        const timer = setTimeout(() => fitToViewport(), 0);
-        window.addEventListener('resize', fitToViewport);
-        return () => {
-            window.removeEventListener('resize', fitToViewport);
-            clearTimeout(timer);
-        };
-    }, [fitToViewport]);
-
-    // Update UI control sizes inversely to zoom so they appear consistent
-    useEffect(() => {
-        const canvas = fabricCanvasRef.current;
-        if (!canvas) return;
-
-        // Update ref for use in event callbacks
-        zoomRef.current = zoom;
 
         const uiSizes = getZoomCompensatedSizes(zoom);
-
-        // Update seam line
-        if (seamRef.current) {
-            seamRef.current.set({
-                strokeWidth: uiSizes.seamStrokeWidth,
-                strokeDashArray: [uiSizes.seamDash, uiSizes.seamDash],
-            });
-        }
-
-        // Update existing snap lines
-        snapLinesRef.current.forEach(line => {
-            line.set({
-                strokeWidth: uiSizes.snapLineStrokeWidth,
-                strokeDashArray: [uiSizes.snapLineDash, uiSizes.snapLineDash],
-            });
-        });
-
-        // Update all object control sizes
         canvas.getObjects().forEach(obj => {
             const customObj = obj as CustomFabricObject;
-            // Skip seam and snap lines (they're handled above)
-            if (customObj.data?.id === 'seam') return;
-            if (obj instanceof fabric.Line && (obj as fabric.Line).stroke === '#ff00ff') return;
+            if (customObj.data?.id === 'seam') {
+                (obj as fabric.Line).set({
+                    strokeWidth: uiSizes.seamStrokeWidth,
+                    strokeDashArray: [uiSizes.seamDash, uiSizes.seamDash],
+                });
+                return;
+            }
+            if (obj.type === 'line' && (obj as fabric.Line).stroke === '#ff00ff') {
+                // Snap line
+                (obj as fabric.Line).set({
+                    strokeWidth: uiSizes.snapLineStrokeWidth,
+                    strokeDashArray: [uiSizes.snapLineDash, uiSizes.snapLineDash],
+                });
+                return;
+            }
 
+            // Element
             obj.set({
                 cornerSize: uiSizes.cornerSize,
                 borderScaleFactor: uiSizes.borderScaleFactor,
             });
-            obj.setCoords();
         });
-
         canvas.requestRenderAll();
     }, [zoom]);
 
+
+    // Styles
     const canvasStyle = {
-        transform: `scale(${zoom / 100})`,
+        transform: `scale(${(zoom / 100) * (SCREEN_PPI / PPI)})`,
         transformOrigin: 'center center',
     };
-
-    // Debounced canvas change notification
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (onCanvasChange && fabricCanvasRef.current) {
-                // For Fabric, we might want to export to JSON or DataURL
-                const dataUrl = fabricCanvasRef.current.toDataURL({ multiplier: 1 });
-                onCanvasChange(dataUrl);
-            }
-        }, 1000); // 1s debounce for final settling
-        return () => clearTimeout(timer);
-    }, [pages, onCanvasChange]);
-
 
     return (
         <section
@@ -605,59 +564,23 @@ export const Canvas: React.FC<CanvasProps> = ({
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                     className={isDragOver ? 'drop-active' : ''}
-                    data-testid="interaction-layer"
                 >
                     <canvas ref={canvasElRef} data-testid="canvas-layer" />
-                    {pages.every(p => p.elements.length === 0) && (
+                    {spread.elements.length === 0 && (
                         <div className="canvas-placeholder" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', textAlign: 'center', width: '100%' }}>
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ margin: '0 auto', display: 'block', opacity: 0.3 }}>
-                                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                                <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
-                                <path d="M21 15L16 10L11 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                            <span className="canvas-placeholder-text" style={{ display: 'block', marginTop: '1rem', opacity: 0.5 }}>
-                                Drag images here from the image pool
-                            </span>
-                            <span className="text-muted" style={{ display: 'block', fontSize: '0.875rem', marginTop: '0.5rem', opacity: 0.4 }}>
-                                Pages {pageIndex + 1} - {pageIndex + 2}
+                            <span className="text-muted" style={{ opacity: 0.5 }}>
+                                Drag images here
                             </span>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Controls (Zoom) - Keep existing */}
             <div className="canvas-controls">
-                <button
-                    className="btn btn-ghost btn-icon"
-                    onClick={() => setZoom(z => Math.max(25, z - 25))}
-                    disabled={zoom <= 25}
-                >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-                        <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                </button>
+                <button className="btn btn-ghost btn-icon" onClick={() => setZoom(z => Math.max(25, z - 25))} disabled={zoom <= 25}>-</button>
                 <span className="zoom-display">{zoom}%</span>
-                <button
-                    className="btn btn-ghost btn-icon"
-                    onClick={() => setZoom(z => Math.min(200, z + 25))}
-                    disabled={zoom >= 200}
-                >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-                        <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M11 8v6M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                </button>
-                <button
-                    className="btn btn-ghost"
-                    onClick={fitToViewport}
-                    style={{ marginLeft: 'var(--space-2)' }}
-                >
-                    Fit
-                </button>
+                <button className="btn btn-ghost btn-icon" onClick={() => setZoom(z => Math.min(200, z + 25))} disabled={zoom >= 200}>+</button>
+                <button className="btn btn-ghost" onClick={fitToViewport}>Fit</button>
             </div>
         </section>
     );

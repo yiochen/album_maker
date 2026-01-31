@@ -1,47 +1,41 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { Page, AlbumSettings } from '../types';
+import type { Spread, AlbumSettings } from '../types';
 import { useCanvasThumbnail } from '../hooks/useCanvasThumbnail';
 import { spreadThumbnailDB, generateSpreadContentHash } from '../db';
 
 interface PageNavigatorProps {
-    pages: Page[];
+    spreads: Spread[];
     currentSpreadIndex: number;
-    maxPages: number;
+    maxSpreads: number;
     albumId: string;
     settings: AlbumSettings;
     onSpreadSelect: (spreadIndex: number) => void;
-    onAddPages: () => void;
-    onDeleteSpread: (leftPageId: string, rightPageId: string) => void;
+    onAddSpread: () => void;
+    onDeleteSpread: (spreadId: string) => void;
     onDeleteSpreads: (spreadIndices: number[]) => void;
 }
 
 export const PageNavigator: React.FC<PageNavigatorProps> = ({
-    pages,
+    spreads,
     currentSpreadIndex,
-    maxPages,
+    maxSpreads,
     albumId,
     settings,
     onSpreadSelect,
-    onAddPages,
+    onAddSpread,
     onDeleteSpread,
     onDeleteSpreads,
 }) => {
-    // Group pages into spreads (pairs)
-    const spreads: [Page, Page | undefined][] = [];
-    for (let i = 0; i < pages.length; i += 2) {
-        spreads.push([pages[i], pages[i + 1]]);
-    }
-
-    const canAddMore = pages.length < maxPages;
+    const canAddMore = spreads.length < maxSpreads;
 
     // Multi-selection state
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
     const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
 
-    // Clear selection when pages change (e.g., after deletion)
-    const [prevPageLength, setPrevPageLength] = useState(pages.length);
-    if (prevPageLength !== pages.length) {
-        setPrevPageLength(pages.length);
+    // Clear selection when spreads change (e.g., after deletion)
+    const [prevLength, setPrevLength] = useState(spreads.length);
+    if (prevLength !== spreads.length) {
+        setPrevLength(spreads.length);
         if (selectedIndices.size > 0) {
             setSelectedIndices(new Set());
             setLastClickedIndex(null);
@@ -104,7 +98,7 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
             return;
         }
 
-        if (window.confirm(`Delete ${selectedIndices.size} spread(s) (${selectedIndices.size * 2} pages)?`)) {
+        if (window.confirm(`Delete ${selectedIndices.size} spread(s)?`)) {
             onDeleteSpreads(Array.from(selectedIndices));
             setSelectedIndices(new Set());
         }
@@ -119,7 +113,7 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
             <div className="page-navigator-header">
                 <span className="page-navigator-title" data-testid="page-navigator-title">Spreads</span>
                 <span className="text-muted" style={{ fontSize: 'var(--text-xs)' }} data-testid="page-count">
-                    {pages.length} / {maxPages} pages
+                    {spreads.length} / {maxSpreads} spreads
                 </span>
             </div>
 
@@ -148,9 +142,8 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
             <div className="page-list">
                 {spreads.map((spread, spreadIndex) => (
                     <SpreadThumbnail
-                        key={spread[0].id}
-                        leftPage={spread[0]}
-                        rightPage={spread[1]}
+                        key={spread.id}
+                        spread={spread}
                         spreadIndex={spreadIndex}
                         albumId={albumId}
                         settings={settings}
@@ -160,25 +153,21 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                         showCheckbox={true}
                         onClick={(e) => handleSpreadClick(spreadIndex, e)}
                         onCheckboxChange={(checked) => handleCheckboxChange(spreadIndex, checked)}
-                        onDelete={() => {
-                            if (spread[1]) {
-                                onDeleteSpread(spread[0].id, spread[1].id);
-                            }
-                        }}
+                        onDelete={() => onDeleteSpread(spread.id)}
                     />
                 ))}
 
                 <button
                     className="add-page-btn"
-                    onClick={onAddPages}
+                    onClick={onAddSpread}
                     disabled={!canAddMore}
-                    title={canAddMore ? 'Add 2 pages' : `Maximum ${maxPages} pages reached`}
+                    title={canAddMore ? 'Add Spread' : `Maximum ${maxSpreads} spreads reached`}
                     data-testid="add-pages-button"
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
-                    Add Pages
+                    Add Spread
                 </button>
             </div>
         </aside>
@@ -186,8 +175,7 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
 };
 
 interface SpreadThumbnailProps {
-    leftPage: Page;
-    rightPage: Page | undefined;
+    spread: Spread;
     spreadIndex: number;
     albumId: string;
     settings: AlbumSettings;
@@ -201,8 +189,7 @@ interface SpreadThumbnailProps {
 }
 
 const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
-    leftPage,
-    rightPage,
+    spread,
     spreadIndex,
     albumId,
     settings,
@@ -251,13 +238,14 @@ const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
     useEffect(() => {
         if (!isVisible) return;
 
-        const pages = rightPage ? [leftPage, rightPage] : [leftPage];
-        const contentHash = generateSpreadContentHash(pages);
+        // Pass single spread to generator
+        const contentHash = generateSpreadContentHash(spread);
 
         const loadThumbnail = async () => {
             // Check cache first
             try {
-                const cached = await spreadThumbnailDB.get(albumId, spreadIndex);
+                // Use spread.id instead of index
+                const cached = await spreadThumbnailDB.get(albumId, spread.id);
                 if (cached && cached.contentHash === contentHash) {
                     setThumbnailUrl(cached.dataUrl);
                     return;
@@ -269,12 +257,13 @@ const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
             // Generate new thumbnail
             setIsLoading(true);
             try {
-                const dataUrl = await generateSpreadThumbnail(pages, settings);
+                // generateSpreadThumbnail expects Spread (single or array, hook handles it)
+                const dataUrl = await generateSpreadThumbnail(spread, settings);
                 if (dataUrl) {
                     setThumbnailUrl(dataUrl);
                     // Cache the thumbnail
                     try {
-                        await spreadThumbnailDB.set(albumId, spreadIndex, dataUrl, contentHash);
+                        await spreadThumbnailDB.set(albumId, spread.id, dataUrl, contentHash);
                     } catch (error) {
                         console.warn('Failed to cache thumbnail:', error);
                     }
@@ -287,11 +276,11 @@ const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
         };
 
         loadThumbnail();
-    }, [isVisible, leftPage, rightPage, spreadIndex, albumId, settings, generateSpreadThumbnail]);
+    }, [isVisible, spread, spreadIndex, albumId, settings, generateSpreadThumbnail]);
 
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (window.confirm('Delete this spread (2 pages)?')) {
+        if (window.confirm('Delete this spread?')) {
             onDelete();
         }
     };

@@ -5,7 +5,7 @@ Contains custom React hooks that encapsulate state management and complex logic,
 
 ## Key Logic
 - **`useHistory`**: Manages the application state stack (past/present/future) and integrates with the Command Pattern.
-- **Canvas Hooks**: Logic for canvas rendering (`useCanvasRender`), interaction (`useCanvasInteraction`), and thumbnails (`useCanvasThumbnail`) is split to reduce complexity.
+- **Canvas Hooks**: Logic for canvas thumbnails (`useCanvasThumbnail`) is separated to reduce complexity.
 - **State Sync**: The project prefers the "state from props" pattern—deriving state during render or using immediate conditional updates—over `useEffect` for syncing props to state, to avoid render loops.
 
 ## Rules of Engagement
