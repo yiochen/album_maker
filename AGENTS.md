@@ -1,4 +1,4 @@
-# Photo Album Editor
+# Photo Album Editor - High Level Blueprint
 
 ## Project Overview
 
@@ -10,123 +10,54 @@ A web-based photo album editor built with React + TypeScript. It provides a Goog
 - **Build Tool**: Vite
 - **Database**: IndexedDB via Dexie.js
 - **Styling**: Vanilla CSS with design tokens
+- **Testing**: Cypress (E2E & Visual Regression)
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                        App.tsx                          │
-│  (Main orchestrator, album state, routing)             │
-└─────────────────────────────────────────────────────────┘
-         │
-         ├──────────────────────────────────────┐
-         │                                      │
-         ▼                                      ▼
-┌─────────────────┐                    ┌─────────────────┐
-│    Components   │                    │     Hooks       │
-│  ├── Canvas     │                    │  ├── useAlbum   │
-│  ├── PageNav    │                    │  ├── useAutoSave│
-│  ├── Properties │                    │  └── useImageWkr│
-│  ├── ImagePool  │                    └─────────────────┘
-│  └── AlbumSelect│
-└─────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────┐
-│                      Services                            │
-│  ├── storage.ts     (IndexedDB CRUD via Dexie)         │
-│  ├── thumbnailCache (Blob caching in IndexedDB)        │
-│  └── export.ts      (Canvas rendering, PNG export)     │
-└─────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────┐
-│                  Photo Sources                           │
-│  Interface: PhotoSource                                  │
-│  ├── googlePhotos.ts  (Google Photos API)              │
-│  └── dummyColors.ts   (Test color images)              │
-└─────────────────────────────────────────────────────────┘
-```
+The application is structured into modular layers. Please refer to the `AGENTS.md` file in each directory for specific implementation details and rules.
 
-## Directory Structure
+### Core Modules
+- **[Commands](src/commands/AGENTS.md)**: Undo/Redo logic using the Command Pattern.
+- **[Components](src/components/AGENTS.md)**: React UI components and Canvas logic (Fabric.js).
+- **[Database](src/db/AGENTS.md)**: Client-side persistence with Dexie.js.
+- **[Hooks](src/hooks/AGENTS.md)**: State management and custom logic hooks.
+- **[Services](src/services/AGENTS.md)**: Stateless business logic (Export, Storage).
+- **[Sources](src/sources/AGENTS.md)**: Plugin system for image providers (Google Photos, etc.).
+- **[Workers](src/workers/AGENTS.md)**: Web Workers for background tasks.
+
+## Directory Structure & Quick Links
 
 ```
 src/
-├── components/          # React UI components
-│   ├── AlbumSelector    # Multi-album dropdown
-│   ├── Canvas           # Main editing canvas
-│   ├── ImagePool        # Bottom image library
-│   ├── PageNavigator    # Left sidebar thumbnails
-│   └── PropertiesPanel  # Right properties panel
-├── db/
-│   └── index.ts         # Dexie.js database config
-├── hooks/
-│   ├── useAlbum.ts      # Album state reducer
-│   ├── useAutoSave.ts   # IndexedDB persistence
-│   └── useImageWorker   # Web Worker communication
-├── services/
-│   ├── export.ts        # Page export logic
-│   ├── storage.ts       # Album CRUD operations
-│   └── thumbnailCache   # Image caching
-├── sources/             # Photo source plugins
-│   ├── types.ts         # PhotoSource interface
-│   ├── googlePhotos.ts  # Google Photos implementation
-│   ├── dummyColors.ts   # Test color images
-│   └── index.ts         # Source registry
-├── templates/
-│   └── pageTemplates.ts # Layout template definitions
-├── types/
-│   └── index.ts         # TypeScript type definitions
-├── workers/
-│   └── imageFetcher     # Background image loading
-├── App.tsx              # Main application
-├── main.tsx             # React entry point
-└── index.css            # Design system
+├── commands/     # Command Pattern (Undo/Redo) -> See src/commands/AGENTS.md
+├── components/   # UI & Canvas -> See src/components/AGENTS.md
+├── db/           # IndexedDB -> See src/db/AGENTS.md
+├── hooks/        # React Hooks -> See src/hooks/AGENTS.md
+├── services/     # Business Logic -> See src/services/AGENTS.md
+├── sources/      # Image Sources -> See src/sources/AGENTS.md
+├── templates/    # Layout Templates
+├── types/        # TypeScript Definitions
+├── utils/        # Utility Functions
+├── workers/      # Web Workers -> See src/workers/AGENTS.md
+├── App.tsx       # Main Orchestrator
+└── index.css     # Global Styles
 ```
 
-## Key Abstractions
+## Global Rules of Engagement
 
-### PhotoSource Interface
-
-All image sources implement this interface (see `src/sources/types.ts`):
-
-```typescript
-interface PhotoSource {
-  id: string;
-  name: string;
-  icon: React.ReactNode;
-  requiresAuth: boolean;
-  isAuthenticated(): boolean;
-  connect(): Promise<void>;
-  disconnect(): void;
-  fetchImages(options?): Promise<FetchImagesResult>;
-  getThumbnailUrl(image, size): string;
-  getFullUrl(image, maxWidth?, maxHeight?): string;
-}
-```
-
-To add a new source:
-1. Create `src/sources/yourSource.ts` implementing `PhotoSource`
-2. Register in `src/sources/index.ts`
-
-### Album State Management
-
-Uses React's `useReducer` pattern. See `src/hooks/useAlbum.ts`:
-
-```typescript
-type AlbumAction =
-  | { type: 'SET_ALBUM'; payload: Album }
-  | { type: 'ADD_PAGE'; payload?: { templateId?: TemplateId } }
-  | { type: 'UPDATE_ELEMENT'; payload: { pageId, elementId, updates } }
-  // ... etc
-```
-
-### IndexedDB Schema (Dexie)
-
-Tables defined in `src/db/index.ts`:
-- `albums`: Album data (id, name, lastModified, data)
-- `thumbnailCache`: Cached image blobs (url, blob, timestamp)
-- `settings`: App settings key-value store
+1.  **Read Before You Write**: Always consult the local `AGENTS.md` in the directory you are working in.
+2.  **Visual Regression**: We use `cypress-visual-regression`. Run `npm run cypress:ci` to verify changes, especially for Canvas rendering.
+3.  **State Management**:
+    *   Use `useHistory` for undoable state.
+    *   Use `useReducer` or "State from Props" for complex local state.
+    *   Avoid deep prop drilling; use composition or context where appropriate.
+4.  **Testing**:
+    *   Use `data-testid` for selectors.
+    *   Close Modals explicitly in tests.
+    *   Wait for Canvas rendering (Fabric.js) to settle before snapshots.
+5.  **Performance**:
+    *   Offload heavy tasks to Web Workers.
+    *   Manage object lifecycles (especially Fabric.js objects) to avoid memory leaks.
 
 ## Development
 
@@ -137,74 +68,9 @@ npm install
 # Start dev server
 npm run dev
 
-# Type check
-npx tsc --noEmit
+# Run Lint
+npm run lint
 
-# Build for production
-npm run build
+# Run Tests
+npm run test:e2e
 ```
-
-## Common Tasks
-
-### Adding a New Template
-
-Edit `src/templates/pageTemplates.ts`:
-
-```typescript
-'your-template': {
-  id: 'your-template',
-  name: 'Your Template',
-  description: 'Description',
-  exportWidth: 2400,
-  exportHeight: 1800,
-  padding: { top: 100, right: 100, bottom: 100, left: 100 },
-  slots: [{ id: 'slot1', x: 10, y: 10, width: 80, height: 80 }],
-}
-```
-
-### Adding a New Photo Source
-
-1. Create `src/sources/newSource.ts`:
-
-```typescript
-import { PhotoSource } from './types';
-
-class NewSource implements PhotoSource {
-  readonly id = 'new-source';
-  readonly name = 'New Source';
-  // ... implement all methods
-}
-
-export const newSource = new NewSource();
-```
-
-2. Register in `src/sources/index.ts`:
-
-```typescript
-import { newSource } from './newSource';
-sources.set(newSource.id, newSource);
-```
-
-### Enabling Google Photos
-
-1. Create Google Cloud project
-2. Enable Google Photos Library API
-3. Configure OAuth consent screen
-4. Create OAuth credentials
-5. Update `src/sources/googlePhotos.ts`:
-
-```typescript
-const CLIENT_ID = 'your-client-id.apps.googleusercontent.com';
-```
-
-## Testing Notes
-
-- **Dummy Colors source** is always available for layout testing
-- Check IndexedDB in DevTools → Application → IndexedDB → AlbumEditorDB
-- Web Worker activity visible in DevTools → Sources → Workers
-
-## Known Limitations
-
-- Google Photos requires OAuth setup (placeholder credentials)
-- Export uses HTML Canvas (may have CORS issues with external images)
-- No undo/redo yet
