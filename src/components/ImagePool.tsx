@@ -10,10 +10,14 @@ interface ImagePoolProps {
 }
 
 export const ImagePool: React.FC<ImagePoolProps> = ({
-    images,
+    images, // keeping props since they are passed by AlbumEditor, can be refactored to use store.
     onImport,
     onClose,
 }) => {
+    // If we want to use store directly:
+    // const { addToPool } = useAlbumStore();
+    // But onImport is passed down.
+
     const [activeSourceId, setActiveSourceId] = useState<string>('dummy-colors');
     const [isLoading, setIsLoading] = useState(false);
     const sources = getAllSources();

@@ -1,37 +1,22 @@
 import React, { useState, useCallback } from 'react';
-import type { Spread, AlbumSettings } from '../types';
+import { useAlbumStore } from '../states/albumStore';
+import { useUIStore } from '../states/uiStore';
 import { SpreadThumbnail } from './SpreadThumbnail';
 
-interface PageNavigatorProps {
-    spreads: Spread[];
-    currentSpreadIndex: number;
-    maxSpreads: number;
-    albumId: string;
-    settings: AlbumSettings;
-    onSpreadSelect: (spreadIndex: number) => void;
-    onAddSpread: () => void;
-    onDeleteSpread: (spreadId: string) => void;
-    onDeleteSpreads: (spreadIndices: number[]) => void;
-}
+export const PageNavigator: React.FC = () => {
+    const { album, addSpreads, deleteSpread } = useAlbumStore();
+    const { currentSpreadIndex, setCurrentSpreadIndex } = useUIStore();
 
-export const PageNavigator: React.FC<PageNavigatorProps> = ({
-    spreads,
-    currentSpreadIndex,
-    maxSpreads,
-    albumId,
-    settings,
-    onSpreadSelect,
-    onAddSpread,
-    onDeleteSpread,
-    onDeleteSpreads,
-}) => {
+    const spreads = album?.spreads || [];
+    const settings = album?.settings;
+    const maxSpreads = settings ? settings.maxPages / 2 : 20;
     const canAddMore = spreads.length < maxSpreads;
 
     // Multi-selection state
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
     const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
 
-    // Clear selection when spreads change (e.g., after deletion)
+    // Clear selection when spreads change
     const [prevLength, setPrevLength] = useState(spreads.length);
     if (prevLength !== spreads.length) {
         setPrevLength(spreads.length);
@@ -41,12 +26,34 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
         }
     }
 
+    const handleSpreadSelect = useCallback((index: number) => {
+        setCurrentSpreadIndex(index);
+    }, [setCurrentSpreadIndex]);
+
+    const handleAddSpread = () => {
+        addSpreads(1);
+    };
+
+    const handleDeleteSpread = (spreadId: string) => {
+        deleteSpread(spreadId);
+    };
+
+    // Helper for bulk delete - since store only has single delete, we iterate
+    // Ideally store should support bulk delete.
+    const handleDeleteSpreads = useCallback((spreadIndices: number[]) => {
+        if (!album) return;
+        const sortedIndices = [...spreadIndices].sort((a, b) => b - a);
+        for (const spreadIndex of sortedIndices) {
+            const spread = album.spreads[spreadIndex];
+            if (spread) deleteSpread(spread.id);
+        }
+    }, [album, deleteSpread]);
+
     const handleSpreadClick = useCallback((spreadIndex: number, event: React.MouseEvent) => {
         const isCtrlOrCmd = event.metaKey || event.ctrlKey;
         const isShift = event.shiftKey;
 
         if (isCtrlOrCmd) {
-            // Toggle individual selection
             setSelectedIndices(prev => {
                 const next = new Set(prev);
                 if (next.has(spreadIndex)) {
@@ -58,7 +65,6 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
             });
             setLastClickedIndex(spreadIndex);
         } else if (isShift && lastClickedIndex !== null) {
-            // Range selection
             const start = Math.min(lastClickedIndex, spreadIndex);
             const end = Math.max(lastClickedIndex, spreadIndex);
             setSelectedIndices(prev => {
@@ -69,11 +75,10 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                 return next;
             });
         } else {
-            // Normal click - navigate to spread
-            onSpreadSelect(spreadIndex);
+            handleSpreadSelect(spreadIndex);
             setLastClickedIndex(spreadIndex);
         }
-    }, [lastClickedIndex, onSpreadSelect]);
+    }, [lastClickedIndex, handleSpreadSelect]);
 
     const handleCheckboxChange = useCallback((spreadIndex: number, checked: boolean) => {
         setSelectedIndices(prev => {
@@ -90,22 +95,22 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
 
     const handleDeleteSelected = useCallback(() => {
         if (selectedIndices.size === 0) return;
-
-        // Cannot delete all spreads
         if (selectedIndices.size >= spreads.length) {
             alert('Cannot delete all spreads. At least one spread must remain.');
             return;
         }
 
         if (window.confirm(`Delete ${selectedIndices.size} spread(s)?`)) {
-            onDeleteSpreads(Array.from(selectedIndices));
+            handleDeleteSpreads(Array.from(selectedIndices));
             setSelectedIndices(new Set());
         }
-    }, [selectedIndices, spreads.length, onDeleteSpreads]);
+    }, [selectedIndices, spreads.length, handleDeleteSpreads]);
 
     const handleClearSelection = useCallback(() => {
         setSelectedIndices(new Set());
     }, []);
+
+    if (!album || !settings) return null;
 
     return (
         <aside className="page-navigator" data-testid="page-navigator">
@@ -144,7 +149,7 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                         key={spread.id}
                         spread={spread}
                         spreadIndex={spreadIndex}
-                        albumId={albumId}
+                        albumId={album.id}
                         settings={settings}
                         isActive={spreadIndex === currentSpreadIndex}
                         isSelected={selectedIndices.has(spreadIndex)}
@@ -152,13 +157,13 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                         showCheckbox={true}
                         onClick={(e) => handleSpreadClick(spreadIndex, e)}
                         onCheckboxChange={(checked) => handleCheckboxChange(spreadIndex, checked)}
-                        onDelete={() => onDeleteSpread(spread.id)}
+                        onDelete={() => handleDeleteSpread(spread.id)}
                     />
                 ))}
 
                 <button
                     className="add-page-btn"
-                    onClick={onAddSpread}
+                    onClick={handleAddSpread}
                     disabled={!canAddMore}
                     title={canAddMore ? 'Add Spread' : `Maximum ${maxSpreads} spreads reached`}
                     data-testid="add-pages-button"

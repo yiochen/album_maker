@@ -8,6 +8,7 @@ A web-based photo album editor built with React + TypeScript. It provides a Goog
 
 - **Framework**: React 18 + TypeScript
 - **Build Tool**: Vite
+- **State Management**: Zustand
 - **Database**: IndexedDB via Dexie.js
 - **Styling**: Vanilla CSS with design tokens
 - **Testing**: Cypress (E2E & Visual Regression)
@@ -20,9 +21,10 @@ The application is structured into modular layers. Please refer to the `AGENTS.m
 - **[Commands](src/commands/AGENTS.md)**: Undo/Redo logic using the Command Pattern.
 - **[Components](src/components/AGENTS.md)**: React UI components and Canvas logic (Fabric.js).
 - **[Database](src/db/AGENTS.md)**: Client-side persistence with Dexie.js.
-- **[Hooks](src/hooks/AGENTS.md)**: State management and custom logic hooks.
+- **[Hooks](src/hooks/AGENTS.md)**: Custom logic hooks.
 - **[Services](src/services/AGENTS.md)**: Stateless business logic (Export, Storage).
 - **[Sources](src/sources/AGENTS.md)**: Plugin system for image providers (Google Photos, etc.).
+- **[States](src/states/AGENTS.md)**: Global state management stores (Zustand).
 - **[Workers](src/workers/AGENTS.md)**: Web Workers for background tasks.
 
 ## Core Concepts
@@ -47,6 +49,7 @@ src/
 ├── hooks/        # React Hooks -> See src/hooks/AGENTS.md
 ├── services/     # Business Logic -> See src/services/AGENTS.md
 ├── sources/      # Image Sources -> See src/sources/AGENTS.md
+├── states/       # Zustand Stores -> See src/states/AGENTS.md
 ├── templates/    # Layout Templates
 ├── types/        # TypeScript Definitions
 ├── utils/        # Utility Functions
@@ -60,7 +63,8 @@ src/
 1.  **Read Before You Write**: Always consult the local `AGENTS.md` in the directory you are working in.
 2.  **Visual Regression**: We use `cypress-visual-regression`. Run `npm run cypress:ci` to verify changes, especially for Canvas rendering.
 3.  **State Management**:
-    *   Use `useHistory` for undoable state.
+    *   Use **Zustand** stores (`src/states/`) for global state.
+    *   Use `useHistory` (wrapped in `albumStore`) for undoable state.
     *   Use `useReducer` or "State from Props" for complex local state.
     *   Avoid deep prop drilling; use composition or context where appropriate.
 4.  **Testing**:

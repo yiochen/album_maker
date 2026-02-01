@@ -5,13 +5,13 @@ import { useAppInitialization } from './hooks/useAppInitialization';
 import './index.css';
 
 const App: React.FC = () => {
-  const { isLoading, initialAlbum } = useAppInitialization();
+  const { isLoading } = useAppInitialization();
 
-  if (isLoading || !initialAlbum) {
+  if (isLoading) {
     return <LoadingScreen />;
   }
 
-  return <AlbumEditor initialAlbum={initialAlbum} />;
+  return <AlbumEditor />;
 };
 
 export default App;

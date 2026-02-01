@@ -8,16 +8,19 @@ import {
   clearLocalStorage,
 } from '../services/storage';
 import { initializeSources } from '../sources';
+import { useAlbumStore } from '../states/albumStore';
 
 export const useAppInitialization = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [initialAlbum, setInitialAlbum] = useState<Album | null>(null);
+  const { setAlbum } = useAlbumStore();
 
   useEffect(() => {
     const init = async () => {
       try {
         // Initialize photo sources
         await initializeSources();
+
+        let albumToSet: Album;
 
         // Check for legacy localStorage data and migrate
         const legacyAlbum = loadFromLocalStorage();
@@ -33,7 +36,7 @@ export const useAppInitialization = () => {
           await albumStorage.saveAlbum(migrated);
           await albumStorage.setCurrentAlbumId(migrated.id);
           clearLocalStorage();
-          setInitialAlbum(migrated);
+          albumToSet = migrated;
         } else {
           // Load from IndexedDB
           const album = await albumStorage.loadCurrentAlbum();
@@ -41,19 +44,20 @@ export const useAppInitialization = () => {
           if (!album.settings) {
             album.settings = { ...APP_CONFIG.DEFAULT_ALBUM_SETTINGS };
           }
-          setInitialAlbum(album);
+          albumToSet = album;
         }
+        setAlbum(albumToSet);
       } catch (error) {
         console.error('Failed to initialize app:', error);
         // Fallback to new album
-        setInitialAlbum(createNewAlbum());
+        setAlbum(createNewAlbum());
       } finally {
         setIsLoading(false);
       }
     };
 
     init();
-  }, []);
+  }, [setAlbum]);
 
-  return { isLoading, initialAlbum };
+  return { isLoading };
 };

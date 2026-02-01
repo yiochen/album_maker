@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import type { Album, PageElement, PoolImage, TemplateId } from '../types';
-import { APP_CONFIG } from '../config';
-import { useAlbum } from '../hooks/useAlbum';
+import React, { useCallback, useMemo } from 'react';
+import type { PageElement, PoolImage, TemplateId } from '../types';
+import { useAlbumStore } from '../states/albumStore';
+import { useUIStore } from '../states/uiStore';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import {
@@ -20,13 +20,10 @@ import { ImagePool } from './ImagePool';
 import { AlbumSelector } from './AlbumSelector';
 import { Modal } from './Modal';
 import { LoadingScreen } from './LoadingScreen';
+import { APP_CONFIG } from '../config';
 
-interface AlbumEditorProps {
-  initialAlbum: Album;
-}
-
-export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
-  // Album state management
+export const AlbumEditor: React.FC = () => {
+  // Global State
   const {
     album,
     setAlbum,
@@ -43,59 +40,54 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     redo,
     canUndo,
     canRedo
-  } = useAlbum(initialAlbum);
+  } = useAlbumStore();
 
-  // Auto-save to IndexedDB
+  const {
+    currentSpreadIndex,
+    selectedElementId,
+    selectedPageId,
+    isImagePoolOpen,
+    isSettingsOpen,
+    isSnappingEnabled,
+    setCurrentSpreadIndex,
+    setSelectedElementId,
+    setSelectedPageId,
+    setImagePoolOpen,
+    setSettingsOpen,
+    setSnappingEnabled,
+  } = useUIStore();
+
+  // Auto-save
   useAutoSave(album);
 
-  // UI state
-  const [currentSpreadIndex, setCurrentSpreadIndex] = useState(0);
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
-  const [isImagePoolOpen, setIsImagePoolOpen] = useState(true);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isSnappingEnabled, setIsSnappingEnabled] = useState(true);
+  // Keyboard shortcuts
+  useKeyboardShortcuts({ undo, redo, canUndo, canRedo });
 
-  // Get current spread
+  // Derived state
   const currentSpread = useMemo(() => {
-    return album.spreads[currentSpreadIndex];
-  }, [album.spreads, currentSpreadIndex]);
+    return album?.spreads[currentSpreadIndex];
+  }, [album, currentSpreadIndex]);
 
-  // Selected element
   const selectedElement = useMemo(() => {
     if (!selectedElementId || !currentSpread) return null;
     return currentSpread.elements.find(e => e.id === selectedElementId) || null;
   }, [currentSpread, selectedElementId]);
 
-  // Ensure currentSpreadIndex is valid when spreads change
-  const maxSpreadIndex = Math.max(0, album.spreads.length - 1);
-  if (currentSpreadIndex > maxSpreadIndex) {
-    setCurrentSpreadIndex(maxSpreadIndex);
+  // Ensure currentSpreadIndex is valid
+  if (album && currentSpreadIndex > Math.max(0, album.spreads.length - 1)) {
+    setCurrentSpreadIndex(Math.max(0, album.spreads.length - 1));
   }
 
-  // Clear selection when switching spreads
-  useEffect(() => {
-    // eslint-disable-next-line
-    setSelectedElementId(null);
-    setSelectedPageId(null);
-  }, [currentSpreadIndex]);
-
-  // Keyboard shortcuts for Undo/Redo
-  useKeyboardShortcuts({ undo, redo, canUndo, canRedo });
-
-  // Handle image drop on canvas
-  // Handle image drop on canvas - using Absolute Coordinates
+  // Callbacks
   const handleImageDrop = useCallback((
     spreadId: string,
     image: PoolImage,
     position: { x: number; y: number },
-    // pagePixelDimensions is deprecated/unused in absolute mode
   ) => {
     const imageWidth = image.width || 300;
-    const imageHeight = image.height || (imageWidth / 1); // Default to square if height missing
+    const imageHeight = image.height || (imageWidth / 1);
     const aspectRatio = imageWidth / imageHeight;
 
-    // Center image at drop position
     const halfWidth = imageWidth / 2;
     const halfHeight = imageHeight / 2;
 
@@ -120,25 +112,21 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
 
     addElement(spreadId, newElement);
     setSelectedElementId(newElement.id);
-    setSelectedPageId(spreadId); // renaming state var later? keeping 'selectedPageId' as 'selectedSpreadId' for now
-  }, [addElement]);
+    setSelectedPageId(spreadId);
+  }, [addElement, setSelectedElementId, setSelectedPageId]);
 
-  // Handle element update
   const handleElementUpdate = useCallback((spreadId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => {
     updateElement(spreadId, elementId, updates, groupId);
   }, [updateElement]);
 
-  // Handle element delete
   const handleElementDelete = useCallback((spreadId: string, elementId: string) => {
     deleteElement(spreadId, elementId);
     setSelectedElementId(null);
     setSelectedPageId(null);
-  }, [deleteElement]);
+  }, [deleteElement, setSelectedElementId, setSelectedPageId]);
 
   const handleCanvasChange = useCallback(async (dataUrl: string) => {
     if (!album || !currentSpread) return;
-
-    // Use current spread for hashing
     const contentHash = generateSpreadContentHash(currentSpread);
     try {
       await spreadThumbnailDB.set(album.id, currentSpread.id, dataUrl, contentHash);
@@ -147,22 +135,19 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     }
   }, [album, currentSpread]);
 
-  // Handle spread delete
   const handleDeleteSpread = useCallback((spreadId: string) => {
     deleteSpread(spreadId);
   }, [deleteSpread]);
 
-  // Handle multiple spread deletion
   const handleDeleteSpreads = useCallback((spreadIndices: number[]) => {
+    if (!album) return;
     const sortedIndices = [...spreadIndices].sort((a, b) => b - a);
-
     for (const spreadIndex of sortedIndices) {
       const spread = album.spreads[spreadIndex];
       if (spread) deleteSpread(spread.id);
     }
-  }, [album.spreads, deleteSpread]);
+  }, [album, deleteSpread]);
 
-  // Handle album selection
   const handleSelectAlbum = useCallback(async (id: string) => {
     const newAlbum = await albumStorage.loadAlbum(id);
     if (newAlbum) {
@@ -174,9 +159,8 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
       setCurrentSpreadIndex(0);
       setSelectedElementId(null);
     }
-  }, [setAlbum]);
+  }, [setAlbum, setCurrentSpreadIndex, setSelectedElementId]);
 
-  // Handle create new album
   const handleCreateAlbum = useCallback(async (name: string) => {
     const newAlbum = createNewAlbum(name);
     await albumStorage.saveAlbum(newAlbum);
@@ -184,14 +168,12 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     setAlbum(newAlbum);
     setCurrentSpreadIndex(0);
     setSelectedElementId(null);
-  }, [setAlbum]);
+  }, [setAlbum, setCurrentSpreadIndex, setSelectedElementId]);
 
-  // Handle delete album
   const handleDeleteAlbum = useCallback(async (id: string) => {
     await albumStorage.deleteAlbum(id);
   }, []);
 
-  // Handle import album
   const handleImportAlbum = useCallback(async () => {
     try {
       const imported = await importAlbumFromJson();
@@ -204,19 +186,13 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
     } catch (error) {
       console.error('Failed to import album:', error);
     }
-  }, [setAlbum]);
+  }, [setAlbum, setCurrentSpreadIndex, setSelectedElementId]);
 
-  // Handle export album
   const handleExportAlbum = useCallback(() => {
-    exportAlbumAsJson(album);
+    if (album) exportAlbumAsJson(album);
   }, [album]);
 
-  const handleSettingsClose = useCallback(() => {
-    setIsSettingsOpen(false);
-  }, []);
-
-  // Early return if no spreads
-  if (!currentSpread) {
+  if (!album || !currentSpread) {
     return <LoadingScreen message="No spreads in album" showSpinner={false} />;
   }
 
@@ -226,17 +202,16 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
         albumName={album.name}
         onAlbumNameChange={setName}
         isSnappingEnabled={isSnappingEnabled}
-        onSnappingToggle={() => setIsSnappingEnabled(!isSnappingEnabled)}
+        onSnappingToggle={() => setSnappingEnabled(!isSnappingEnabled)}
         onImport={handleImportAlbum}
         onExport={handleExportAlbum}
-        onSettingsClick={() => setIsSettingsOpen(!isSettingsOpen)}
+        onSettingsClick={() => setSettingsOpen(!isSettingsOpen)}
         onUndo={undo}
         onRedo={redo}
         canUndo={canUndo}
         canRedo={canRedo}
       />
 
-      {/* Album selector bar */}
       <div className="album-bar">
         <AlbumSelector
           currentAlbumId={album.id}
@@ -246,7 +221,7 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
         />
         <button
           className={`btn btn-ghost btn-icon ${isImagePoolOpen ? 'active' : ''}`}
-          onClick={() => setIsImagePoolOpen(!isImagePoolOpen)}
+          onClick={() => setImagePoolOpen(!isImagePoolOpen)}
           title="Toggle Image Pool"
           data-testid="toggle-image-pool-button"
         >
@@ -262,7 +237,7 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
         <PageNavigator
           spreads={album.spreads}
           currentSpreadIndex={currentSpreadIndex}
-          maxSpreads={album.settings.maxPages / 2} // Conversion?
+          maxSpreads={album.settings.maxPages / 2}
           albumId={album.id}
           settings={album.settings}
           onSpreadSelect={setCurrentSpreadIndex}
@@ -314,7 +289,7 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
           <ImagePool
             images={album.imagePool}
             onImport={addToPool}
-            onClose={() => setIsImagePoolOpen(false)}
+            onClose={() => setImagePoolOpen(false)}
           />
         )}
       </main>
@@ -322,7 +297,7 @@ export const AlbumEditor: React.FC<AlbumEditorProps> = ({ initialAlbum }) => {
       {isSettingsOpen && (
         <Modal
           title="Album Settings"
-          onClose={handleSettingsClose}
+          onClose={() => setSettingsOpen(false)}
           titleTestId="settings-title"
         >
           <AlbumSettingsPanel

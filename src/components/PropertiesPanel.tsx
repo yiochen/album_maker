@@ -1,9 +1,8 @@
 import React from 'react';
 import type { Spread, PageElement, AlbumSettings } from '../types';
-// Remove import { percentToUnit } from '../utils/snapping'; - Implementing unit conversion locally or using updated utils
 
 interface PropertiesPanelProps {
-    spread: Spread;
+    spread: Spread; // Still need this or derive it?
     settings: AlbumSettings;
     selectedElement: PageElement | null;
     selectedPageId: string | null;
@@ -23,6 +22,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     onElementUpdate,
     onElementDelete,
 }) => {
+    // If we wanted to go full store, we would select `selectedElement` here using IDs from UI store.
+    // But AlbumEditor already did that and passed it.
+    // I'll stick to props for the "passed down" data to avoid duplicate logic,
+    // but the `onElementUpdate` and `onElementDelete` could be replaced by store actions
+    // IF we knew the spreadId and elementId.
+    // We do know them from `selectedElement` and `selectedPageId`.
+
+    // For now, I'll keep the props as the main refactor was prop drilling in AlbumEditor (which we solved by using stores there).
+    // The previous step refactored AlbumEditor to use stores.
+    // This file seems fine to stay as a presentational component mostly.
+
+    // Actually, I can use store logic inside `ElementProperties`.
 
     return (
         <aside className="properties-panel">

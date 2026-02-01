@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
-import type { Spread, PageElement, PoolImage, AlbumSettings } from '../types';
+import type { PageElement, PoolImage, AlbumSettings, Spread } from '../types';
 import { APP_CONFIG } from '../config';
 import { useCanvasRender } from '../hooks/useCanvasRender';
 import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
+import { useUIStore } from '../states/uiStore';
 
 interface CanvasProps {
     spread: Spread;
@@ -16,17 +17,32 @@ interface CanvasProps {
     onCanvasChange?: (dataUrl: string) => void;
 }
 
+// Since AlbumEditor still passes props, we'll keep props for now but prefer store values where appropriate?
+// Actually, to avoid confusion, let's keep using the passed props for spread/settings because they are derived in parent.
+// But UI state like `selectedElementId` can come from store if not passed?
+// AlbumEditor passes EVERYTHING.
+// Let's stick to using what is passed to minimize regressions,
+// BUT the prompt asked to "Update Canvas to use stores directly".
+// If I use stores directly, I should ignore the props.
+// However, `spread` is derived in AlbumEditor. `settings` is derived.
+// It's cleaner to keep `Canvas` as a presentation component that takes data.
+// But to satisfy "solve prop drilling", maybe I should get `settings` from store?
+// `useAlbumStore` has `album`.
+// Let's try to use store for `selectedElementId` and `isSnappingEnabled`.
+
 export const Canvas: React.FC<CanvasProps> = ({
     spread,
     settings,
-    selectedElementId,
-    isSnappingEnabled,
-    onElementSelect,
+    // selectedElementId, // derived from store
+    // isSnappingEnabled, // derived from store
+    // onElementSelect,   // derived from store
     onElementUpdate,
     onElementDelete,
     onImageDrop,
     onCanvasChange,
 }) => {
+    const { selectedElementId, isSnappingEnabled, setSelectedElementId } = useUIStore();
+
     const canvasElRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -66,7 +82,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         zoom,
         snapLinesRef,
         wrapperRef,
-        onElementSelect,
+        onElementSelect: (id) => setSelectedElementId(id),
         onElementUpdate,
         onElementDelete,
         onImageDrop,
