@@ -234,17 +234,7 @@ export const AlbumEditor: React.FC = () => {
       </div>
 
       <main className={`main-content ${isImagePoolOpen ? 'image-pool-open' : ''}`}>
-        <PageNavigator
-          spreads={album.spreads}
-          currentSpreadIndex={currentSpreadIndex}
-          maxSpreads={album.settings.maxPages / 2}
-          albumId={album.id}
-          settings={album.settings}
-          onSpreadSelect={setCurrentSpreadIndex}
-          onAddSpread={() => addSpreads(1)}
-          onDeleteSpread={handleDeleteSpread}
-          onDeleteSpreads={handleDeleteSpreads}
-        />
+        <PageNavigator />
 
         <Canvas
           spread={currentSpread}
