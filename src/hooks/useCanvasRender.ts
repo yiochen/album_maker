@@ -56,6 +56,19 @@ export const useCanvasRender = ({
     // Zoom state
     const [zoom, setZoom] = useState(25);
 
+    // Stable ref for callback to avoid re-initializing canvas
+    const onCanvasChangeRef = useRef(onCanvasChange);
+    onCanvasChangeRef.current = onCanvasChange;
+
+    // Refs for props to avoid unnecessary effect re-runs
+    const spreadRef = useRef(spread);
+    spreadRef.current = spread;
+    const selectedElementIdRef = useRef(selectedElementId);
+    selectedElementIdRef.current = selectedElementId;
+
+    // Track the last spread ID that was fully synced to detect spread changes
+    const lastSyncedSpreadId = useRef<string | null>(null);
+
     // Canvas dimensions (Absolute Pixels)
     const canvasWidth = settings.pageWidth * 2 * APP_CONFIG.PPI;
     const canvasHeight = settings.pageHeight * APP_CONFIG.PPI;
@@ -106,13 +119,13 @@ export const useCanvasRender = ({
             snapLinesRef.current = [];
             canvas.requestRenderAll();
 
-            if (onCanvasChange) {
+            if (onCanvasChangeRef.current) {
                 const dataUrl = canvas.toDataURL({
                     format: 'jpeg',
                     quality: APP_CONFIG.THUMBNAIL_QUALITY,
                     multiplier: APP_CONFIG.THUMBNAIL_MULTIPLIER
                 });
-                onCanvasChange(dataUrl);
+                onCanvasChangeRef.current(dataUrl);
             }
         });
 
@@ -126,7 +139,8 @@ export const useCanvasRender = ({
             canvas.dispose();
             setFabricCanvas(null);
         };
-    }, [canvasElRef, containerRef, canvasWidth, canvasHeight, fabricCanvas, onCanvasChange]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canvasElRef, containerRef, canvasWidth, canvasHeight]);
 
     // Auto-Fit Logic
     const fitToViewport = useCallback(() => {
@@ -164,51 +178,61 @@ export const useCanvasRender = ({
         return () => window.removeEventListener('resize', handleResize);
     }, [fitToViewport]);
 
-    // Sync State to Fabric
+    // Sync State to Fabric - Only runs when spread ID changes or canvas initializes
+    // FabricJS owns positions/sizes during interaction; React syncs on add/remove/switch spread
     useEffect(() => {
         const canvas = fabricCanvas;
         if (!canvas) return;
+
+        const currentSpread = spreadRef.current;
+        const isSpreadChange = lastSyncedSpreadId.current !== currentSpread.id;
+
+        // Track current spread
+        lastSyncedSpreadId.current = currentSpread.id;
 
         const currentObjects = canvas.getObjects() as CustomFabricObject[];
         const validIds = new Set<string>();
         const elementsToLoad: { element: PageElement, width: number, height: number }[] = [];
 
-        spread.elements.forEach(element => {
+        currentSpread.elements.forEach(element => {
             validIds.add(element.id);
             const existingObj = currentObjects.find(o => o.data?.id === element.id);
 
-            const targetLeft = element.position.x;
-            const targetTop = element.position.y;
-            const targetWidth = element.size.width;
-            const targetHeight = element.size.height;
-
             if (existingObj) {
-                if (!isObjectMoving(existingObj)) {
-                    let modified = false;
-                    if (existingObj instanceof fabric.Image) {
-                        const img = existingObj;
-                        const newScaleX = targetWidth / (img.width || 1);
-                        const newScaleY = targetHeight / (img.height || 1);
-
-                        if (Math.abs(img.left! - targetLeft) > 1) { img.set('left', targetLeft); modified = true; }
-                        if (Math.abs(img.top! - targetTop) > 1) { img.set('top', targetTop); modified = true; }
-                        if (Math.abs((img.scaleX || 1) - newScaleX) > 0.001) { img.set('scaleX', newScaleX); modified = true; }
-                        if (Math.abs((img.scaleY || 1) - newScaleY) > 0.001) { img.set('scaleY', newScaleY); modified = true; }
-
-                        const isLocked = element.lockAspectRatio;
+                // Element exists in canvas
+                // Only sync lockAspectRatio (external property from panel)
+                // DO NOT sync position/size - FabricJS owns those during interaction
+                if (existingObj instanceof fabric.Image) {
+                    const img = existingObj;
+                    const isLocked = element.lockAspectRatio;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    if ((img as any).uniformScaling !== isLocked) {
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        if ((img as any).uniformScaling !== isLocked) {
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            (img as any).uniformScaling = isLocked;
-                            modified = true;
-                        }
+                        (img as any).uniformScaling = isLocked;
+                        img.setCoords();
+                    }
 
-                        if (modified) img.setCoords();
+                    // Only sync position/size if we just switched spreads (full reload)
+                    if (isSpreadChange && !isObjectMoving(existingObj)) {
+                        const targetWidth = element.size.width;
+                        const targetHeight = element.size.height;
+                        img.set({
+                            left: element.position.x,
+                            top: element.position.y,
+                            scaleX: targetWidth / (img.width || 1),
+                            scaleY: targetHeight / (img.height || 1),
+                        });
+                        img.setCoords();
                     }
                 }
             } else {
+                // New element - queue for loading
                 if (!loadingIds.current.has(element.id)) {
-                    elementsToLoad.push({ element, width: targetWidth, height: targetHeight });
+                    elementsToLoad.push({
+                        element,
+                        width: element.size.width,
+                        height: element.size.height
+                    });
                 }
             }
         });
@@ -222,21 +246,16 @@ export const useCanvasRender = ({
         });
 
         // Load new images
+        const zoomValue = zoom; // Capture current zoom for async callback
         elementsToLoad.forEach(async ({ element, width, height }) => {
             if (loadingIds.current.has(element.id)) return;
             loadingIds.current.add(element.id);
 
             try {
                 const img = await fabric.Image.fromURL(element.imageUrl, { crossOrigin: 'anonymous' });
-                // Check if canvas is still valid (might have been disposed/changed)
-                // Note: using fabricCanvas variable from closure, might be stale if re-rendered?
-                // But loading is async. Best to check if component is mounted or check canvas.
-                // We'll rely on checking if it's in state? Or ref?
-                // Since we don't have a ref to current canvas anymore in closure context easily without ref.
-                // But the canvas object itself has a .disposed property in recent fabric versions? Or we can check if it has objects.
 
                 const isLocked = element.lockAspectRatio;
-                const uiSizes = getZoomCompensatedSizes(zoom);
+                const uiSizes = getZoomCompensatedSizes(zoomValue);
 
                 img.set({
                     left: element.position.x,
@@ -253,10 +272,13 @@ export const useCanvasRender = ({
                     transparentCorners: false,
                     cornerSize: uiSizes.cornerSize,
                     borderScaleFactor: uiSizes.borderScaleFactor,
+                    // Enable FabricJS caching for performance
+                    objectCaching: true,
+                    noScaleCache: true, // Don't invalidate cache during scaling
                 });
 
                 canvas.add(img);
-                if (selectedElementId === element.id) {
+                if (selectedElementIdRef.current === element.id) {
                     canvas.setActiveObject(img);
                 }
                 canvas.requestRenderAll();
@@ -268,8 +290,7 @@ export const useCanvasRender = ({
         });
 
         canvas.requestRenderAll();
-
-    }, [spread, selectedElementId, zoom, fabricCanvas]);
+    }, [fabricCanvas, spread.id, spread.elements.length, zoom]);
 
     // Update UI sizes when zoom changes
     useEffect(() => {

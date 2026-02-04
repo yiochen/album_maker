@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useAlbumStore } from '../states/albumStore';
 import { useUIStore } from '../states/uiStore';
 import { SpreadThumbnail } from './SpreadThumbnail';
+import { Spread } from '../types';
 
 export const PageNavigator: React.FC = () => {
     const { album, addSpreads, deleteSpread } = useAlbumStore();
@@ -144,7 +145,7 @@ export const PageNavigator: React.FC = () => {
             )}
 
             <div className="page-list">
-                {spreads.map((spread, spreadIndex) => (
+                {spreads.map((spread: Spread, spreadIndex: number) => (
                     <SpreadThumbnail
                         key={spread.id}
                         spread={spread}

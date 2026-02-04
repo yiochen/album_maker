@@ -23,6 +23,8 @@ import {
     ClearPoolCommand
 } from '../commands/poolCommands';
 import { CommandManager } from '../commands/commandManager';
+import { setVal } from '../utils/typeUtil';
+
 
 // Command Manager Instance (shared singleton for the store)
 const commandManager = new CommandManager<Album>();
@@ -88,8 +90,8 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
             if (!album) return;
             const oldValues: Partial<AlbumSettings> = {};
             for (const key of Object.keys(settings) as Array<keyof AlbumSettings>) {
-                // @ts-expect-error - Partial types handling
-                oldValues[key] = album.settings[key];
+
+                setVal(oldValues, key, album.settings[key]);
             }
             commandManager.execute(new SetSettingsCommand(settings, oldValues));
             syncState();
@@ -128,8 +130,8 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
 
             const oldValues: Partial<Spread> = {};
             for (const key of Object.keys(updates) as Array<keyof Spread>) {
-                // @ts-expect-error - Partial types handling
-                oldValues[key] = spread[key];
+
+                setVal(oldValues, key, spread[key]);
             }
 
             commandManager.execute(new UpdateSpreadCommand(spreadId, updates, oldValues));
@@ -151,8 +153,8 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
 
             const oldValues: Partial<PageElement> = {};
             for (const key of Object.keys(updates) as Array<keyof PageElement>) {
-                // @ts-expect-error - Partial types handling
-                oldValues[key] = element[key];
+
+                setVal(oldValues, key, element[key]);
             }
 
             commandManager.execute(new UpdateElementCommand(spreadId, elementId, updates, oldValues, groupId));
@@ -196,8 +198,7 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
                 if (el) {
                     oldValues = {};
                     for (const key of Object.keys(updates) as Array<keyof PageElement>) {
-                        // @ts-expect-error - Partial types handling
-                        oldValues[key] = el[key];
+                        setVal(oldValues, key, el[key]);
                     }
                 }
             }

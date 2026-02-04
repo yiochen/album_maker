@@ -11,7 +11,9 @@ Contains custom React hooks that encapsulate state management and complex logic,
 
 ### Canvas Logic
 - **`useCanvasRender`**: Manages the Fabric.js canvas instance, initialization, rendering cycle, zoom state, and syncing React state to Fabric objects.
+
 - **`useCanvasInteraction`**: Handles user interactions on the canvas, including selection, movement/snapping, modification updates, and drag-and-drop.
+  > **Note**: Snapping is a runtime-only interaction behavior. Snap constraints are calculated during drag/resize to guide positioning but are **not persisted** in the state or database. Elements retain their absolute position once placed.
 - **`useCanvasThumbnail`**: Logic for generating spread thumbnails.
 
 ### State Management

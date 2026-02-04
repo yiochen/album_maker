@@ -29,8 +29,6 @@ export const AlbumEditor: React.FC = () => {
     setAlbum,
     setName,
     setSettings,
-    addSpreads,
-    deleteSpread,
     addElement,
     updateElement,
     updateSpread,
@@ -134,19 +132,6 @@ export const AlbumEditor: React.FC = () => {
       console.warn('Failed to save thumbnail:', error);
     }
   }, [album, currentSpread]);
-
-  const handleDeleteSpread = useCallback((spreadId: string) => {
-    deleteSpread(spreadId);
-  }, [deleteSpread]);
-
-  const handleDeleteSpreads = useCallback((spreadIndices: number[]) => {
-    if (!album) return;
-    const sortedIndices = [...spreadIndices].sort((a, b) => b - a);
-    for (const spreadIndex of sortedIndices) {
-      const spread = album.spreads[spreadIndex];
-      if (spread) deleteSpread(spread.id);
-    }
-  }, [album, deleteSpread]);
 
   const handleSelectAlbum = useCallback(async (id: string) => {
     const newAlbum = await albumStorage.loadAlbum(id);

@@ -115,35 +115,29 @@ export const useCanvasInteraction = ({
         // but we attach here for interaction logic (snapping). Fabric supports multiple listeners.
 
         canvas.on('object:moving', (e) => {
-             // We need to mark moving here too or rely on render hook?
-             // Render hook handles isMoving flag for sync prevention.
-             // Interaction hook handles Snapping.
-
             const obj = e.target as CustomFabricObject;
             if (!obj || !obj.data) return;
 
-            if (snapLinesRef.current) {
-                snapLinesRef.current.forEach(line => canvas.remove(line));
-                snapLinesRef.current.length = 0;
-            } else {
-                 // Should ideally be initialized in render hook, but if null/undefined:
-                 // We can't assign to readonly ref.current.
-                 // We'll rely on snapLinesRef.current being initialized.
-                 // If it's not, we can't do anything since we can't write to it.
-                 // But in useCanvasRender, we initialize it to [].
-            }
-
-            const snapLines = snapLinesRef.current || [];
-
-            const percentX = (obj.left! / canvasWidth) * 100;
-            const percentY = (obj.top! / canvasHeight) * 100;
-            const percentW = (obj.getScaledWidth() / canvasWidth) * 100;
-            const percentH = (obj.getScaledHeight() / canvasHeight) * 100;
-
+            // Cache scaled dimensions - only compute once per move event
+            const scaledWidth = obj.getScaledWidth();
+            const scaledHeight = obj.getScaledHeight();
             let newLeft = obj.left!;
             let newTop = obj.top!;
 
+            // Clear existing snap lines
+            const snapLines = snapLinesRef.current;
+            if (snapLines && snapLines.length > 0) {
+                snapLines.forEach(line => canvas.remove(line));
+                snapLines.length = 0;
+            }
+
+            // Only calculate snapping if enabled - skip expensive calculations otherwise
             if (isSnappingEnabledRef.current) {
+                const percentX = (obj.left! / canvasWidth) * 100;
+                const percentY = (obj.top! / canvasHeight) * 100;
+                const percentW = (scaledWidth / canvasWidth) * 100;
+                const percentH = (scaledHeight / canvasHeight) * 100;
+
                 const snapResult = calculateSnap(
                     { x: percentX, y: percentY },
                     { width: percentW, height: percentH }
@@ -169,7 +163,7 @@ export const useCanvasInteraction = ({
 
                         const fabricLine = new fabric.Line([x1, y1, x2, y2], {
                             stroke: '#ff00ff',
-                            strokeWidth: 1, // Will be updated by render hook's zoom logic
+                            strokeWidth: 1,
                             selectable: false,
                             evented: false,
                             strokeDashArray: [4, 4],
@@ -180,21 +174,25 @@ export const useCanvasInteraction = ({
                 }
             }
 
-            // Apply validated position (Absolute Px)
-            obj.left = newLeft;
-            obj.top = newTop;
+            // Only apply position changes if snapping modified the position
+            // This lets FabricJS handle native dragging without interference
+            if (isSnappingEnabledRef.current) {
+                obj.left = newLeft;
+                obj.top = newTop;
+            }
 
-            // Bleed
+            // Bleed constraints - only clamp if outside bounds
             const bleedMargin = APP_CONFIG.BLEED_MARGIN;
-            const minX = -obj.getScaledWidth() + bleedMargin;
+            const minX = -scaledWidth + bleedMargin;
             const maxX = canvasWidth - bleedMargin;
-            const minY = -obj.getScaledHeight() + bleedMargin;
+            const minY = -scaledHeight + bleedMargin;
             const maxY = canvasHeight - bleedMargin;
 
-            if (obj.left < minX) obj.left = minX;
-            if (obj.left > maxX) obj.left = maxX;
-            if (obj.top < minY) obj.top = minY;
-            if (obj.top > maxY) obj.top = maxY;
+            // Only modify position if clamping is actually needed
+            if (obj.left! < minX) obj.left = minX;
+            else if (obj.left! > maxX) obj.left = maxX;
+            if (obj.top! < minY) obj.top = minY;
+            else if (obj.top! > maxY) obj.top = maxY;
         });
 
         // Modification

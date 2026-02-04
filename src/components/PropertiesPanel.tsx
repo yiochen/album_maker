@@ -148,7 +148,6 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                 ...element.position,
                 [axis]: pxValue,
             },
-            snapConstraints: undefined,
         });
     };
 
@@ -263,7 +262,6 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
 
                             onUpdate({
                                 position: { x, y },
-                                snapConstraints: undefined,
                             });
                         }}
                     >
@@ -279,7 +277,6 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                                 const targetHeight = targetWidth / element.originalAspectRatio!;
                                 onUpdate({
                                     size: { width: targetWidth, height: targetHeight },
-                                    snapConstraints: undefined,
                                 });
                             }}
                         >
