@@ -59,4 +59,4 @@ Cypress.Commands.add('getCanvasLayer', () => {
 Cypress.Commands.add('getInteractionLayer', () => {
     return cy.get('[data-testid="interaction-layer"]');
 });
-export {};
+export { };

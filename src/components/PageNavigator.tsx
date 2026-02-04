@@ -1,38 +1,23 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { Spread, AlbumSettings } from '../types';
-import { useCanvasThumbnail } from '../hooks/useCanvasThumbnail';
-import { spreadThumbnailDB, generateSpreadContentHash } from '../db';
+import React, { useState, useCallback } from 'react';
+import { useAlbumStore } from '../states/albumStore';
+import { useUIStore } from '../states/uiStore';
+import { SpreadThumbnail } from './SpreadThumbnail';
+import { Spread } from '../types';
 
-interface PageNavigatorProps {
-    spreads: Spread[];
-    currentSpreadIndex: number;
-    maxSpreads: number;
-    albumId: string;
-    settings: AlbumSettings;
-    onSpreadSelect: (spreadIndex: number) => void;
-    onAddSpread: () => void;
-    onDeleteSpread: (spreadId: string) => void;
-    onDeleteSpreads: (spreadIndices: number[]) => void;
-}
+export const PageNavigator: React.FC = () => {
+    const { album, addSpreads, deleteSpread } = useAlbumStore();
+    const { currentSpreadIndex, setCurrentSpreadIndex } = useUIStore();
 
-export const PageNavigator: React.FC<PageNavigatorProps> = ({
-    spreads,
-    currentSpreadIndex,
-    maxSpreads,
-    albumId,
-    settings,
-    onSpreadSelect,
-    onAddSpread,
-    onDeleteSpread,
-    onDeleteSpreads,
-}) => {
+    const spreads = album?.spreads || [];
+    const settings = album?.settings;
+    const maxSpreads = settings ? settings.maxPages / 2 : 20;
     const canAddMore = spreads.length < maxSpreads;
 
     // Multi-selection state
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
     const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
 
-    // Clear selection when spreads change (e.g., after deletion)
+    // Clear selection when spreads change
     const [prevLength, setPrevLength] = useState(spreads.length);
     if (prevLength !== spreads.length) {
         setPrevLength(spreads.length);
@@ -42,12 +27,34 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
         }
     }
 
+    const handleSpreadSelect = useCallback((index: number) => {
+        setCurrentSpreadIndex(index);
+    }, [setCurrentSpreadIndex]);
+
+    const handleAddSpread = () => {
+        addSpreads(1);
+    };
+
+    const handleDeleteSpread = (spreadId: string) => {
+        deleteSpread(spreadId);
+    };
+
+    // Helper for bulk delete - since store only has single delete, we iterate
+    // Ideally store should support bulk delete.
+    const handleDeleteSpreads = useCallback((spreadIndices: number[]) => {
+        if (!album) return;
+        const sortedIndices = [...spreadIndices].sort((a, b) => b - a);
+        for (const spreadIndex of sortedIndices) {
+            const spread = album.spreads[spreadIndex];
+            if (spread) deleteSpread(spread.id);
+        }
+    }, [album, deleteSpread]);
+
     const handleSpreadClick = useCallback((spreadIndex: number, event: React.MouseEvent) => {
         const isCtrlOrCmd = event.metaKey || event.ctrlKey;
         const isShift = event.shiftKey;
 
         if (isCtrlOrCmd) {
-            // Toggle individual selection
             setSelectedIndices(prev => {
                 const next = new Set(prev);
                 if (next.has(spreadIndex)) {
@@ -59,7 +66,6 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
             });
             setLastClickedIndex(spreadIndex);
         } else if (isShift && lastClickedIndex !== null) {
-            // Range selection
             const start = Math.min(lastClickedIndex, spreadIndex);
             const end = Math.max(lastClickedIndex, spreadIndex);
             setSelectedIndices(prev => {
@@ -70,11 +76,10 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                 return next;
             });
         } else {
-            // Normal click - navigate to spread
-            onSpreadSelect(spreadIndex);
+            handleSpreadSelect(spreadIndex);
             setLastClickedIndex(spreadIndex);
         }
-    }, [lastClickedIndex, onSpreadSelect]);
+    }, [lastClickedIndex, handleSpreadSelect]);
 
     const handleCheckboxChange = useCallback((spreadIndex: number, checked: boolean) => {
         setSelectedIndices(prev => {
@@ -91,22 +96,22 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
 
     const handleDeleteSelected = useCallback(() => {
         if (selectedIndices.size === 0) return;
-
-        // Cannot delete all spreads
         if (selectedIndices.size >= spreads.length) {
             alert('Cannot delete all spreads. At least one spread must remain.');
             return;
         }
 
         if (window.confirm(`Delete ${selectedIndices.size} spread(s)?`)) {
-            onDeleteSpreads(Array.from(selectedIndices));
+            handleDeleteSpreads(Array.from(selectedIndices));
             setSelectedIndices(new Set());
         }
-    }, [selectedIndices, spreads.length, onDeleteSpreads]);
+    }, [selectedIndices, spreads.length, handleDeleteSpreads]);
 
     const handleClearSelection = useCallback(() => {
         setSelectedIndices(new Set());
     }, []);
+
+    if (!album || !settings) return null;
 
     return (
         <aside className="page-navigator" data-testid="page-navigator">
@@ -140,12 +145,12 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
             )}
 
             <div className="page-list">
-                {spreads.map((spread, spreadIndex) => (
+                {spreads.map((spread: Spread, spreadIndex: number) => (
                     <SpreadThumbnail
                         key={spread.id}
                         spread={spread}
                         spreadIndex={spreadIndex}
-                        albumId={albumId}
+                        albumId={album.id}
                         settings={settings}
                         isActive={spreadIndex === currentSpreadIndex}
                         isSelected={selectedIndices.has(spreadIndex)}
@@ -153,13 +158,13 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                         showCheckbox={true}
                         onClick={(e) => handleSpreadClick(spreadIndex, e)}
                         onCheckboxChange={(checked) => handleCheckboxChange(spreadIndex, checked)}
-                        onDelete={() => onDeleteSpread(spread.id)}
+                        onDelete={() => handleDeleteSpread(spread.id)}
                     />
                 ))}
 
                 <button
                     className="add-page-btn"
-                    onClick={onAddSpread}
+                    onClick={handleAddSpread}
                     disabled={!canAddMore}
                     title={canAddMore ? 'Add Spread' : `Maximum ${maxSpreads} spreads reached`}
                     data-testid="add-pages-button"
@@ -171,189 +176,5 @@ export const PageNavigator: React.FC<PageNavigatorProps> = ({
                 </button>
             </div>
         </aside>
-    );
-};
-
-interface SpreadThumbnailProps {
-    spread: Spread;
-    spreadIndex: number;
-    albumId: string;
-    settings: AlbumSettings;
-    isActive: boolean;
-    isSelected: boolean;
-    canDelete: boolean;
-    showCheckbox: boolean;
-    onClick: (e: React.MouseEvent) => void;
-    onCheckboxChange: (checked: boolean) => void;
-    onDelete: () => void;
-}
-
-const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
-    spread,
-    spreadIndex,
-    albumId,
-    settings,
-    isActive,
-    isSelected,
-    canDelete,
-    showCheckbox,
-    onClick,
-    onCheckboxChange,
-    onDelete,
-}) => {
-    const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-    const [isVisible, setIsVisible] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const { generateSpreadThumbnail } = useCanvasThumbnail();
-
-    // Lazy loading with IntersectionObserver
-    useEffect(() => {
-        const element = containerRef.current;
-        if (!element) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        setIsVisible(true);
-                    }
-                });
-            },
-            {
-                root: null,
-                rootMargin: '50px',
-                threshold: 0.1,
-            }
-        );
-
-        observer.observe(element);
-
-        return () => {
-            observer.disconnect();
-        };
-    }, []);
-
-    // Generate thumbnail when visible
-    useEffect(() => {
-        if (!isVisible) return;
-
-        // Pass single spread to generator
-        const contentHash = generateSpreadContentHash(spread);
-
-        const loadThumbnail = async () => {
-            // Check cache first
-            try {
-                // Use spread.id instead of index
-                const cached = await spreadThumbnailDB.get(albumId, spread.id);
-                if (cached && cached.contentHash === contentHash) {
-                    setThumbnailUrl(cached.dataUrl);
-                    return;
-                }
-            } catch (error) {
-                console.warn('Failed to load cached thumbnail:', error);
-            }
-
-            // Generate new thumbnail
-            setIsLoading(true);
-            try {
-                // generateSpreadThumbnail expects Spread (single or array, hook handles it)
-                const dataUrl = await generateSpreadThumbnail(spread, settings);
-                if (dataUrl) {
-                    setThumbnailUrl(dataUrl);
-                    // Cache the thumbnail
-                    try {
-                        await spreadThumbnailDB.set(albumId, spread.id, dataUrl, contentHash);
-                    } catch (error) {
-                        console.warn('Failed to cache thumbnail:', error);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to generate thumbnail:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        loadThumbnail();
-    }, [isVisible, spread, spreadIndex, albumId, settings, generateSpreadThumbnail]);
-
-    const handleDelete = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (window.confirm('Delete this spread?')) {
-            onDelete();
-        }
-    };
-
-    const handleCheckboxClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-    };
-
-    const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onCheckboxChange(e.target.checked);
-    };
-
-    return (
-        <div
-            ref={containerRef}
-            className={`spread-thumbnail ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''}`}
-            onClick={onClick}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onClick(e as unknown as React.MouseEvent)}
-            data-testid="spread-thumbnail"
-        >
-            {showCheckbox && (
-                <label
-                    className="spread-thumbnail-checkbox"
-                    onClick={handleCheckboxClick}
-                    data-testid="spread-checkbox-label"
-                >
-                    <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={handleCheckboxChange}
-                        data-testid="spread-checkbox"
-                    />
-                </label>
-            )}
-
-            <div className="spread-thumbnail-content">
-                {thumbnailUrl ? (
-                    <img
-                        src={thumbnailUrl}
-                        alt={`Spread ${spreadIndex + 1}`}
-                        className="spread-thumbnail-image"
-                    />
-                ) : isLoading ? (
-                    <div className="spread-thumbnail-loading">
-                        <div className="loading-spinner" />
-                    </div>
-                ) : (
-                    <div className="spread-thumbnail-placeholder">
-                        <div className="spread-thumbnail-page" />
-                        <div className="spread-thumbnail-seam" />
-                        <div className="spread-thumbnail-page" />
-                    </div>
-                )}
-            </div>
-
-            <span className="page-thumbnail-number" data-testid="page-number">
-                {spreadIndex * 2 + 1}-{spreadIndex * 2 + 2}
-            </span>
-
-            {canDelete && (
-                <button
-                    className="page-thumbnail-delete"
-                    onClick={handleDelete}
-                    title="Delete spread"
-                    data-testid="delete-spread-button"
-                >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                </button>
-            )}
-        </div>
     );
 };

@@ -1,6 +1,13 @@
 // Album settings
 export type Unit = 'inch' | 'cm';
 
+// Snap edge for runtime snapping calculations
+export type SnapEdge =
+  | 'left' | 'right' | 'top' | 'bottom'
+  | 'seam'
+  | 'left-center-h' | 'left-center-v'
+  | 'right-center-h' | 'right-center-v';
+
 export interface AlbumSettings {
   pageWidth: number;
   pageHeight: number;
@@ -9,31 +16,7 @@ export interface AlbumSettings {
   maxPages: number;
 }
 
-// Snap constraint for smart positioning
-export type SnapEdge =
-  | 'left' | 'right' | 'top' | 'bottom'
-  | 'seam'
-  | 'left-center-h' | 'left-center-v'
-  | 'right-center-h' | 'right-center-v';
 
-export interface SnapConstraint {
-  edge: SnapEdge;
-  offset: number; // Distance from snap target in percentage
-}
-
-export interface SnapConstraints {
-  horizontal?: SnapConstraint; // x-axis snap
-  vertical?: SnapConstraint;   // y-axis snap
-}
-
-// Default album settings
-export const DEFAULT_ALBUM_SETTINGS: AlbumSettings = {
-  pageWidth: 8,
-  pageHeight: 10,
-  unit: 'inch',
-  isSquare: false,
-  maxPages: 40,
-};
 
 // Album and page related types
 export interface Album {
@@ -73,8 +56,7 @@ export interface PageElement {
   size: Size; // Absolute dimensions in pixels
   crop?: CropArea;
   lockAspectRatio?: boolean;
-  snapConstraints?: SnapConstraints;
-  // Original aspect ratio (stored when image added)
+
   originalAspectRatio?: number;
 }
 

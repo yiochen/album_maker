@@ -1,8 +1,6 @@
 import type { Album, Spread, TemplateId } from '../types';
-import { DEFAULT_ALBUM_SETTINGS } from '../types';
+import { APP_CONFIG } from '../config';
 import { albumDB, settingsDB } from '../db';
-
-const CURRENT_ALBUM_KEY = 'currentAlbumId';
 
 // Create a new empty album
 export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
@@ -12,7 +10,7 @@ export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
     return {
         id: albumId,
         name,
-        settings: { ...DEFAULT_ALBUM_SETTINGS },
+        settings: { ...APP_CONFIG.DEFAULT_ALBUM_SETTINGS },
         createdAt: now,
         updatedAt: now,
         spreads: [createNewSpread()], // Start with one spread
@@ -72,12 +70,12 @@ export const albumStorage = {
 
     // Get current album ID
     async getCurrentAlbumId(): Promise<string | null> {
-        return settingsDB.get(CURRENT_ALBUM_KEY);
+        return settingsDB.get(APP_CONFIG.CURRENT_ALBUM_KEY);
     },
 
     // Set current album ID
     async setCurrentAlbumId(id: string): Promise<void> {
-        await settingsDB.set(CURRENT_ALBUM_KEY, id);
+        await settingsDB.set(APP_CONFIG.CURRENT_ALBUM_KEY, id);
     },
 
     // Load current album or create new one
@@ -99,7 +97,6 @@ export const albumStorage = {
 
 // Auto-save with debouncing
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-const SAVE_DELAY = 1000; // 1 second debounce
 
 export const debouncedSave = (album: Album): void => {
     if (saveTimeout) {
@@ -113,7 +110,7 @@ export const debouncedSave = (album: Album): void => {
         } catch (error) {
             console.error('Failed to auto-save album:', error);
         }
-    }, SAVE_DELAY);
+    }, APP_CONFIG.SAVE_DELAY);
 };
 
 export const immediatelyFlushSave = async (album: Album): Promise<void> => {
@@ -178,7 +175,7 @@ export const importAlbumFromJson = (): Promise<Album> => {
 // Legacy: Load from localStorage (for migration)
 export const loadFromLocalStorage = (): Album | null => {
     try {
-        const data = localStorage.getItem('albumEditor_album');
+        const data = localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEY);
         if (!data) return null;
         return JSON.parse(data) as Album;
     } catch {
@@ -188,5 +185,5 @@ export const loadFromLocalStorage = (): Album | null => {
 
 // Legacy: Clear localStorage after migration
 export const clearLocalStorage = (): void => {
-    localStorage.removeItem('albumEditor_album');
+    localStorage.removeItem(APP_CONFIG.LOCAL_STORAGE_KEY);
 };

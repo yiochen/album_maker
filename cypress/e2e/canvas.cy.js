@@ -109,7 +109,8 @@ describe('Canvas', () => {
             cy.get('[data-testid="canvas-container"]').should('have.attr', 'data-has-selection', 'true');
             cy.contains('.properties-title', 'Image Properties').should('be.visible');
             // Press Delete globally
-            cy.get('body').type('{del}');
+            cy.wait(500); // Wait for listeners to be ready
+            cy.get('body').trigger('keydown', { key: 'Delete', code: 'Delete', which: 46, keyCode: 46, force: true });
             // Element should be removed (Properties panel should revert to Spread Properties)
             cy.contains('.properties-title', 'Spread Properties', { timeout: 5000 }).should('be.visible');
         });
@@ -118,7 +119,8 @@ describe('Canvas', () => {
             cy.get('[data-testid="canvas-container"]').should('have.attr', 'data-has-selection', 'true');
             cy.contains('.properties-title', 'Image Properties').should('be.visible');
             // Press Backspace globally
-            cy.get('body').type('{backspace}');
+            cy.wait(500); // Wait for listeners to be ready
+            cy.get('body').trigger('keydown', { key: 'Backspace', code: 'Backspace', which: 8, keyCode: 8, force: true });
             // Element should be removed
             cy.contains('.properties-title', 'Spread Properties', { timeout: 5000 }).should('be.visible');
         });

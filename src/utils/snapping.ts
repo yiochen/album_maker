@@ -1,4 +1,4 @@
-import type { SnapEdge, SnapConstraints, Position, Size } from '../types';
+import type { SnapEdge, Position, Size } from '../types';
 
 // Snap threshold in percentage
 const SNAP_THRESHOLD = 2;
@@ -12,7 +12,6 @@ export interface SnapTarget {
 export interface SnapResult {
     position: Position;
     snappedEdges: SnapEdge[];
-    snapConstraints?: SnapConstraints;
 }
 
 export interface SnapLine {
@@ -24,30 +23,36 @@ export interface SnapLine {
 /**
  * Get all snap targets for a two-page spread
  * Canvas is 2x page width, 1x page height
+ * Cached as a constant to avoid re-creation on every call
  */
-export function getSnapTargets(): SnapTarget[] {
-    const targets: SnapTarget[] = [];
-
+const SNAP_TARGETS: SnapTarget[] = [
     // Left page edges
-    targets.push({ edge: 'left', position: 0, orientation: 'vertical' });
-    targets.push({ edge: 'top', position: 0, orientation: 'horizontal' });
-    targets.push({ edge: 'bottom', position: 100, orientation: 'horizontal' });
+    { edge: 'left', position: 0, orientation: 'vertical' },
+    { edge: 'top', position: 0, orientation: 'horizontal' },
+    { edge: 'bottom', position: 100, orientation: 'horizontal' },
 
     // Seam (center of spread)
-    targets.push({ edge: 'seam', position: 50, orientation: 'vertical' });
+    { edge: 'seam', position: 50, orientation: 'vertical' },
 
     // Right page edges
-    targets.push({ edge: 'right', position: 100, orientation: 'vertical' });
+    { edge: 'right', position: 100, orientation: 'vertical' },
 
     // Left page center lines
-    targets.push({ edge: 'left-center-h', position: 50, orientation: 'horizontal' }); // Horizontal center
-    targets.push({ edge: 'left-center-v', position: 25, orientation: 'vertical' });   // Vertical center of left page
+    { edge: 'left-center-h', position: 50, orientation: 'horizontal' },
+    { edge: 'left-center-v', position: 25, orientation: 'vertical' },
 
     // Right page center lines
-    targets.push({ edge: 'right-center-h', position: 50, orientation: 'horizontal' }); // Same as left center horizontal
-    targets.push({ edge: 'right-center-v', position: 75, orientation: 'vertical' });   // Vertical center of right page
+    { edge: 'right-center-h', position: 50, orientation: 'horizontal' },
+    { edge: 'right-center-v', position: 75, orientation: 'vertical' },
+];
 
-    return targets;
+// Pre-filtered arrays to avoid filtering on every move
+const VERTICAL_TARGETS = SNAP_TARGETS.filter(t => t.orientation === 'vertical');
+const HORIZONTAL_TARGETS = SNAP_TARGETS.filter(t => t.orientation === 'horizontal');
+
+/** @deprecated Use SNAP_TARGETS constant directly */
+export function getSnapTargets(): SnapTarget[] {
+    return SNAP_TARGETS;
 }
 
 /**
@@ -61,14 +66,12 @@ export function calculateSnap(
     size: Size,
     threshold: number = SNAP_THRESHOLD
 ): SnapResult {
-    const targets = getSnapTargets();
     const snappedEdges: SnapEdge[] = [];
-    const snapConstraints: SnapConstraints = {};
 
     let newX = position.x;
     let newY = position.y;
 
-    // Element edges
+    // Element edges - pre-compute once
     const left = position.x;
     const right = position.x + size.width;
     const top = position.y;
@@ -76,52 +79,46 @@ export function calculateSnap(
     const centerX = position.x + size.width / 2;
     const centerY = position.y + size.height / 2;
 
-    // Check vertical snaps (for X position)
-    for (const target of targets.filter(t => t.orientation === 'vertical')) {
+    // Check vertical snaps (for X position) - use pre-filtered array
+    for (const target of VERTICAL_TARGETS) {
         // Snap left edge
         if (Math.abs(left - target.position) < threshold) {
             newX = target.position;
             snappedEdges.push(target.edge);
-            snapConstraints.horizontal = { edge: target.edge, offset: 0 };
             break;
         }
         // Snap right edge
         if (Math.abs(right - target.position) < threshold) {
             newX = target.position - size.width;
             snappedEdges.push(target.edge);
-            snapConstraints.horizontal = { edge: target.edge, offset: -size.width };
             break;
         }
         // Snap center
         if (Math.abs(centerX - target.position) < threshold) {
             newX = target.position - size.width / 2;
             snappedEdges.push(target.edge);
-            snapConstraints.horizontal = { edge: target.edge, offset: -size.width / 2 };
             break;
         }
     }
 
-    // Check horizontal snaps (for Y position)
-    for (const target of targets.filter(t => t.orientation === 'horizontal')) {
+    // Check horizontal snaps (for Y position) - use pre-filtered array
+    for (const target of HORIZONTAL_TARGETS) {
         // Snap top edge
         if (Math.abs(top - target.position) < threshold) {
             newY = target.position;
             snappedEdges.push(target.edge);
-            snapConstraints.vertical = { edge: target.edge, offset: 0 };
             break;
         }
         // Snap bottom edge
         if (Math.abs(bottom - target.position) < threshold) {
             newY = target.position - size.height;
             snappedEdges.push(target.edge);
-            snapConstraints.vertical = { edge: target.edge, offset: -size.height };
             break;
         }
         // Snap center
         if (Math.abs(centerY - target.position) < threshold) {
             newY = target.position - size.height / 2;
             snappedEdges.push(target.edge);
-            snapConstraints.vertical = { edge: target.edge, offset: -size.height / 2 };
             break;
         }
     }
@@ -129,7 +126,6 @@ export function calculateSnap(
     return {
         position: { x: newX, y: newY },
         snappedEdges,
-        snapConstraints: Object.keys(snapConstraints).length > 0 ? snapConstraints : undefined,
     };
 }
 
@@ -217,33 +213,6 @@ export function getActiveSnapLines(snappedEdges: SnapEdge[]): SnapLine[] {
             position: t.position,
             edge: t.edge,
         }));
-}
-
-/**
- * Recompute element position based on snap constraints when page size changes
- */
-export function recomputePositionFromConstraints(
-    constraints: SnapConstraints
-): Position {
-    const targets = getSnapTargets();
-    let x = 0;
-    let y = 0;
-
-    if (constraints.horizontal) {
-        const target = targets.find(t => t.edge === constraints.horizontal!.edge);
-        if (target) {
-            x = target.position + constraints.horizontal.offset;
-        }
-    }
-
-    if (constraints.vertical) {
-        const target = targets.find(t => t.edge === constraints.vertical!.edge);
-        if (target) {
-            y = target.position + constraints.vertical.offset;
-        }
-    }
-
-    return { x, y };
 }
 
 /**
