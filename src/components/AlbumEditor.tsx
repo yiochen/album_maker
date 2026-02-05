@@ -1,16 +1,10 @@
 import React, { useCallback, useMemo } from 'react';
-import type { PageElement, PoolImage, TemplateId } from '../types';
+import type { TemplateId } from '../types';
 import { useAlbumStore } from '../states/albumStore';
 import { useUIStore } from '../states/uiStore';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
-import {
-  albumStorage,
-  createNewAlbum,
-  exportAlbumAsJson,
-  importAlbumFromJson,
-} from '../services/storage';
-import { spreadThumbnailDB, generateSpreadContentHash } from '../db';
+import { useAlbumActions } from '../hooks/useAlbumActions';
 import { Toolbar } from './Toolbar';
 import { AlbumSettingsPanel } from './AlbumSettingsPanel';
 import { PageNavigator } from './PageNavigator';
@@ -26,13 +20,8 @@ export const AlbumEditor: React.FC = () => {
   // Global State
   const {
     album,
-    setAlbum,
     setName,
     setSettings,
-    addElement,
-    updateElement,
-    updateSpread,
-    deleteElement,
     addToPool,
     undo,
     redo,
@@ -61,6 +50,19 @@ export const AlbumEditor: React.FC = () => {
   // Keyboard shortcuts
   useKeyboardShortcuts({ undo, redo, canUndo, canRedo });
 
+  const {
+      handleImageDrop,
+      handleElementUpdate,
+      handleElementDelete,
+      handleCanvasChange,
+      handleSelectAlbum,
+      handleCreateAlbum,
+      handleDeleteAlbum,
+      handleImportAlbum,
+      handleExportAlbum,
+      updateSpread
+  } = useAlbumActions();
+
   // Derived state
   const currentSpread = useMemo(() => {
     return album?.spreads[currentSpreadIndex];
@@ -76,53 +78,6 @@ export const AlbumEditor: React.FC = () => {
     setCurrentSpreadIndex(Math.max(0, album.spreads.length - 1));
   }
 
-  // Callbacks
-  const handleImageDrop = useCallback((
-    spreadId: string,
-    image: PoolImage,
-    position: { x: number; y: number },
-  ) => {
-    const imageWidth = image.width || 300;
-    const imageHeight = image.height || (imageWidth / 1);
-    const aspectRatio = imageWidth / imageHeight;
-
-    const halfWidth = imageWidth / 2;
-    const halfHeight = imageHeight / 2;
-
-    const newElement: PageElement = {
-      id: crypto.randomUUID(),
-      type: 'image',
-      imageUrl: image.baseUrl,
-      thumbnailUrl: image.thumbnailUrl || image.baseUrl,
-      sourceId: image.sourceId,
-      sourceImageId: image.sourceImageId,
-      position: {
-        x: position.x - halfWidth,
-        y: position.y - halfHeight,
-      },
-      size: {
-        width: imageWidth,
-        height: imageHeight,
-      },
-      originalAspectRatio: aspectRatio,
-      lockAspectRatio: true,
-    };
-
-    addElement(spreadId, newElement);
-    setSelectedElementId(newElement.id);
-    setSelectedPageId(spreadId);
-  }, [addElement, setSelectedElementId, setSelectedPageId]);
-
-  const handleElementUpdate = useCallback((spreadId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => {
-    updateElement(spreadId, elementId, updates, groupId);
-  }, [updateElement]);
-
-  const handleElementDelete = useCallback((spreadId: string, elementId: string) => {
-    deleteElement(spreadId, elementId);
-    setSelectedElementId(null);
-    setSelectedPageId(null);
-  }, [deleteElement, setSelectedElementId, setSelectedPageId]);
-
   const toCanvasPx = useCallback(
     (value: number) => value * (APP_CONFIG.SCREEN_PPI / APP_CONFIG.PPI),
     []
@@ -131,60 +86,6 @@ export const AlbumEditor: React.FC = () => {
     (value: number) => value * (APP_CONFIG.PPI / APP_CONFIG.SCREEN_PPI),
     []
   );
-
-  const handleCanvasChange = useCallback(async (dataUrl: string) => {
-    if (!album || !currentSpread) return;
-    const contentHash = generateSpreadContentHash(currentSpread);
-    try {
-      await spreadThumbnailDB.set(album.id, currentSpread.id, dataUrl, contentHash);
-    } catch (error) {
-      console.warn('Failed to save thumbnail:', error);
-    }
-  }, [album, currentSpread]);
-
-  const handleSelectAlbum = useCallback(async (id: string) => {
-    const newAlbum = await albumStorage.loadAlbum(id);
-    if (newAlbum) {
-      if (!newAlbum.settings) {
-        newAlbum.settings = { ...APP_CONFIG.DEFAULT_ALBUM_SETTINGS };
-      }
-      await albumStorage.setCurrentAlbumId(id);
-      setAlbum(newAlbum);
-      setCurrentSpreadIndex(0);
-      setSelectedElementId(null);
-    }
-  }, [setAlbum, setCurrentSpreadIndex, setSelectedElementId]);
-
-  const handleCreateAlbum = useCallback(async (name: string) => {
-    const newAlbum = createNewAlbum(name);
-    await albumStorage.saveAlbum(newAlbum);
-    await albumStorage.setCurrentAlbumId(newAlbum.id);
-    setAlbum(newAlbum);
-    setCurrentSpreadIndex(0);
-    setSelectedElementId(null);
-  }, [setAlbum, setCurrentSpreadIndex, setSelectedElementId]);
-
-  const handleDeleteAlbum = useCallback(async (id: string) => {
-    await albumStorage.deleteAlbum(id);
-  }, []);
-
-  const handleImportAlbum = useCallback(async () => {
-    try {
-      const imported = await importAlbumFromJson();
-      if (!imported.settings) {
-        imported.settings = { ...APP_CONFIG.DEFAULT_ALBUM_SETTINGS };
-      }
-      setAlbum(imported);
-      setCurrentSpreadIndex(0);
-      setSelectedElementId(null);
-    } catch (error) {
-      console.error('Failed to import album:', error);
-    }
-  }, [setAlbum, setCurrentSpreadIndex, setSelectedElementId]);
-
-  const handleExportAlbum = useCallback(() => {
-    if (album) exportAlbumAsJson(album);
-  }, [album]);
 
   if (!album || !currentSpread) {
     return <LoadingScreen message="No spreads in album" showSpinner={false} />;
