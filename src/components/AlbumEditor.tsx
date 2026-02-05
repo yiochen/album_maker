@@ -123,6 +123,15 @@ export const AlbumEditor: React.FC = () => {
     setSelectedPageId(null);
   }, [deleteElement, setSelectedElementId, setSelectedPageId]);
 
+  const toCanvasPx = useCallback(
+    (value: number) => value * (APP_CONFIG.SCREEN_PPI / APP_CONFIG.PPI),
+    []
+  );
+  const toModelPx = useCallback(
+    (value: number) => value * (APP_CONFIG.PPI / APP_CONFIG.SCREEN_PPI),
+    []
+  );
+
   const handleCanvasChange = useCallback(async (dataUrl: string) => {
     if (!album || !currentSpread) return;
     const contentHash = generateSpreadContentHash(currentSpread);
@@ -224,6 +233,9 @@ export const AlbumEditor: React.FC = () => {
         <Canvas
           spread={currentSpread}
           settings={album.settings}
+          ppi={APP_CONFIG.PPI}
+          toCanvasPx={toCanvasPx}
+          toModelPx={toModelPx}
           selectedElementId={selectedElementId}
           isSnappingEnabled={isSnappingEnabled}
           onElementSelect={(id) => {

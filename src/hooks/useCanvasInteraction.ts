@@ -13,6 +13,8 @@ interface UseCanvasInteractionProps {
     selectedElementId: string | null;
     isSnappingEnabled: boolean;
     zoom: number;
+    toCanvasPx: (value: number) => number;
+    toModelPx: (value: number) => number;
     snapLinesRef: React.RefObject<fabric.Line[]>;
     wrapperRef: React.RefObject<HTMLDivElement | null>;
     onElementSelect: (elementId: string | null) => void;
@@ -27,9 +29,10 @@ export const useCanvasInteraction = ({
     canvasWidth,
     canvasHeight,
     spread,
-    // selectedElementId, // Unused
     isSnappingEnabled,
     zoom,
+    toCanvasPx,
+    toModelPx,
     snapLinesRef,
     wrapperRef,
     onElementSelect,
@@ -182,7 +185,7 @@ export const useCanvasInteraction = ({
             }
 
             // Bleed constraints - only clamp if outside bounds
-            const bleedMargin = APP_CONFIG.BLEED_MARGIN;
+            const bleedMargin = toCanvasPx(APP_CONFIG.BLEED_MARGIN);
             const minX = -scaledWidth + bleedMargin;
             const maxX = canvasWidth - bleedMargin;
             const minY = -scaledHeight + bleedMargin;
@@ -206,8 +209,11 @@ export const useCanvasInteraction = ({
             }
 
             onElementUpdateRef.current(spreadRef.current.id, obj.data.id, {
-                position: { x: obj.left!, y: obj.top! },
-                size: { width: obj.getScaledWidth(), height: obj.getScaledHeight() },
+                position: { x: toModelPx(obj.left!), y: toModelPx(obj.top!) },
+                size: {
+                    width: toModelPx(obj.getScaledWidth()),
+                    height: toModelPx(obj.getScaledHeight()),
+                },
             });
 
             if (onCanvasChangeRef.current) {
@@ -224,9 +230,8 @@ export const useCanvasInteraction = ({
             canvas.off('selection:created', handleSelection);
             canvas.off('selection:updated', handleSelection);
             canvas.off('selection:cleared', handleSelectionCleared);
-            // We rely on canvas disposal for other cleanup or manual off if we could
         };
-    }, [fabricCanvas, canvasWidth, canvasHeight, snapLinesRef]); // Re-run when canvas instance changes
+    }, [fabricCanvas, canvasWidth, canvasHeight, snapLinesRef, toCanvasPx, toModelPx]); // Re-run when canvas instance changes
 
     // Drag Drop Handlers
     const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -253,15 +258,18 @@ export const useCanvasInteraction = ({
             const domX = e.clientX - rect.left;
             const domY = e.clientY - rect.top;
 
-            const scale = (zoom / 100) * (APP_CONFIG.SCREEN_PPI / APP_CONFIG.PPI);
+            const scale = zoom / 100;
             const canvasX = domX / scale;
             const canvasY = domY / scale;
 
-            onImageDropRef.current(spreadRef.current.id, image, { x: canvasX, y: canvasY });
+            onImageDropRef.current(spreadRef.current.id, image, {
+                x: toModelPx(canvasX),
+                y: toModelPx(canvasY),
+            });
         } catch (err) {
             console.error('Failed to parse drop', err);
         }
-    }, [zoom, wrapperRef]);
+    }, [zoom, wrapperRef, toModelPx]);
 
     return {
         isDragOver,

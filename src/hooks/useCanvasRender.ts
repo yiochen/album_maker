@@ -14,7 +14,7 @@ export interface ExtendedFabricObject extends fabric.Object {
 }
 
 const getZoomCompensatedSizes = (zoomPercent: number) => {
-    const scale = (zoomPercent / 100) * (APP_CONFIG.SCREEN_PPI / APP_CONFIG.PPI);
+    const scale = zoomPercent / 100;
     const inverseScale = 1 / scale;
     const base = APP_CONFIG.BASE_UI_SIZES;
 
@@ -33,6 +33,8 @@ interface UseCanvasRenderProps {
     containerRef: React.RefObject<HTMLDivElement | null>;
     spread: Spread;
     settings: AlbumSettings;
+    ppi: number;
+    toCanvasPx: (value: number) => number;
     selectedElementId: string | null;
     onCanvasChange?: (dataUrl: string) => void;
 }
@@ -42,6 +44,8 @@ export const useCanvasRender = ({
     containerRef,
     spread,
     settings,
+    ppi,
+    toCanvasPx,
     selectedElementId,
     onCanvasChange,
 }: UseCanvasRenderProps) => {
@@ -69,9 +73,10 @@ export const useCanvasRender = ({
     // Track the last spread ID that was fully synced to detect spread changes
     const lastSyncedSpreadId = useRef<string | null>(null);
 
-    // Canvas dimensions (Absolute Pixels)
-    const canvasWidth = settings.pageWidth * 2 * APP_CONFIG.PPI;
-    const canvasHeight = settings.pageHeight * APP_CONFIG.PPI;
+    const modelWidth = settings.pageWidth * 2 * ppi;
+    const modelHeight = settings.pageHeight * ppi;
+    const canvasWidth = toCanvasPx(modelWidth);
+    const canvasHeight = toCanvasPx(modelHeight);
 
     const isObjectMoving = (obj: fabric.Object) => {
         return (obj as ExtendedFabricObject).isMoving;
@@ -112,9 +117,6 @@ export const useCanvasRender = ({
         // Cleanup moved state on mouse up
         canvas.on('mouse:up', () => {
             canvas.getObjects().forEach(o => (o as ExtendedFabricObject).isMoving = false);
-            // Snap lines cleanup is handled in interaction hook usually, but we can do it here too to be safe?
-            // Better leave interaction logic separate, but this is cleanup.
-            // Actually, snap lines are rendering artifacts, so maybe fine here.
             snapLinesRef.current.forEach(line => canvas.remove(line));
             snapLinesRef.current = [];
             canvas.requestRenderAll();
@@ -154,7 +156,7 @@ export const useCanvasRender = ({
         const scaleY = availableHeight / canvasHeight;
         const scale = Math.min(scaleX, scaleY);
 
-        const zoomPercent = Math.max(10, Math.floor(scale * 100 * (APP_CONFIG.PPI / APP_CONFIG.SCREEN_PPI)));
+        const zoomPercent = Math.max(10, Math.floor(scale * 100));
         setZoom(zoomPercent);
     }, [canvasWidth, canvasHeight, containerRef]);
 
@@ -217,10 +219,10 @@ export const useCanvasRender = ({
                         const targetWidth = element.size.width;
                         const targetHeight = element.size.height;
                         img.set({
-                            left: element.position.x,
-                            top: element.position.y,
-                            scaleX: targetWidth / (img.width || 1),
-                            scaleY: targetHeight / (img.height || 1),
+                            left: toCanvasPx(element.position.x),
+                            top: toCanvasPx(element.position.y),
+                            scaleX: toCanvasPx(targetWidth) / (img.width || 1),
+                            scaleY: toCanvasPx(targetHeight) / (img.height || 1),
                         });
                         img.setCoords();
                     }
@@ -258,10 +260,10 @@ export const useCanvasRender = ({
                 const uiSizes = getZoomCompensatedSizes(zoomValue);
 
                 img.set({
-                    left: element.position.x,
-                    top: element.position.y,
-                    scaleX: width / (img.width || 1),
-                    scaleY: height / (img.height || 1),
+                    left: toCanvasPx(element.position.x),
+                    top: toCanvasPx(element.position.y),
+                    scaleX: toCanvasPx(width) / (img.width || 1),
+                    scaleY: toCanvasPx(height) / (img.height || 1),
                     data: { id: element.id },
                     lockRotation: true,
                     uniformScaling: isLocked,
@@ -290,7 +292,7 @@ export const useCanvasRender = ({
         });
 
         canvas.requestRenderAll();
-    }, [fabricCanvas, spread.id, spread.elements.length, zoom]);
+    }, [fabricCanvas, spread.id, spread.elements.length, zoom, modelWidth, modelHeight, ppi, toCanvasPx]);
 
     // Update UI sizes when zoom changes
     useEffect(() => {

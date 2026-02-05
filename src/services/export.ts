@@ -52,15 +52,6 @@ export const exportSpread = async (
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw seam (center)
-    // const seamX = canvasWidth / 2;
-    // ctx.strokeStyle = '#e5e7eb';
-    // ctx.beginPath();
-    // ctx.setLineDash([4, 4]); // Export with dashed line? Or maybe solid/none for print?
-    // usually for print export we might NOT want the seam, but for digital we might.
-    // Keeping it simple for now, maybe skip seam for export if unrelated.
-    // Let's skip the seam for final export as it's a UI helper.
-
     // Draw each element
     for (const element of spread.elements) {
         await drawElement(ctx, element);
@@ -113,10 +104,6 @@ const drawElement = async (
 
         // Draw with optional cropping
         if (element.crop) {
-            // Crop is likely in % of the original image if we follow CSS standards,
-            // but let's assume standard behavior for now.
-            // If crop data exists but we don't know the unit, be careful.
-            // Assuming crop is percentage of Source Image based on usage in other apps.
             const srcX = (element.crop.x / 100) * img.width;
             const srcY = (element.crop.y / 100) * img.height;
             const srcWidth = (element.crop.width / 100) * img.width;
@@ -124,16 +111,6 @@ const drawElement = async (
 
             ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, x, y, width, height);
         } else {
-            // Cover fit - maintain aspect ratio and fill the area
-            // However, with Absolute positioning/sizing, the element IS the viewport.
-            // The image content should fill the element box.
-            // Fabric handling is: uniform scaling to fit? Or fill?
-            // In Canvas.tsx: scaleX = targetWidth / img.width.
-            // This means the image is STRETCHED to fit unless aspect ratio is locked.
-            // If lockAspectRatio is true, it preserves aspect.
-            // If we just drawImage(img, x, y, width, height), it stretches.
-            // This matches the Fabric `scaleX/scaleY` behavior exactly.
-
             ctx.drawImage(img, x, y, width, height);
         }
     } catch (error) {
@@ -163,7 +140,6 @@ const drawPageNumber = (
         // Left page number on bottom-left corner of left page?
         // Or bottom-left of the page area.
         // centerX passed is the seam (width/2).
-        // Let's put it at bottom-left of the page.
         // Page is from 0 to centerX.
         ctx.textAlign = 'left';
         ctx.fillText(
@@ -176,7 +152,6 @@ const drawPageNumber = (
         // Page is from (centerX - width/2) to centerX? No.
         // Right page is from seam to width.
         // centerX passed is total width.
-        // Let's put it at bottom-right of the page.
         ctx.textAlign = 'right';
         ctx.fillText(
             pageNumber.toString(),

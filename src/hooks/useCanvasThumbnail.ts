@@ -55,7 +55,6 @@ export function useCanvasThumbnail() {
         settings: AlbumSettings,
         options: Partial<ThumbnailOptions> = {}
     ): Promise<string | null> => {
-        // Handle array shim if needed (though we should move to passing single spread)
         const targetSpread = Array.isArray(spread) ? spread[0] : spread;
         if (!targetSpread) return null;
 

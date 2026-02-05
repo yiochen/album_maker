@@ -27,13 +27,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     canUndo,
     canRedo,
 }) => {
-    // Note: To fully resolve prop drilling, this component should fetch most data from store.
-    // However, for now we respect the props passed by the parent which manages some callbacks (like import/export).
-
-    // Unused store hooks removed to fix lint errors
-    // const { canUndo, canRedo, undo, redo, album, setName } = useAlbumStore();
-    // const { isSnappingEnabled: storeSnapping, toggleSnapping } = useUIStore();
-
     return (
         <header className="toolbar" data-testid="toolbar">
             <div className="toolbar-left">
