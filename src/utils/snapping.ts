@@ -25,7 +25,7 @@ export interface SnapLine {
  * Canvas is 2x page width, 1x page height
  * Cached as a constant to avoid re-creation on every call
  */
-const SNAP_TARGETS: SnapTarget[] = [
+export const SNAP_TARGETS: SnapTarget[] = [
     // Left page edges
     { edge: 'left', position: 0, orientation: 'vertical' },
     { edge: 'top', position: 0, orientation: 'horizontal' },
@@ -49,11 +49,6 @@ const SNAP_TARGETS: SnapTarget[] = [
 // Pre-filtered arrays to avoid filtering on every move
 const VERTICAL_TARGETS = SNAP_TARGETS.filter(t => t.orientation === 'vertical');
 const HORIZONTAL_TARGETS = SNAP_TARGETS.filter(t => t.orientation === 'horizontal');
-
-/** @deprecated Use SNAP_TARGETS constant directly */
-export function getSnapTargets(): SnapTarget[] {
-    return SNAP_TARGETS;
-}
 
 /**
  * Calculate snapped position for an element
@@ -138,7 +133,7 @@ export function calculateResizeSnap(
     resizeHandle: string,
     threshold: number = SNAP_THRESHOLD
 ): { position: Position; size: Size; snappedEdges: SnapEdge[] } {
-    const targets = getSnapTargets();
+    const targets = SNAP_TARGETS;
     const snappedEdges: SnapEdge[] = [];
 
     let newX = position.x;
@@ -205,7 +200,7 @@ export function calculateResizeSnap(
  * Get snap lines to display on canvas
  */
 export function getActiveSnapLines(snappedEdges: SnapEdge[]): SnapLine[] {
-    const targets = getSnapTargets();
+    const targets = SNAP_TARGETS;
     return targets
         .filter(t => snappedEdges.includes(t.edge))
         .map(t => ({
