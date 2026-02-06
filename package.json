@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "cy:open": "cypress open",
     "cy:run": "cypress run",
+    "cy:open:update": "cypress open --env updateSnapshots=true",
+    "cy:run:update": "cypress run --env updateSnapshots=true",
     "test:e2e": "start-server-and-test dev http://localhost:5173 cy:run",
     "clean-port": "kill -9 $(lsof -t -i:5173)"
   },

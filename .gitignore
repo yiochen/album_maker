@@ -27,3 +27,4 @@ dist-ssr
 cypress/videos/
 cypress/screenshots/
 cypress/downloads/
+**/__diff__/**
