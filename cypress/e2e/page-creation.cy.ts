@@ -30,9 +30,12 @@ describe('Page Creation', () => {
         // Add another spread first if only one exists
         cy.get('[data-testid="spread-thumbnail"]').then(($spreads) => {
             if ($spreads.length < 2) {
-                cy.get('[data-testid="add-pages-button"]').click();
+                cy.get('[data-testid="add-pages-button"]').should('not.be.disabled').click();
             }
         });
+
+        // Ensure we have at least 2 spreads before trying to interact
+        cy.get('[data-testid="spread-thumbnail"]').should('have.length.at.least', 2);
 
         // Click on the second spread
         cy.get('[data-testid="spread-thumbnail"]').eq(1).click();

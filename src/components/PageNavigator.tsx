@@ -5,7 +5,7 @@ import { SpreadThumbnail } from './SpreadThumbnail';
 import { Spread } from '../types';
 
 export const PageNavigator: React.FC = () => {
-    const { album, addSpreads, deleteSpread } = useAlbumStore();
+    const { album, addSpreads, deleteSpread, deleteSpreads } = useAlbumStore();
     const { currentSpreadIndex, setCurrentSpreadIndex } = useUIStore();
 
     const spreads = album?.spreads || [];
@@ -39,16 +39,21 @@ export const PageNavigator: React.FC = () => {
         deleteSpread(spreadId);
     };
 
-    // Helper for bulk delete - since store only has single delete, we iterate
-    // Ideally store should support bulk delete.
+    // Helper for bulk delete
     const handleDeleteSpreads = useCallback((spreadIndices: number[]) => {
         if (!album) return;
-        const sortedIndices = [...spreadIndices].sort((a, b) => b - a);
-        for (const spreadIndex of sortedIndices) {
-            const spread = album.spreads[spreadIndex];
-            if (spread) deleteSpread(spread.id);
+
+        const ids: string[] = [];
+        for (const idx of spreadIndices) {
+            if (album.spreads[idx]) {
+                ids.push(album.spreads[idx].id);
+            }
         }
-    }, [album, deleteSpread]);
+
+        if (ids.length > 0) {
+            deleteSpreads(ids);
+        }
+    }, [album, deleteSpreads]);
 
     const handleSpreadClick = useCallback((spreadIndex: number, event: React.MouseEvent) => {
         const isCtrlOrCmd = event.metaKey || event.ctrlKey;

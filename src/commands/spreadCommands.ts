@@ -173,3 +173,41 @@ export class UpdateSpreadCommand implements Command<Album> {
         };
     }
 }
+
+export class DeleteSpreadsCommand implements Command<Album> {
+    readonly type = 'DELETE_SPREADS';
+
+    constructor(
+        public readonly spreadIds: string[],
+        public readonly originalSpreads: { spread: Spread, index: number }[]
+    ) { }
+
+    execute(state: Album): Album {
+        const idsToRemove = new Set(this.spreadIds);
+        const remainingSpreads = state.spreads.filter(s => !idsToRemove.has(s.id));
+
+        if (remainingSpreads.length < 1) return state;
+
+        return {
+            ...state,
+            spreads: remainingSpreads,
+            updatedAt: Date.now(),
+        };
+    }
+
+    undo(state: Album): Album {
+        const newSpreads = [...state.spreads];
+        // Insert back in increasing index order to maintain relative positions
+        const sortedSpreads = [...this.originalSpreads].sort((a, b) => a.index - b.index);
+
+        for (const item of sortedSpreads) {
+             newSpreads.splice(item.index, 0, item.spread);
+        }
+
+        return {
+            ...state,
+            spreads: newSpreads,
+            updatedAt: Date.now(),
+        };
+    }
+}

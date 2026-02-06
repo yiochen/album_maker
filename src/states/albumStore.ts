@@ -10,6 +10,7 @@ import {
     AddSpreadCommand,
     AddSpreadsCommand,
     DeleteSpreadCommand,
+    DeleteSpreadsCommand,
     ReorderSpreadsCommand,
     UpdateSpreadCommand
 } from '../commands/spreadCommands';
@@ -43,6 +44,7 @@ interface AlbumState {
     addSpread: (templateId?: TemplateId) => void;
     addSpreads: (count?: number, templateId?: TemplateId) => void;
     deleteSpread: (spreadId: string) => void;
+    deleteSpreads: (spreadIds: string[]) => void;
     reorderSpreads: (fromIndex: number, toIndex: number) => void;
     updateSpread: (spreadId: string, updates: Partial<Spread>) => void;
     addElement: (spreadId: string, element: PageElement) => void;
@@ -114,6 +116,42 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
             if (index === -1) return;
             const spread = album.spreads[index];
             commandManager.execute(new DeleteSpreadCommand(spreadId, spread, index));
+            syncState();
+        },
+
+        deleteSpreads: (spreadIds: string[]) => {
+            const album = get().album;
+            if (!album) return;
+
+            const idsToDelete = new Set(spreadIds);
+            const validIds = new Set<string>();
+
+            // Identify valid IDs to delete
+            album.spreads.forEach((spread) => {
+                if (idsToDelete.has(spread.id)) {
+                    validIds.add(spread.id);
+                }
+            });
+
+            // Ensure at least one spread remains
+            if (album.spreads.length - validIds.size < 1) {
+                if (album.spreads.length > 0) {
+                    // Keep the first spread (mimics legacy behavior)
+                    validIds.delete(album.spreads[0].id);
+                }
+            }
+
+            if (validIds.size === 0) return;
+
+            // Gather full spread objects for the command (for Undo)
+            const spreadsToDelete: { spread: Spread, index: number }[] = [];
+            album.spreads.forEach((spread, index) => {
+                if (validIds.has(spread.id)) {
+                    spreadsToDelete.push({ spread, index });
+                }
+            });
+
+            commandManager.execute(new DeleteSpreadsCommand(Array.from(validIds), spreadsToDelete));
             syncState();
         },
 
