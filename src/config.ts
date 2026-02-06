@@ -42,4 +42,5 @@ export const APP_CONFIG = {
   SAVE_DELAY: 1000,
   CURRENT_ALBUM_KEY: 'currentAlbumId',
   LOCAL_STORAGE_KEY: 'albumEditor_album',
+  CLEAR_INDEX_DB_ON_LOAD_ERROR: true,
 };
