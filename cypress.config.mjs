@@ -8,8 +8,6 @@ export default defineConfig({
         video: false,
         screenshotOnRunFailure: true,
         async setupNodeEvents(on, config) {
-            const { addMatchImageSnapshotPlugin } = await import('@simonsmith/cypress-image-snapshot/plugin');
-            addMatchImageSnapshotPlugin(on);
 
             on('before:browser:launch', (browser, launchOptions) => {
                 if (browser.family === 'chromium' && browser.name !== 'electron') {
