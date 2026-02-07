@@ -37,8 +37,8 @@ describe('Page Creation', () => {
         // Ensure we have at least 2 spreads before trying to interact
         cy.get('[data-testid="spread-thumbnail"]').should('have.length.at.least', 2);
 
-        // Click on the second spread
-        cy.get('[data-testid="spread-thumbnail"]').eq(1).click();
+        // Wait for the second spread to be fully rendered and clickable
+        cy.get('[data-testid="spread-thumbnail"]').eq(1).should('be.visible').click();
         cy.get('[data-testid="spread-thumbnail"]').eq(1).should('have.class', 'active');
 
         // Click on the first spread

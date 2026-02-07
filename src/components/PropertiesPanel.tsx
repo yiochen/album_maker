@@ -232,39 +232,6 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                     <button
                         className="btn btn-secondary"
-                        onClick={() => {
-                            // Center in spread
-                            const spreadWidthPx = settings.pageWidth * 2 * PPI;
-                            const spreadHeightPx = settings.pageHeight * PPI;
-
-                            const x = (spreadWidthPx - element.size.width) / 2;
-                            const y = (spreadHeightPx - element.size.height) / 2;
-
-                            onUpdate({
-                                position: { x, y },
-                            });
-                        }}
-                    >
-                        Center on Spread
-                    </button>
-                    {element.originalAspectRatio && (
-                        <button
-                            className="btn btn-secondary"
-                            onClick={() => {
-                                // Reset to "reasonable" size (e.g. 50% of page width)
-                                const spreadWidthPx = settings.pageWidth * 2 * PPI;
-                                const targetWidth = spreadWidthPx * 0.25; // Quarter spread width?
-                                const targetHeight = targetWidth / element.originalAspectRatio!;
-                                onUpdate({
-                                    size: { width: targetWidth, height: targetHeight },
-                                });
-                            }}
-                        >
-                            Reset Image Size
-                        </button>
-                    )}
-                    <button
-                        className="btn btn-secondary"
                         onClick={onDelete}
                         style={{ color: 'var(--color-error)' }}
                     >

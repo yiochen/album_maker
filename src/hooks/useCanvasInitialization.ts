@@ -30,7 +30,7 @@ export const useCanvasInitialization = ({
     }, [onCanvasChange]);
 
     useEffect(() => {
-        if (!canvasElRef.current || fabricCanvas) return;
+        if (!canvasElRef.current) return;
 
         const canvas = new fabric.Canvas(canvasElRef.current, {
             preserveObjectStacking: true,
@@ -69,7 +69,7 @@ export const useCanvasInitialization = ({
             }
             canvas.requestRenderAll();
 
-             if (onCanvasChangeRef.current) {
+            if (onCanvasChangeRef.current) {
                 const dataUrl = canvas.toDataURL({
                     format: 'jpeg',
                     quality: APP_CONFIG.THUMBNAIL_QUALITY,
