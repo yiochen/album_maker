@@ -738,7 +738,7 @@ body {
 
 .pool-image {
   flex-shrink: 0;
-  width: 120px;
+  width: auto;
   height: 100%;
   background: var(--color-surface);
   border-radius: var(--radius-md);
@@ -757,9 +757,9 @@ body {
 }
 
 .pool-image img {
-  width: 100%;
+  width: auto;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .pool-empty {

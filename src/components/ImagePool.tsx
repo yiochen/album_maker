@@ -176,6 +176,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, image)}
                                 data-testid="pool-image"
+                                style={{ aspectRatio: image.width && image.height ? `${image.width} / ${image.height}` : '1 / 1' }}
                             >
                                 <img
                                     src={image.thumbnailUrl || image.baseUrl}
