@@ -59,9 +59,30 @@ export const useCanvasInteraction = ({
                 const canvas = fabricCanvas;
                 if (!canvas) return;
                 const activeObj = canvas.getActiveObject() as CustomFabricObject;
-                if (activeObj && activeObj.data) {
-                    onElementDeleteRef.current(spreadRef.current.id, activeObj.data.id);
+
+                // Handle single object selection
+                if (activeObj && activeObj.data?.id) {
+                    const id = activeObj.data.id;
                     canvas.discardActiveObject();
+                    onElementDeleteRef.current(spreadRef.current.id, id);
+                    canvas.requestRenderAll();
+                    return;
+                }
+
+                // Handle active selection (multi-selection)
+                if (activeObj && activeObj.type === 'activeSelection') {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const objects = (activeObj as any).getObjects() as CustomFabricObject[];
+                    const idsToDelete = objects.map(o => o.data?.id).filter((id): id is string => !!id);
+
+                    if (idsToDelete.length > 0) {
+                        canvas.discardActiveObject();
+                        // Delete each element
+                        idsToDelete.forEach(id => {
+                            onElementDeleteRef.current(spreadRef.current.id, id);
+                        });
+                        canvas.requestRenderAll();
+                    }
                 }
             }
         };

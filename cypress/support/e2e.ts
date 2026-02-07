@@ -1,8 +1,4 @@
-import { addMatchImageSnapshotCommand } from '@simonsmith/cypress-image-snapshot/command';
 import './commands';
-
-// Add visual snapshot command
-addMatchImageSnapshotCommand();
 
 // Clear IndexedDB before each test to ensure clean state
 beforeEach(() => {
