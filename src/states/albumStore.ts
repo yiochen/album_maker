@@ -255,3 +255,60 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
         }
     };
 });
+
+// ============ Selector Helper Hooks ============
+// These hooks provide optimized selectors for specific state slices
+
+/** Select the entire album object */
+export const useAlbum = () => useAlbumStore(state => state.album);
+
+/** Select album settings */
+export const useAlbumSettings = () => useAlbumStore(state => state.album?.settings);
+
+/** Select album spreads array */
+export const useAlbumSpreads = () => useAlbumStore(state => state.album?.spreads || []);
+
+/** Select album ID */
+export const useAlbumId = () => useAlbumStore(state => state.album?.id);
+
+/** Select album name */
+export const useAlbumName = () => useAlbumStore(state => state.album?.name);
+
+/** Select album image pool */
+export const useAlbumImagePool = () => useAlbumStore(state => state.album?.imagePool || []);
+
+/** Select page width from settings */
+export const usePageWidth = () => useAlbumStore(state => state.album?.settings.pageWidth);
+
+/** Select page height from settings */
+export const usePageHeight = () => useAlbumStore(state => state.album?.settings.pageHeight);
+
+/** Select whether undo is available */
+export const useCanUndo = () => useAlbumStore(state => state.canUndo);
+
+/** Select whether redo is available */
+export const useCanRedo = () => useAlbumStore(state => state.canRedo);
+
+/** Select addElement action */
+export const useAddElement = () => useAlbumStore(state => state.addElement);
+
+/** Select updateElement action */
+export const useUpdateElement = () => useAlbumStore(state => state.updateElement);
+
+/** Select deleteElement action */
+export const useDeleteElement = () => useAlbumStore(state => state.deleteElement);
+
+/** Select addSpreads action */
+export const useAddSpreads = () => useAlbumStore(state => state.addSpreads);
+
+/** Select deleteSpread action */
+export const useDeleteSpread = () => useAlbumStore(state => state.deleteSpread);
+
+/** Select deleteSpreads action */
+export const useDeleteSpreads = () => useAlbumStore(state => state.deleteSpreads);
+
+/** Select undo action */
+export const useUndo = () => useAlbumStore(state => state.undo);
+
+/** Select redo action */
+export const useRedo = () => useAlbumStore(state => state.redo);

@@ -50,10 +50,20 @@ export interface PageElement {
   type: 'image';
   imageUrl: string;
   thumbnailUrl: string;
+  /** Identifies which photo source/provider this image came from (e.g., "google-photos", "dummy-colors") */
   sourceId: string;
+  /** The unique ID of this image within its source (e.g., Google Photos media item ID) */
   sourceImageId: string;
-  position: Position; // Absolute coordinates in pixels
-  size: Size; // Absolute dimensions in pixels
+  /**
+   * Center position in MODEL PIXELS (at print PPI, e.g., 300 PPI).
+   * Use toCanvasPx() to convert to screen pixels for rendering.
+   */
+  position: Position;
+  /**
+   * Dimensions in MODEL PIXELS (at print PPI, e.g., 300 PPI).
+   * Use toCanvasPx() to convert to screen pixels for rendering.
+   */
+  size: Size;
   crop?: CropArea;
   lockAspectRatio?: boolean;
 
@@ -77,17 +87,28 @@ export interface CropArea {
   height: number;
 }
 
-// Image pool (imported from any source)
+/**
+ * Image stored in the album's image pool, imported from any photo source.
+ * The combination of sourceId + sourceImageId uniquely identifies an image globally.
+ */
 export interface PoolImage {
   id: string;
+  /** Identifies which photo source/provider this image came from (e.g., "google-photos", "dummy-colors") */
   sourceId: string;
+  /** The unique ID of this image within its source (e.g., Google Photos media item ID) */
   sourceImageId: string;
   baseUrl: string;
   thumbnailUrl?: string;
   filename: string;
   mimeType: string;
+  /** Original width of the image in pixels (full resolution) */
   width?: number;
+  /** Original height of the image in pixels (full resolution) */
   height?: number;
+  /** Actual width of the thumbnail image in pixels */
+  thumbnailWidth?: number;
+  /** Actual height of the thumbnail image in pixels */
+  thumbnailHeight?: number;
   createdAt?: number;
 }
 

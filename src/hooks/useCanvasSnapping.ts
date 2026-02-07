@@ -1,9 +1,21 @@
+/**
+ * useCanvasSnapping - Handles snapping and bleed constraints during object movement.
+ *
+ * PIXEL COORDINATE SYSTEM:
+ * - All props (canvasWidth, canvasHeight) are in CANVAS/SCREEN PIXELS (at SCREEN_PPI, e.g., 96 PPI)
+ * - Fabric.js object positions (left, top) are in CANVAS PIXELS
+ * - Updates to onElementUpdate are converted to MODEL PIXELS (at PPI, e.g., 300 PPI) via toModelPx()
+ *
+ * FabricJS uses center origin (originX/originY: 'center'), so left/top represent the center position.
+ */
 import { useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 import { CustomFabricObject } from './fabricTypes';
 import { APP_CONFIG } from '../config';
 import type { Spread, PageElement } from '../types';
+import { toCanvasPx, toModelPx } from '../utils/imageUtils';
+import { getZoomCompensatedSizes } from './useCanvasObjects';
 
 interface UseCanvasSnappingProps {
     fabricCanvas: fabric.Canvas | null;
@@ -11,8 +23,7 @@ interface UseCanvasSnappingProps {
     canvasHeight: number;
     spread: Spread;
     isSnappingEnabled: boolean;
-    toCanvasPx: (value: number) => number;
-    toModelPx: (value: number) => number;
+    zoom: number;
     snapLinesRef: React.RefObject<fabric.Line[]>;
     onElementUpdate: (spreadId: string, elementId: string, updates: Partial<PageElement>) => void;
     onCanvasChange?: (dataUrl: string) => void;
@@ -24,8 +35,7 @@ export const useCanvasSnapping = ({
     canvasHeight,
     spread,
     isSnappingEnabled,
-    toCanvasPx,
-    toModelPx,
+    zoom,
     snapLinesRef,
     onElementUpdate,
     onCanvasChange,
@@ -35,13 +45,16 @@ export const useCanvasSnapping = ({
     const onCanvasChangeRef = useRef(onCanvasChange);
     const spreadRef = useRef(spread);
     const isSnappingEnabledRef = useRef(isSnappingEnabled);
+    // Cache UI sizes to avoid recalculating on every mouse move
+    const uiSizesRef = useRef(getZoomCompensatedSizes(zoom));
 
     useEffect(() => {
         onElementUpdateRef.current = onElementUpdate;
         onCanvasChangeRef.current = onCanvasChange;
         spreadRef.current = spread;
         isSnappingEnabledRef.current = isSnappingEnabled;
-    }, [onElementUpdate, onCanvasChange, spread, isSnappingEnabled]);
+        uiSizesRef.current = getZoomCompensatedSizes(zoom);
+    }, [onElementUpdate, onCanvasChange, spread, isSnappingEnabled, zoom]);
 
     useEffect(() => {
         const canvas = fabricCanvas;
@@ -64,10 +77,16 @@ export const useCanvasSnapping = ({
                 snapLines.length = 0;
             }
 
+            // With center origin, convert center position to top-left for snapping calculations
+            const halfWidth = scaledWidth / 2;
+            const halfHeight = scaledHeight / 2;
+            const topLeftX = obj.left! - halfWidth;
+            const topLeftY = obj.top! - halfHeight;
+
             // Only calculate snapping if enabled
             if (isSnappingEnabledRef.current) {
-                const percentX = (obj.left! / canvasWidth) * 100;
-                const percentY = (obj.top! / canvasHeight) * 100;
+                const percentX = (topLeftX / canvasWidth) * 100;
+                const percentY = (topLeftY / canvasHeight) * 100;
                 const percentW = (scaledWidth / canvasWidth) * 100;
                 const percentH = (scaledHeight / canvasHeight) * 100;
 
@@ -77,29 +96,33 @@ export const useCanvasSnapping = ({
                 );
 
                 if (snapResult.snappedEdges.length > 0) {
-                    newLeft = (snapResult.position.x / 100) * canvasWidth;
-                    newTop = (snapResult.position.y / 100) * canvasHeight;
+                    // Convert snapped top-left back to center position
+                    const snappedTopLeftX = (snapResult.position.x / 100) * canvasWidth;
+                    const snappedTopLeftY = (snapResult.position.y / 100) * canvasHeight;
+                    newLeft = snappedTopLeftX + halfWidth;
+                    newTop = snappedTopLeftY + halfHeight;
 
                     const activeLines = getActiveSnapLines(snapResult.snappedEdges);
+                    const uiSizes = uiSizesRef.current;
 
-                    activeLines.forEach(line => {
+                    activeLines.forEach(lineData => {
                         let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
-                        if (line.orientation === 'vertical') {
-                            x1 = x2 = (line.position / 100) * canvasWidth;
+                        if (lineData.orientation === 'vertical') {
+                            x1 = x2 = (lineData.position / 100) * canvasWidth;
                             y1 = 0;
                             y2 = canvasHeight;
                         } else {
-                            y1 = y2 = (line.position / 100) * canvasHeight;
+                            y1 = y2 = (lineData.position / 100) * canvasHeight;
                             x1 = 0;
                             x2 = canvasWidth;
                         }
 
                         const fabricLine = new fabric.Line([x1, y1, x2, y2], {
                             stroke: '#ff00ff',
-                            strokeWidth: 1,
+                            strokeWidth: uiSizes.snapLineStrokeWidth,
                             selectable: false,
                             evented: false,
-                            strokeDashArray: [4, 4],
+                            strokeDashArray: [uiSizes.snapLineDash, uiSizes.snapLineDash],
                         });
                         canvas.add(fabricLine);
                         snapLines.push(fabricLine);
@@ -113,17 +136,17 @@ export const useCanvasSnapping = ({
                 obj.top = newTop;
             }
 
-            // Bleed constraints
+            // Bleed constraints - using center origin
             const bleedMargin = toCanvasPx(APP_CONFIG.BLEED_MARGIN);
-            const minX = -scaledWidth + bleedMargin;
-            const maxX = canvasWidth - bleedMargin;
-            const minY = -scaledHeight + bleedMargin;
-            const maxY = canvasHeight - bleedMargin;
+            const minCenterX = -halfWidth + bleedMargin;
+            const maxCenterX = canvasWidth + halfWidth - bleedMargin;
+            const minCenterY = -halfHeight + bleedMargin;
+            const maxCenterY = canvasHeight + halfHeight - bleedMargin;
 
-            if (obj.left! < minX) obj.left = minX;
-            else if (obj.left! > maxX) obj.left = maxX;
-            if (obj.top! < minY) obj.top = minY;
-            else if (obj.top! > maxY) obj.top = maxY;
+            if (obj.left! < minCenterX) obj.left = minCenterX;
+            else if (obj.left! > maxCenterX) obj.left = maxCenterX;
+            if (obj.top! < minCenterY) obj.top = minCenterY;
+            else if (obj.top! > maxCenterY) obj.top = maxCenterY;
         };
 
         const handleObjectModified = (e: { target?: fabric.Object }) => {
@@ -160,5 +183,5 @@ export const useCanvasSnapping = ({
             canvas.off('object:moving', handleObjectMoving);
             canvas.off('object:modified', handleObjectModified);
         };
-    }, [fabricCanvas, canvasWidth, canvasHeight, snapLinesRef, toCanvasPx, toModelPx]);
+    }, [fabricCanvas, canvasWidth, canvasHeight, snapLinesRef]);
 };

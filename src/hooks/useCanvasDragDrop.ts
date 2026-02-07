@@ -1,11 +1,21 @@
+/**
+ * useCanvasDragDrop - Handles drag-and-drop of images onto the canvas.
+ *
+ * PIXEL COORDINATE SYSTEM:
+ * - DOM event coordinates are in screen pixels
+ * - Converts to CANVAS PIXELS (adjusting for zoom)
+ * - Converts to MODEL PIXELS via toModelPx() before calling onImageDrop
+ *
+ * onImageDrop receives position in MODEL PIXELS (at PPI, e.g., 300 PPI).
+ */
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { PoolImage } from '../types';
+import { toModelPx } from '../utils/imageUtils';
 
 interface UseCanvasDragDropProps {
     spreadId: string;
     zoom: number;
     wrapperRef: React.RefObject<HTMLDivElement | null>;
-    toModelPx: (value: number) => number;
     onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
 }
 
@@ -13,7 +23,6 @@ export const useCanvasDragDrop = ({
     spreadId,
     zoom,
     wrapperRef,
-    toModelPx,
     onImageDrop,
 }: UseCanvasDragDropProps) => {
     const [isDragOver, setIsDragOver] = useState(false);
@@ -61,7 +70,7 @@ export const useCanvasDragDrop = ({
         } catch (err) {
             console.error('Failed to parse drop', err);
         }
-    }, [zoom, wrapperRef, toModelPx]);
+    }, [zoom, wrapperRef]);
 
     return {
         isDragOver,

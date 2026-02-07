@@ -196,18 +196,22 @@ export function calculateResizeSnap(
     };
 }
 
+// Pre-built lookup map for fast access
+const SNAP_LINE_MAP = new Map<SnapEdge, SnapLine>(
+    SNAP_TARGETS.map(t => [t.edge, { orientation: t.orientation, position: t.position, edge: t.edge }])
+);
+
 /**
  * Get snap lines to display on canvas
+ * Uses pre-built map for O(1) lookup per edge
  */
 export function getActiveSnapLines(snappedEdges: SnapEdge[]): SnapLine[] {
-    const targets = SNAP_TARGETS;
-    return targets
-        .filter(t => snappedEdges.includes(t.edge))
-        .map(t => ({
-            orientation: t.orientation,
-            position: t.position,
-            edge: t.edge,
-        }));
+    const result: SnapLine[] = [];
+    for (const edge of snappedEdges) {
+        const line = SNAP_LINE_MAP.get(edge);
+        if (line) result.push(line);
+    }
+    return result;
 }
 
 /**

@@ -1,15 +1,19 @@
 import React, { useState, useCallback } from 'react';
-import { useAlbumStore } from '../states/albumStore';
-import { useUIStore } from '../states/uiStore';
+import { useAlbumSpreads, useAlbumSettings, useAlbumId, useAddSpreads, useDeleteSpread, useDeleteSpreads } from '../states/albumStore';
+import { useCurrentSpreadIndex, useSetCurrentSpreadIndex } from '../states/uiStore';
 import { SpreadThumbnail } from './SpreadThumbnail';
 import { Spread } from '../types';
 
 export const PageNavigator: React.FC = () => {
-    const { album, addSpreads, deleteSpread, deleteSpreads } = useAlbumStore();
-    const { currentSpreadIndex, setCurrentSpreadIndex } = useUIStore();
+    const spreads = useAlbumSpreads();
+    const settings = useAlbumSettings();
+    const albumId = useAlbumId();
+    const addSpreads = useAddSpreads();
+    const deleteSpread = useDeleteSpread();
+    const deleteSpreads = useDeleteSpreads();
+    const currentSpreadIndex = useCurrentSpreadIndex();
+    const setCurrentSpreadIndex = useSetCurrentSpreadIndex();
 
-    const spreads = album?.spreads || [];
-    const settings = album?.settings;
     const maxSpreads = settings ? settings.maxPages / 2 : 20;
     const canAddMore = spreads.length < maxSpreads;
 
@@ -41,19 +45,19 @@ export const PageNavigator: React.FC = () => {
 
     // Helper for bulk delete
     const handleDeleteSpreads = useCallback((spreadIndices: number[]) => {
-        if (!album) return;
+        if (spreads.length === 0) return;
 
         const ids: string[] = [];
         for (const idx of spreadIndices) {
-            if (album.spreads[idx]) {
-                ids.push(album.spreads[idx].id);
+            if (spreads[idx]) {
+                ids.push(spreads[idx].id);
             }
         }
 
         if (ids.length > 0) {
             deleteSpreads(ids);
         }
-    }, [album, deleteSpreads]);
+    }, [spreads, deleteSpreads]);
 
     const handleSpreadClick = useCallback((spreadIndex: number, event: React.MouseEvent) => {
         const isCtrlOrCmd = event.metaKey || event.ctrlKey;
@@ -116,7 +120,7 @@ export const PageNavigator: React.FC = () => {
         setSelectedIndices(new Set());
     }, []);
 
-    if (!album || !settings) return null;
+    if (!settings) return null;
 
     return (
         <aside className="page-navigator" data-testid="page-navigator">
@@ -155,7 +159,7 @@ export const PageNavigator: React.FC = () => {
                         key={spread.id}
                         spread={spread}
                         spreadIndex={spreadIndex}
-                        albumId={album.id}
+                        albumId={albumId!}
                         settings={settings}
                         isActive={spreadIndex === currentSpreadIndex}
                         isSelected={selectedIndices.has(spreadIndex)}

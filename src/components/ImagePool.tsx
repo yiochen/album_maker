@@ -1,7 +1,13 @@
-import React, { useCallback, useState } from 'react';
-import { PoolImage } from '../types';
+import React, { useState, useCallback } from 'react';
 import { APP_CONFIG } from '../config';
-import { SourceImage, getAllSources, getSource } from '../sources';
+import type { PoolImage } from '../types';
+import type { SourceImage } from '../sources';
+import { getAllSources, getSource } from '../sources';
+import { usePageWidth, usePageHeight } from '../states/albumStore';
+import {
+    calculateThumbnailSize,
+    calculateCanvasMaxDimensions,
+} from '../utils/imageUtils';
 
 interface ImagePoolProps {
     images: PoolImage[];
@@ -18,6 +24,8 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const sources = getAllSources();
     const activeSource = getSource(activeSourceId);
+    const pageWidth = usePageWidth();
+    const pageHeight = usePageHeight();
 
     const handleDragStart = useCallback((e: React.DragEvent, image: PoolImage) => {
         e.dataTransfer.setData('application/json', JSON.stringify(image));
@@ -38,7 +46,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
     }, []);
 
     const handleImportFromSource = useCallback(async () => {
-        if (!activeSource) return;
+        if (!activeSource || !pageWidth || !pageHeight) return;
 
         // Check if auth required
         if (activeSource.requiresAuth && !activeSource.isAuthenticated()) {
@@ -55,19 +63,37 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
         try {
             const result = await activeSource.fetchImages();
 
-            // Convert source images to pool images
-            const poolImages: PoolImage[] = result.images.map((img: SourceImage) => ({
-                id: crypto.randomUUID(),
-                sourceId: activeSource.id,
-                sourceImageId: img.id,
-                baseUrl: activeSource.getFullUrl(img),
-                thumbnailUrl: activeSource.getThumbnailUrl(img, APP_CONFIG.THUMBNAIL_SIZE),
-                filename: img.filename,
-                mimeType: img.mimeType,
-                width: img.width,
-                height: img.height,
-                createdAt: img.createdAt,
-            }));
+            // Calculate canvas max dimensions based on album settings
+            const { maxWidth, maxHeight } = calculateCanvasMaxDimensions(
+                pageWidth,
+                pageHeight
+            );
+
+            // Convert source images to pool images with optimal thumbnail sizes
+            const poolImages: PoolImage[] = result.images.map((img: SourceImage) => {
+                // Calculate optimal thumbnail size for this image
+                const thumbSize = calculateThumbnailSize(
+                    img.width,
+                    img.height,
+                    maxWidth,
+                    maxHeight
+                );
+
+                return {
+                    id: crypto.randomUUID(),
+                    sourceId: activeSource.id,
+                    sourceImageId: img.id,
+                    baseUrl: activeSource.getFullUrl(img),
+                    thumbnailUrl: activeSource.getThumbnailUrl(img, thumbSize.width, thumbSize.height),
+                    filename: img.filename,
+                    mimeType: img.mimeType,
+                    width: img.width,
+                    height: img.height,
+                    thumbnailWidth: thumbSize.width,
+                    thumbnailHeight: thumbSize.height,
+                    createdAt: img.createdAt,
+                };
+            });
 
             onImport(poolImages);
         } catch (error) {
@@ -76,7 +102,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
         } finally {
             setIsLoading(false);
         }
-    }, [activeSource, onImport]);
+    }, [activeSource, pageWidth, pageHeight, onImport]);
 
     return (
         <div className="image-pool" data-testid="image-pool">
@@ -149,13 +175,15 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                                 className="pool-image"
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, image)}
-                                title={image.filename}
                                 data-testid="pool-image"
                             >
                                 <img
                                     src={image.thumbnailUrl || image.baseUrl}
                                     alt={image.filename}
+                                    title={image.filename}
                                     loading="lazy"
+                                    data-width-px={image.width}
+                                    data-height-px={image.height}
                                 />
                             </div>
                         ))}

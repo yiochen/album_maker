@@ -1,17 +1,12 @@
 import React, { useRef } from 'react';
-import type { PageElement, PoolImage, AlbumSettings, Spread } from '../types';
+import type { PageElement, PoolImage, Spread } from '../types';
 import { useCanvasRender } from '../hooks/useCanvasRender';
 import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
-import { useUIStore } from '../states/uiStore';
+import { useSelectedElementId, useIsSnappingEnabled, useSetSelectedElementId } from '../states/uiStore';
+import { useAlbumSettings } from '../states/albumStore';
 
 interface CanvasProps {
     spread: Spread;
-    settings: AlbumSettings;
-    ppi: number;
-    // Convert model-space pixels (PPI) to canvas-space pixels (screen-rendered canvas).
-    toCanvasPx: (value: number) => number;
-    // Convert canvas-space pixels (screen-rendered canvas) back to model-space pixels (PPI).
-    toModelPx: (value: number) => number;
     selectedElementId: string | null;
     isSnappingEnabled: boolean;
     onElementSelect: (elementId: string | null) => void;
@@ -23,16 +18,15 @@ interface CanvasProps {
 
 export const Canvas: React.FC<CanvasProps> = ({
     spread,
-    settings,
-    ppi,
-    toCanvasPx,
-    toModelPx,
     onElementUpdate,
     onElementDelete,
     onImageDrop,
     onCanvasChange,
 }) => {
-    const { selectedElementId, isSnappingEnabled, setSelectedElementId } = useUIStore();
+    const selectedElementId = useSelectedElementId();
+    const isSnappingEnabled = useIsSnappingEnabled();
+    const setSelectedElementId = useSetSelectedElementId();
+    const settings = useAlbumSettings()!;
 
     const canvasElRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -52,8 +46,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         containerRef,
         spread,
         settings,
-        ppi,
-        toCanvasPx,
         selectedElementId,
         onCanvasChange,
     });
@@ -70,8 +62,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         canvasWidth,
         canvasHeight,
         spread,
-        toCanvasPx,
-        toModelPx,
         selectedElementId,
         isSnappingEnabled,
         zoom,

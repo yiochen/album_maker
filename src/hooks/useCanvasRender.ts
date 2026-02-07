@@ -5,6 +5,8 @@ import { useCanvasInitialization } from './useCanvasInitialization';
 import { useCanvasZoom } from './useCanvasZoom';
 import { useCanvasObjects, getZoomCompensatedSizes } from './useCanvasObjects';
 import type { Spread, AlbumSettings } from '../types';
+import { toCanvasPx } from '../utils/imageUtils';
+import { APP_CONFIG } from '../config';
 
 // Re-export types for backward compatibility (if needed by other files)
 export type { CustomFabricObject, ExtendedFabricObject };
@@ -16,8 +18,6 @@ interface UseCanvasRenderProps {
     containerRef: React.RefObject<HTMLDivElement | null>;
     spread: Spread;
     settings: AlbumSettings;
-    ppi: number;
-    toCanvasPx: (value: number) => number;
     selectedElementId: string | null;
     onCanvasChange?: (dataUrl: string) => void;
 }
@@ -27,11 +27,10 @@ export const useCanvasRender = ({
     containerRef,
     spread,
     settings,
-    ppi,
-    toCanvasPx,
     selectedElementId,
     onCanvasChange,
 }: UseCanvasRenderProps) => {
+    const ppi = APP_CONFIG.PPI;
     const modelWidth = settings.pageWidth * 2 * ppi;
     const modelHeight = settings.pageHeight * ppi;
     const canvasWidth = toCanvasPx(modelWidth);
@@ -58,8 +57,6 @@ export const useCanvasRender = ({
         fabricCanvas,
         spread,
         settings,
-        ppi,
-        toCanvasPx,
         selectedElementId,
         zoom,
     });

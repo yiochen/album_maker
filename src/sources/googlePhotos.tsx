@@ -232,10 +232,10 @@ class GooglePhotosSource implements PhotoSource, InitializableSource {
         }));
     }
 
-    getThumbnailUrl(image: SourceImage, size: number): string {
+    getThumbnailUrl(image: SourceImage, width: number, height: number): string {
         const baseUrl = image.metadata?.baseUrl as string;
         if (!baseUrl) return '';
-        return `${baseUrl}=w${size}-h${size}-c`;
+        return `${baseUrl}=w${width}-h${height}`;
     }
 
     getFullUrl(image: SourceImage, maxWidth?: number, maxHeight?: number): string {

@@ -14,8 +14,6 @@ interface UseCanvasInteractionProps {
     selectedElementId: string | null;
     isSnappingEnabled: boolean;
     zoom: number;
-    toCanvasPx: (value: number) => number;
-    toModelPx: (value: number) => number;
     snapLinesRef: React.RefObject<fabric.Line[]>;
     wrapperRef: React.RefObject<HTMLDivElement | null>;
     onElementSelect: (elementId: string | null) => void;
@@ -32,8 +30,6 @@ export const useCanvasInteraction = ({
     spread,
     isSnappingEnabled,
     zoom,
-    toCanvasPx,
-    toModelPx,
     snapLinesRef,
     wrapperRef,
     onElementSelect,
@@ -84,8 +80,7 @@ export const useCanvasInteraction = ({
         canvasHeight,
         spread,
         isSnappingEnabled,
-        toCanvasPx,
-        toModelPx,
+        zoom,
         snapLinesRef,
         onElementUpdate,
         onCanvasChange,
@@ -95,7 +90,6 @@ export const useCanvasInteraction = ({
         spreadId: spread.id,
         zoom,
         wrapperRef,
-        toModelPx,
         onImageDrop,
     });
 

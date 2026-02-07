@@ -63,8 +63,8 @@ export interface PhotoSource {
     // Get albums/folders if the source supports them
     fetchAlbums?(): Promise<SourceAlbum[]>;
 
-    // Get thumbnail URL for an image
-    getThumbnailUrl(image: SourceImage, size: number): string;
+    // Get thumbnail URL for an image at specific dimensions
+    getThumbnailUrl(image: SourceImage, width: number, height: number): string;
 
     // Get full-resolution URL for an image
     getFullUrl(image: SourceImage, maxWidth?: number, maxHeight?: number): string;

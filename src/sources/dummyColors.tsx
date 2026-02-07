@@ -26,17 +26,20 @@ const COLORS = [
     '#1E293B', // Dark slate
 ];
 
-// Predefined sizes
+// Realistic photo sizes (common camera and phone resolutions)
 const SIZES = [
-    { width: 100, height: 100, name: 'Square Small' },
-    { width: 200, height: 200, name: 'Square Medium' },
-    { width: 400, height: 400, name: 'Square Large' },
-    { width: 400, height: 300, name: 'Landscape 4:3' },
-    { width: 800, height: 600, name: 'Landscape HD' },
-    { width: 300, height: 400, name: 'Portrait 3:4' },
-    { width: 600, height: 800, name: 'Portrait HD' },
-    { width: 1920, height: 1080, name: 'Full HD' },
-    { width: 1080, height: 1920, name: 'Full HD Portrait' },
+    // Landscape photos
+    { width: 4032, height: 3024, name: 'iPhone 12MP Landscape' },
+    { width: 6000, height: 4000, name: '24MP DSLR Landscape' },
+    { width: 5472, height: 3648, name: '20MP Landscape' },
+    { width: 4000, height: 3000, name: '12MP Standard Landscape' },
+    { width: 3840, height: 2160, name: '4K Landscape' },
+    // Portrait photos
+    { width: 3024, height: 4032, name: 'iPhone 12MP Portrait' },
+    { width: 4000, height: 6000, name: '24MP DSLR Portrait' },
+    { width: 3648, height: 5472, name: '20MP Portrait' },
+    { width: 3000, height: 4000, name: '12MP Standard Portrait' },
+    { width: 2160, height: 3840, name: '4K Portrait' },
 ];
 
 // Icon component
@@ -104,10 +107,10 @@ class DummyColorsSource implements PhotoSource {
         };
     }
 
-    getThumbnailUrl(image: SourceImage, size: number): string {
+    getThumbnailUrl(image: SourceImage, width: number, height: number): string {
         const color = image.metadata?.color as string;
         if (!color) return '';
-        return generateColorSvg(color, size, size);
+        return generateColorSvg(color, width, height);
     }
 
     getFullUrl(image: SourceImage): string {

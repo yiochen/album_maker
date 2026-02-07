@@ -1,10 +1,12 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { TemplateId } from '../types';
 import { useAlbumStore } from '../states/albumStore';
 import { useUIStore } from '../states/uiStore';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
-import { useAlbumActions } from '../hooks/useAlbumActions';
+import { useElementActions } from '../hooks/useElementActions';
+import { useAlbumLifecycle } from '../hooks/useAlbumLifecycle';
+import { useThumbnailSync } from '../hooks/useThumbnailSync';
 import { Toolbar } from './Toolbar';
 import { AlbumSettingsPanel } from './AlbumSettingsPanel';
 import { PageNavigator } from './PageNavigator';
@@ -14,7 +16,6 @@ import { ImagePool } from './ImagePool';
 import { AlbumSelector } from './AlbumSelector';
 import { Modal } from './Modal';
 import { LoadingScreen } from './LoadingScreen';
-import { APP_CONFIG } from '../config';
 
 export const AlbumEditor: React.FC = () => {
   // Global State
@@ -26,7 +27,8 @@ export const AlbumEditor: React.FC = () => {
     undo,
     redo,
     canUndo,
-    canRedo
+    canRedo,
+    updateSpread
   } = useAlbumStore();
 
   const {
@@ -50,18 +52,20 @@ export const AlbumEditor: React.FC = () => {
   // Keyboard shortcuts
   useKeyboardShortcuts({ undo, redo, canUndo, canRedo });
 
+  // Element actions (drop, update, delete)
+  const { handleImageDrop, handleElementUpdate, handleElementDelete } = useElementActions();
+
+  // Album lifecycle (CRUD, import/export)
   const {
-      handleImageDrop,
-      handleElementUpdate,
-      handleElementDelete,
-      handleCanvasChange,
-      handleSelectAlbum,
-      handleCreateAlbum,
-      handleDeleteAlbum,
-      handleImportAlbum,
-      handleExportAlbum,
-      updateSpread
-  } = useAlbumActions();
+    handleSelectAlbum,
+    handleCreateAlbum,
+    handleDeleteAlbum,
+    handleImportAlbum,
+    handleExportAlbum,
+  } = useAlbumLifecycle();
+
+  // Thumbnail sync
+  const { handleCanvasChange } = useThumbnailSync();
 
   // Derived state
   const currentSpread = useMemo(() => {
@@ -77,15 +81,6 @@ export const AlbumEditor: React.FC = () => {
   if (album && currentSpreadIndex > Math.max(0, album.spreads.length - 1)) {
     setCurrentSpreadIndex(Math.max(0, album.spreads.length - 1));
   }
-
-  const toCanvasPx = useCallback(
-    (value: number) => value * (APP_CONFIG.SCREEN_PPI / APP_CONFIG.PPI),
-    []
-  );
-  const toModelPx = useCallback(
-    (value: number) => value * (APP_CONFIG.PPI / APP_CONFIG.SCREEN_PPI),
-    []
-  );
 
   if (!album || !currentSpread) {
     return <LoadingScreen message="No spreads in album" showSpinner={false} />;
@@ -133,10 +128,6 @@ export const AlbumEditor: React.FC = () => {
 
         <Canvas
           spread={currentSpread}
-          settings={album.settings}
-          ppi={APP_CONFIG.PPI}
-          toCanvasPx={toCanvasPx}
-          toModelPx={toModelPx}
           selectedElementId={selectedElementId}
           isSnappingEnabled={isSnappingEnabled}
           onElementSelect={(id) => {

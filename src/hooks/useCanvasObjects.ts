@@ -1,8 +1,36 @@
+/**
+ * useCanvasObjects - Syncs PageElement state to FabricJS canvas objects.
+ *
+ * PIXEL COORDINATE SYSTEM:
+ * - PageElement position/size are in MODEL PIXELS (at PPI, e.g., 300 PPI)
+ * - FabricJS left/top/scale are in CANVAS PIXELS (at SCREEN_PPI, e.g., 96 PPI)
+ * - Uses toCanvasPx() to convert from model → canvas when rendering
+ *
+ * FabricJS uses center origin (originX/originY: 'center'), so left/top represent the center position.
+ *
+ * DATA FLOW - Avoiding Circular Updates:
+ * 
+ * During editing, data flows: FabricJS → React State (via object:modified)
+ * - User drags/resizes on canvas → FabricJS updates visually in real-time
+ * - object:modified fires ONCE when mouse is released
+ * - useCanvasSnapping converts canvas position → model pixels, calls updateElement()
+ * - Zustand store updates, triggering React re-render
+ * 
+ * This useEffect runs when `spread` changes, but it intentionally SKIPS
+ * re-positioning existing objects UNLESS:
+ * 1. The user switched to a different spread (isSpreadChange check)
+ * 2. AND the object is not currently being moved (isMoving flag)
+ * 
+ * This prevents FabricJS and React from fighting over object positions during editing.
+ * FabricJS is the source of truth during interaction; React state is the source of 
+ * truth when switching spreads or on initial load.
+ */
 import { useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import type { Spread, PageElement, AlbumSettings } from '../types';
 import { APP_CONFIG } from '../config';
 import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
+import { toCanvasPx } from '../utils/imageUtils';
 
 export const getZoomCompensatedSizes = (zoomPercent: number) => {
     const scale = zoomPercent / 100;
@@ -23,8 +51,6 @@ interface UseCanvasObjectsProps {
     fabricCanvas: fabric.Canvas | null;
     spread: Spread;
     settings: AlbumSettings;
-    ppi: number;
-    toCanvasPx: (value: number) => number;
     selectedElementId: string | null;
     zoom: number;
 }
@@ -33,11 +59,10 @@ export const useCanvasObjects = ({
     fabricCanvas,
     spread,
     settings,
-    ppi,
-    toCanvasPx,
     selectedElementId,
     zoom,
 }: UseCanvasObjectsProps) => {
+    const ppi = APP_CONFIG.PPI;
     const loadingIds = useRef<Set<string>>(new Set());
 
     // Refs for props
@@ -91,6 +116,8 @@ export const useCanvasObjects = ({
                         img.set({
                             left: toCanvasPx(element.position.x),
                             top: toCanvasPx(element.position.y),
+                            originX: 'center',
+                            originY: 'center',
                             scaleX: toCanvasPx(targetWidth) / (img.width || 1),
                             scaleY: toCanvasPx(targetHeight) / (img.height || 1),
                         });
@@ -129,6 +156,8 @@ export const useCanvasObjects = ({
                 img.set({
                     left: toCanvasPx(element.position.x),
                     top: toCanvasPx(element.position.y),
+                    originX: 'center',
+                    originY: 'center',
                     scaleX: toCanvasPx(width) / (img.width || 1),
                     scaleY: toCanvasPx(height) / (img.height || 1),
                     data: { id: element.id },
@@ -158,7 +187,7 @@ export const useCanvasObjects = ({
         });
 
         canvas.requestRenderAll();
-    }, [fabricCanvas, spread.id, spread.elements.length, zoom, modelWidth, modelHeight, ppi, toCanvasPx]);
+    }, [fabricCanvas, spread.id, spread.elements.length, zoom, modelWidth, modelHeight, ppi]);
 
     // Update UI sizes when zoom changes
     useEffect(() => {
