@@ -1,5 +1,4 @@
 import './commands';
-import '@4tw/cypress-drag-drop';
 
 // Clear IndexedDB before each test to ensure clean state
 beforeEach(() => {

@@ -192,6 +192,8 @@ body {
 
 .main-content.image-pool-open {
   grid-template-rows: 1fr var(--image-pool-height);
+  min-width: 0;
+  /* Allow grid items to shrink */
 }
 
 /* =============================================
@@ -703,6 +705,8 @@ body {
   flex-direction: column;
   background: var(--color-bg-secondary);
   border-top: 1px solid var(--color-border);
+  min-width: 0;
+  /* Crucial for horizontal scroll in grid/flex */
 }
 
 .image-pool-header {
@@ -727,13 +731,21 @@ body {
 .image-pool-content {
   flex: 1;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: var(--space-3);
+  padding-bottom: var(--space-4);
+  /* Extra space for scrollbar */
+  min-width: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .image-grid {
   display: flex;
   gap: var(--space-3);
   height: 100%;
+  width: max-content;
+  /* Ensure grid expands to fit items */
+  flex-wrap: nowrap;
 }
 
 .pool-image {
