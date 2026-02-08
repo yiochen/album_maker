@@ -18,8 +18,8 @@ describe('Page Creation', () => {
         cy.get('[data-testid="spread-thumbnail"]').then(($spreads) => {
             const initialCount = $spreads.length;
 
-            // Click add pages button
-            cy.get('[data-testid="add-pages-button"]').click();
+            // Click add pages button (ensure it's enabled first)
+            cy.get('[data-testid="add-pages-button"]').should('not.be.disabled').click();
 
             // Should have one more spread
             cy.get('[data-testid="spread-thumbnail"]').should('have.length', initialCount + 1);

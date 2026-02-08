@@ -4,8 +4,11 @@ import './commands';
 // Add visual snapshot command
 addMatchImageSnapshotCommand();
 
-// Clear IndexedDB before each test to ensure clean state
+// Clear IndexedDB and LocalStorage before each test to ensure clean state
 beforeEach(() => {
+    // Clear LocalStorage
+    cy.clearLocalStorage();
+
     cy.window().then((win) => {
         // Clear all IndexedDB databases
         if ('indexedDB' in win) {

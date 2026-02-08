@@ -72,10 +72,34 @@ export const useCanvasDragDrop = ({
         }
     }, [zoom, wrapperRef]);
 
+    const handleTouchDrop = useCallback((e: Event) => {
+        const customEvent = e as CustomEvent;
+        const { image, x, y } = customEvent.detail;
+
+        const rect = wrapperRef.current?.getBoundingClientRect();
+        if (!rect) return;
+
+        // Check if drop is inside the canvas wrapper
+        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+            const domX = x - rect.left;
+            const domY = y - rect.top;
+
+            const scale = zoom / 100;
+            const canvasX = domX / scale;
+            const canvasY = domY / scale;
+
+            onImageDropRef.current(spreadIdRef.current, image, {
+                x: toModelPx(canvasX),
+                y: toModelPx(canvasY),
+            });
+        }
+    }, [zoom, wrapperRef]);
+
     return {
         isDragOver,
         handleDragOver,
         handleDragLeave,
         handleDrop,
+        handleTouchDrop,
     };
 };

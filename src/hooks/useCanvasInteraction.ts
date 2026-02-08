@@ -86,12 +86,17 @@ export const useCanvasInteraction = ({
         onCanvasChange,
     });
 
-    const { isDragOver, handleDragOver, handleDragLeave, handleDrop } = useCanvasDragDrop({
+    const { isDragOver, handleDragOver, handleDragLeave, handleDrop, handleTouchDrop } = useCanvasDragDrop({
         spreadId: spread.id,
         zoom,
         wrapperRef,
         onImageDrop,
     });
+
+    useEffect(() => {
+        window.addEventListener('app:image-drop', handleTouchDrop);
+        return () => window.removeEventListener('app:image-drop', handleTouchDrop);
+    }, [handleTouchDrop]);
 
     return {
         isDragOver,
