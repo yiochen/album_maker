@@ -107,4 +107,18 @@ describe('Image Pool', () => {
             cy.get('[data-testid="pool-image"]').should('have.length', imageCount);
         });
     });
+
+    it('should be horizontally scrollable when many images are imported', () => {
+        cy.importDummyImages(); // Imports 200 images
+
+        cy.get('.image-pool-content').then(($el) => {
+            const el = $el[0];
+            // The scrollWidth should be significantly larger than clientWidth
+            expect(el.scrollWidth).to.be.greaterThan(el.clientWidth);
+
+            // Should be able to scroll
+            $el.scrollLeft(200);
+            expect(el.scrollLeft).to.be.greaterThan(0);
+        });
+    });
 });
