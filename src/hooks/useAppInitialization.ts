@@ -9,6 +9,7 @@ import {
 } from '../services/storage';
 import { initializeSources } from '../sources';
 import { useAlbumStore } from '../states/albumStore';
+import { db } from '../db';
 
 export const useAppInitialization = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +50,17 @@ export const useAppInitialization = () => {
         setAlbum(albumToSet);
       } catch (error) {
         console.error('Failed to initialize app:', error);
+
+        if (APP_CONFIG.CLEAR_INDEX_DB_ON_LOAD_ERROR) {
+          console.warn('Clearing IndexedDB due to load error...');
+          try {
+            await db.delete();
+            await db.open();
+          } catch (dbError) {
+            console.error('Failed to clear/reset DB:', dbError);
+          }
+        }
+
         // Fallback to new album
         setAlbum(createNewAlbum());
       } finally {
