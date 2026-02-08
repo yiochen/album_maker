@@ -9,8 +9,7 @@
         "module": "ESNext",
         "moduleResolution": "bundler",
         "types": [
-            "cypress",
-            "@simonsmith/cypress-image-snapshot"
+            "cypress"
         ],
         "isolatedModules": true,
         "strict": true,
