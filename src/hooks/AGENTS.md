@@ -35,8 +35,9 @@ All objects use **center origin** (`originX: 'center'`, `originY: 'center'`), so
 ### Canvas Logic
 - **`useCanvasRender`**: Manages the Fabric.js canvas instance, initialization, rendering cycle, zoom state, and syncing React state to Fabric objects.
 
-- **`useCanvasInteraction`**: Handles user interactions on the canvas, including selection, movement/snapping, modification updates, and drag-and-drop.
+- **`useCanvasInteraction`**: Handles user interactions on the canvas, including selection, movement/snapping, and modification updates.
   > **Note**: Snapping is a runtime-only interaction behavior. Snap constraints are calculated during drag/resize to guide positioning but are **not persisted** in the state or database. Elements retain their absolute position once placed.
+  > **Note**: Drag-and-drop from the ImagePool is handled by `@dnd-kit/core` via `DndWrapper` component. See `src/components/DndWrapper.tsx` and `src/contexts/DndDropContext.ts`.
 - **`useCanvasThumbnail`**: Logic for generating spread thumbnails.
 
 - **`useCanvasObjects`**: Syncs PageElement state to FabricJS objects. Converts MODEL PIXELS → CANVAS PIXELS for rendering.
@@ -50,8 +51,6 @@ All objects use **center origin** (`originX: 'center'`, `originY: 'center'`), so
 
 - **`useCanvasSnapping`**: Handles snapping/constraints. Works in CANVAS PIXELS internally, converts to MODEL PIXELS for state updates.
   > **Gotcha - Snap Line Pooling**: Do NOT attempt to pre-create pooled snap lines (show/hide instead of add/remove). FabricJS canvas object references become stale or corrupted after `object:modified` events due to how `useCanvasObjects` syncs React state to canvas objects. The current approach of creating fresh line instances per move event and removing them on release is intentional and works reliably.
-
-- **`useCanvasDragDrop`**: Handles image drop. Converts DOM coordinates → CANVAS PIXELS → MODEL PIXELS.
 
 - **`useElementActions`**: Creates/updates elements. All inputs and outputs are in MODEL PIXELS.
 

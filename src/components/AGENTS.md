@@ -23,6 +23,11 @@ Contains all React UI components for the application, including the main Canvas,
 ### Modals
 - **Modals (`Modal.tsx`)**: Reusable dialog component handling overlays and keyboard (Escape) interactions.
 
+### Drag and Drop (@dnd-kit)
+- **DndWrapper (`DndWrapper.tsx`)**: The main context provider for @dnd-kit, managing drag state and `DragOverlay`.
+- **DroppableCanvas (`DroppableCanvas.tsx`)**: Wrapper for the canvas element that makes it a valid drop target.
+- **DraggablePoolImage (`DraggablePoolImage.tsx`)**: Wrapper for image pool items that makes them draggable.
+
 ## Business Logic & Configuration
 
 ### Configuration
