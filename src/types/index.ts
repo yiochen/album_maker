@@ -47,24 +47,47 @@ export interface Spread {
 
 export interface PageElement {
   id: string;
-  type: 'image';
+  type: 'image' | 'smartFrame';
   imageUrl: string;
   thumbnailUrl: string;
   /** Identifies which photo source/provider this image came from (e.g., "google-photos", "dummy-colors") */
   sourceId: string;
   /** The unique ID of this image within its source (e.g., Google Photos media item ID) */
   sourceImageId: string;
+
+  // --- NEW GAPLESS LAYOUT ---
+  /** Normalized coordinates (0.0 - 1.0) relative to the spread */
+  box?: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  };
+
+  /** Transform for the inner content (image) relative to the frame */
+  contentTransform?: {
+    zoom: number;    // Scale relative to 'cover' size (1.0 = cover)
+    panX: number;    // 0.0 - 1.0 (relative to frame width)
+    panY: number;    // 0.0 - 1.0 (relative to frame height)
+    rotation?: number; // In degrees
+  };
+
+  // --- DEPRECATED (Keep for migration) ---
   /**
    * Center position in MODEL PIXELS (at print PPI, e.g., 300 PPI).
    * Use toCanvasPx() to convert to screen pixels for rendering.
+   * @deprecated Use 'box' instead
    */
-  position: Position;
+  position?: Position;
   /**
    * Dimensions in MODEL PIXELS (at print PPI, e.g., 300 PPI).
    * Use toCanvasPx() to convert to screen pixels for rendering.
+   * @deprecated Use 'box' instead
    */
-  size: Size;
+  size?: Size;
+  /** @deprecated Use 'contentTransform' instead */
   crop?: CropArea;
+
   lockAspectRatio?: boolean;
 
   originalAspectRatio?: number;

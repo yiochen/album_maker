@@ -153,16 +153,8 @@ export const AlbumEditor: React.FC = () => {
           onTemplateChange={(spreadId, templateId) => {
             updateSpread(spreadId, { templateId: templateId as TemplateId });
           }}
-          onElementUpdate={(updates) => {
-            if (selectedElementId && selectedPageId) {
-              handleElementUpdate(selectedPageId, selectedElementId, updates);
-            }
-          }}
-          onElementDelete={() => {
-            if (selectedElementId && selectedPageId) {
-              handleElementDelete(selectedPageId, selectedElementId);
-            }
-          }}
+          onElementUpdate={handleElementUpdate}
+          onElementDelete={handleElementDelete}
         />
 
         {isImagePoolOpen && (

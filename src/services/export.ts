@@ -29,6 +29,153 @@ const sanitizeFilename = (name: string): string => {
         .toLowerCase() || 'album';
 };
 
+// Draw a single element on the canvas
+const drawElement = async (
+    ctx: CanvasRenderingContext2D,
+    element: PageElement,
+    canvasWidth: number,
+    canvasHeight: number
+): Promise<void> => {
+    if (element.type !== 'image' && element.type !== 'smartFrame') return;
+
+    try {
+        const img = await loadImage(element.imageUrl);
+
+        let x = 0, y = 0, width = 0, height = 0;
+
+        // --- 1. Determine Frame Dimensions ---
+        if (element.box) {
+            // Gapless Logic: Integer rounding on edges
+            const left = Math.round(element.box.x1 * canvasWidth);
+            const top = Math.round(element.box.y1 * canvasHeight);
+            const right = Math.round(element.box.x2 * canvasWidth);
+            const bottom = Math.round(element.box.y2 * canvasHeight);
+
+            x = left;
+            y = top;
+            width = right - left;
+            height = bottom - top;
+        } else if (element.position && element.size) {
+            // Legacy Logic
+            x = element.position.x - element.size.width / 2;
+            y = element.position.y - element.size.height / 2;
+            width = element.size.width;
+            height = element.size.height;
+        } else {
+            // Should not happen for valid elements
+            return;
+        }
+
+        // --- 2. Draw Content ---
+        ctx.save();
+
+        // Clip to frame
+        ctx.beginPath();
+        ctx.rect(x, y, width, height);
+        ctx.clip();
+
+        if (element.contentTransform) {
+            // --- SmartFrame Logic ---
+            const { zoom, panX, panY, rotation } = element.contentTransform;
+
+            // Calculate Cover Scale
+            const scaleX = width / img.width;
+            const scaleY = height / img.height;
+            const coverScale = Math.max(scaleX, scaleY);
+
+            const finalScale = coverScale * zoom;
+
+            const actualImgWidth = img.width * finalScale;
+            const actualImgHeight = img.height * finalScale;
+
+            // Calculate Top-Left position relative to Frame Top-Left
+
+            let offsetX = 0;
+            let offsetY = 0;
+
+            if (actualImgWidth > width) {
+                offsetX = (0.5 - panX) * (actualImgWidth - width);
+            }
+            if (actualImgHeight > height) {
+                offsetY = (0.5 - panY) * (actualImgHeight - height);
+            }
+
+            // Frame Center
+            const cx = x + width / 2;
+            const cy = y + height / 2;
+
+            // Image Draw Position (Top-Left)
+            const drawX = cx + offsetX - actualImgWidth / 2;
+            const drawY = cy + offsetY - actualImgHeight / 2;
+
+            if (rotation) {
+                ctx.translate(cx + offsetX, cy + offsetY);
+                ctx.rotate((rotation * Math.PI) / 180);
+                ctx.translate(-(cx + offsetX), -(cy + offsetY));
+            }
+
+            ctx.drawImage(img, drawX, drawY, actualImgWidth, actualImgHeight);
+
+        } else if (element.crop) {
+            // --- Legacy Crop Logic ---
+            const srcX = (element.crop.x / 100) * img.width;
+            const srcY = (element.crop.y / 100) * img.height;
+            const srcWidth = (element.crop.width / 100) * img.width;
+            const srcHeight = (element.crop.height / 100) * img.height;
+
+            ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, x, y, width, height);
+        } else {
+            // --- Default Stretch ---
+            ctx.drawImage(img, x, y, width, height);
+        }
+
+        ctx.restore();
+
+    } catch (error) {
+        console.error('Failed to draw element:', error);
+        // Draw placeholder
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(
+            element.position?.x ?? 0,
+            element.position?.y ?? 0,
+            element.size?.width ?? 100,
+            element.size?.height ?? 100
+        );
+    }
+};
+
+// Draw page number on the image
+const drawPageNumber = (
+    ctx: CanvasRenderingContext2D,
+    pageNumber: number,
+    centerX: number,
+    canvasHeight: number,
+    side: 'left' | 'right'
+): void => {
+    const fontSize = 48; // Fixed size for print
+    const padding = 60;
+
+    ctx.font = `${fontSize}px Inter, sans-serif`;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.textBaseline = 'bottom';
+
+    if (side === 'left') {
+        ctx.textAlign = 'left';
+        ctx.fillText(
+            pageNumber.toString(),
+            padding,
+            canvasHeight - padding
+        );
+    } else {
+        ctx.textAlign = 'right';
+        ctx.fillText(
+            pageNumber.toString(),
+            centerX - padding,
+            canvasHeight - padding
+        );
+    }
+};
+
 // Export a single spread to an image
 export const exportSpread = async (
     spread: Spread,
@@ -42,7 +189,6 @@ export const exportSpread = async (
     const canvasWidth = settings.pageWidth * 2 * PPI;
     const canvasHeight = settings.pageHeight * PPI;
 
-    // Create canvas
     const canvas = document.createElement('canvas');
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
@@ -50,11 +196,17 @@ export const exportSpread = async (
 
     // Fill with white background
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // Draw background if any
+    if (spread.background) {
+        ctx.fillStyle = spread.background;
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    }
 
     // Draw each element
     for (const element of spread.elements) {
-        await drawElement(ctx, element);
+        await drawElement(ctx, element, canvasWidth, canvasHeight);
     }
 
     // Add page numbers if requested (Left and Right)
@@ -84,81 +236,16 @@ export const exportSpread = async (
     });
 };
 
-// Draw a single element on the canvas
-const drawElement = async (
-    ctx: CanvasRenderingContext2D,
-    element: PageElement
-): Promise<void> => {
-    if (element.type !== 'image') return;
-
-    try {
-        // Use image URL directly (sources provide full URLs)
-        const imageUrl = element.imageUrl;
-        const img = await loadImage(imageUrl);
-
-        // Position and Size are already in Absolute Pixels (at 300 PPI)
-        const x = element.position.x;
-        const y = element.position.y;
-        const width = element.size.width;
-        const height = element.size.height;
-
-        // Draw with optional cropping
-        if (element.crop) {
-            const srcX = (element.crop.x / 100) * img.width;
-            const srcY = (element.crop.y / 100) * img.height;
-            const srcWidth = (element.crop.width / 100) * img.width;
-            const srcHeight = (element.crop.height / 100) * img.height;
-
-            ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, x, y, width, height);
-        } else {
-            ctx.drawImage(img, x, y, width, height);
-        }
-    } catch (error) {
-        console.error('Failed to draw element:', error);
-        // Draw placeholder for failed images
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(element.position.x, element.position.y, element.size.width, element.size.height);
-    }
-};
-
-// Draw page number on the image
-const drawPageNumber = (
-    ctx: CanvasRenderingContext2D,
-    pageNumber: number,
-    centerX: number, // The right boundary of the page area
-    canvasHeight: number,
-    side: 'left' | 'right'
-): void => {
-    const fontSize = 48; // Fixed size for print
-    const padding = 60;
-
-    ctx.font = `${fontSize}px Inter, sans-serif`;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.textBaseline = 'bottom';
-
-    if (side === 'left') {
-        // Left page number on bottom-left corner of left page?
-        // Or bottom-left of the page area.
-        // centerX passed is the seam (width/2).
-        // Page is from 0 to centerX.
-        ctx.textAlign = 'left';
-        ctx.fillText(
-            pageNumber.toString(),
-            padding,
-            canvasHeight - padding
-        );
-    } else {
-        // Right page
-        // Page is from (centerX - width/2) to centerX? No.
-        // Right page is from seam to width.
-        // centerX passed is total width.
-        ctx.textAlign = 'right';
-        ctx.fillText(
-            pageNumber.toString(),
-            centerX - padding, // centerX here acts as right edge for 'right'
-            canvasHeight - padding
-        );
-    }
+// Download a blob as a file
+const downloadBlob = (blob: Blob, filename: string): void => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 };
 
 // Export all spreads
@@ -211,18 +298,6 @@ export const exportAllSpreads = async (
         totalPages: totalSpreads,
         status: 'complete',
     });
-};
-
-// Download a blob as a file
-const downloadBlob = (blob: Blob, filename: string): void => {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
 };
 
 // Export single spread and download

@@ -12,6 +12,7 @@ import { useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 import { CustomFabricObject } from './fabricTypes';
+import { GaplessPageItem } from '../components/GaplessPageItem';
 import { APP_CONFIG } from '../config';
 import type { Spread, PageElement } from '../types';
 import { toCanvasPx, toModelPx } from '../utils/imageUtils';
@@ -149,7 +150,7 @@ export const useCanvasSnapping = ({
             else if (obj.top! > maxCenterY) obj.top = maxCenterY;
         };
 
-        const handleObjectModified = (e: { target?: fabric.Object }) => {
+        const handleObjectModified = (e: { target?: fabric.Object, transform?: { corner?: string } }) => {
             const obj = e.target as CustomFabricObject;
             if (!obj || !obj.data) return;
 
@@ -158,13 +159,25 @@ export const useCanvasSnapping = ({
                 snapLinesRef.current.length = 0;
             }
 
-            onElementUpdateRef.current(spreadRef.current.id, obj.data.id, {
-                position: { x: toModelPx(obj.left!), y: toModelPx(obj.top!) },
-                size: {
-                    width: toModelPx(obj.getScaledWidth()),
-                    height: toModelPx(obj.getScaledHeight()),
-                },
-            });
+            if (obj instanceof GaplessPageItem) {
+                // Use GaplessPageItem logic for normalized box updates
+                const updates = obj.updateLayoutFromPixels(
+                    canvasWidth,
+                    canvasHeight,
+                    e.transform?.corner // Pass the active corner to enable anchor locking
+                );
+
+                onElementUpdateRef.current(spreadRef.current.id, obj.data.id, updates);
+            } else {
+                // Legacy fallback (should happen less often as we migrate)
+                onElementUpdateRef.current(spreadRef.current.id, obj.data.id, {
+                    position: { x: toModelPx(obj.left!), y: toModelPx(obj.top!) },
+                    size: {
+                        width: toModelPx(obj.getScaledWidth()),
+                        height: toModelPx(obj.getScaledHeight()),
+                    },
+                });
+            }
 
             if (onCanvasChangeRef.current) {
                 const dataUrl = canvas.toDataURL({
@@ -178,6 +191,7 @@ export const useCanvasSnapping = ({
 
         canvas.on('object:moving', handleObjectMoving);
         canvas.on('object:modified', handleObjectModified);
+        // We also want to capture resizing end, which object:modified covers.
 
         return () => {
             canvas.off('object:moving', handleObjectMoving);

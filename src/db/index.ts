@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import { Spread } from '../types';
 
 // Types for database
 export interface AlbumRecord {
@@ -204,16 +205,27 @@ export const spreadThumbnailDB = {
 };
 
 // Generate a simple hash from spread content for cache invalidation
-// Updated to be clearer about Spread structure assumption
-export function generateSpreadContentHash(spread: { elements: Array<{ id: string; position: { x: number; y: number }; size: { width: number; height: number } }> }): string {
-    const content = spread.elements.map(e =>
-        `${e.id}:${e.position.x.toFixed(1)},${e.position.y.toFixed(1)}:${e.size.width.toFixed(1)},${e.size.height.toFixed(1)}`
-    ).join('|');
+export function generateSpreadContentHash(spread: Spread): string {
+    const content = spread.elements.map(e => {
+        if (e.box) {
+             // Use box coordinates
+             return `${e.id}:box:${e.box.x1.toFixed(4)},${e.box.y1.toFixed(4)},${e.box.x2.toFixed(4)},${e.box.y2.toFixed(4)}`;
+        }
+        if (e.position && e.size) {
+             // Use legacy position/size
+             return `${e.id}:pos:${e.position.x.toFixed(1)},${e.position.y.toFixed(1)}:${e.size.width.toFixed(1)},${e.size.height.toFixed(1)}`;
+        }
+        return `${e.id}:unknown`;
+    }).join('|');
+
+    // Include background
+    const bg = spread.background || 'white';
+    const fullContent = `${bg}|${content}`;
 
     // Simple hash function
     let hash = 0;
-    for (let i = 0; i < content.length; i++) {
-        const char = content.charCodeAt(i);
+    for (let i = 0; i < fullContent.length; i++) {
+        const char = fullContent.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
         hash = hash & hash;
     }

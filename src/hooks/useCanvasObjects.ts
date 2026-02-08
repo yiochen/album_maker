@@ -1,35 +1,18 @@
 /**
  * useCanvasObjects - Syncs PageElement state to FabricJS canvas objects.
  *
- * PIXEL COORDINATE SYSTEM:
- * - PageElement position/size are in MODEL PIXELS (at PPI, e.g., 300 PPI)
- * - FabricJS left/top/scale are in CANVAS PIXELS (at SCREEN_PPI, e.g., 96 PPI)
- * - Uses toCanvasPx() to convert from model → canvas when rendering
- *
- * FabricJS uses center origin (originX/originY: 'center'), so left/top represent the center position.
- *
- * DATA FLOW - Avoiding Circular Updates:
- * 
- * During editing, data flows: FabricJS → React State (via object:modified)
- * - User drags/resizes on canvas → FabricJS updates visually in real-time
- * - object:modified fires ONCE when mouse is released
- * - useCanvasSnapping converts canvas position → model pixels, calls updateElement()
- * - Zustand store updates, triggering React re-render
- * 
- * This useEffect runs when `spread` changes, but it intentionally SKIPS
- * re-positioning existing objects UNLESS:
- * 1. The user switched to a different spread (isSpreadChange check)
- * 2. AND the object is not currently being moved (isMoving flag)
- * 
- * This prevents FabricJS and React from fighting over object positions during editing.
- * FabricJS is the source of truth during interaction; React state is the source of 
- * truth when switching spreads or on initial load.
+ * REFACTORED FOR GAPLESS LAYOUT:
+ * - Uses GaplessPageItem (SmartFrame) instead of raw fabric.Image
+ * - Uses normalized 'box' coordinates (0-1) for layout
+ * - Handles migration of legacy elements on the fly
  */
 import { useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
-import type { Spread, PageElement, AlbumSettings } from '../types';
+import type { Spread, AlbumSettings } from '../types';
 import { APP_CONFIG } from '../config';
 import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
+import { GaplessPageItem } from '../components/GaplessPageItem';
+import { migratePageElement } from '../utils/migration';
 import { toCanvasPx } from '../utils/imageUtils';
 
 export const getZoomCompensatedSizes = (zoomPercent: number) => {
@@ -77,6 +60,10 @@ export const useCanvasObjects = ({
     const modelWidth = settings.pageWidth * 2 * ppi;
     const modelHeight = settings.pageHeight * ppi;
 
+    // Calculate canvas dimensions in screen pixels for layout application
+    const canvasWidth = toCanvasPx(modelWidth);
+    const canvasHeight = toCanvasPx(modelHeight);
+
     const isObjectMoving = (obj: fabric.Object) => {
         return (obj as ExtendedFabricObject).isMoving;
     };
@@ -93,48 +80,58 @@ export const useCanvasObjects = ({
 
         const currentObjects = canvas.getObjects() as CustomFabricObject[];
         const validIds = new Set<string>();
-        const elementsToLoad: { element: PageElement, width: number, height: number }[] = [];
 
-        currentSpread.elements.forEach(element => {
-            validIds.add(element.id);
+        // Items to load (create new GaplessPageItem)
+        const elementsToLoad: { element: ReturnType<typeof migratePageElement> }[] = [];
+
+        currentSpread.elements.forEach(rawElement => {
+            validIds.add(rawElement.id);
+
+            // Ensure element is in new format (migration on the fly for rendering)
+            const element = migratePageElement(rawElement, settings);
+
             const existingObj = currentObjects.find(o => o.data?.id === element.id);
 
             if (existingObj) {
-                if (existingObj instanceof fabric.Image) {
-                    const img = existingObj;
-                    const isLocked = element.lockAspectRatio;
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    if ((img as any).uniformScaling !== isLocked) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        (img as any).uniformScaling = isLocked;
-                        img.setCoords();
-                    }
+                if (existingObj instanceof GaplessPageItem) {
+                    const item = existingObj as GaplessPageItem;
+
+                    // Update internal element reference
+                    item.pageElement = element;
+
+                    // Sync locked state
+                    // GaplessPageItem might not support lockAspectRatio property directly on Group?
+                    // Actually we used to set uniformScaling on fabric.Image.
+                    // For Frame, we usually allow non-uniform scaling to resize frame.
+                    // But if lockAspectRatio is true, maybe we should enforce it?
+                    // For now, let's assume frames are free-form.
 
                     if (isSpreadChange && !isObjectMoving(existingObj)) {
-                        const targetWidth = element.size.width;
-                        const targetHeight = element.size.height;
-                        img.set({
-                            left: toCanvasPx(element.position.x),
-                            top: toCanvasPx(element.position.y),
-                            originX: 'center',
-                            originY: 'center',
-                            scaleX: toCanvasPx(targetWidth) / (img.width || 1),
-                            scaleY: toCanvasPx(targetHeight) / (img.height || 1),
-                        });
-                        img.setCoords();
+                        // Apply layout from normalized box
+                        item.applyLayout(canvasWidth, canvasHeight);
+                    } else if (!isObjectMoving(existingObj)) {
+                         // Even if not spread change, we might need to re-apply if element changed externally (undo/redo)
+                         // But if we are interacting, we skip.
+                         // Optimization: Check if box changed?
+                         // For now, safe to apply layout if not moving.
+                         item.applyLayout(canvasWidth, canvasHeight);
+                    }
+                } else {
+                    // Object exists but is not GaplessPageItem (e.g. old fabric.Image from previous render?)
+                    // Should remove and re-create.
+                    canvas.remove(existingObj);
+                    if (!loadingIds.current.has(element.id)) {
+                        elementsToLoad.push({ element });
                     }
                 }
             } else {
                 if (!loadingIds.current.has(element.id)) {
-                    elementsToLoad.push({
-                        element,
-                        width: element.size.width,
-                        height: element.size.height
-                    });
+                    elementsToLoad.push({ element });
                 }
             }
         });
 
+        // Cleanup removed objects
         currentObjects.forEach(obj => {
             const customObj = obj as CustomFabricObject;
             if (customObj.data?.id && customObj.data.id !== 'seam' && !validIds.has(customObj.data.id)) {
@@ -142,27 +139,18 @@ export const useCanvasObjects = ({
             }
         });
 
+        // Load new items
         const zoomValue = zoom;
-        elementsToLoad.forEach(async ({ element, width, height }) => {
+        elementsToLoad.forEach(async ({ element }) => {
             if (loadingIds.current.has(element.id)) return;
             loadingIds.current.add(element.id);
 
             try {
                 const img = await fabric.Image.fromURL(element.imageUrl, { crossOrigin: 'anonymous' });
 
-                const isLocked = element.lockAspectRatio;
                 const uiSizes = getZoomCompensatedSizes(zoomValue);
 
-                img.set({
-                    left: toCanvasPx(element.position.x),
-                    top: toCanvasPx(element.position.y),
-                    originX: 'center',
-                    originY: 'center',
-                    scaleX: toCanvasPx(width) / (img.width || 1),
-                    scaleY: toCanvasPx(height) / (img.height || 1),
-                    data: { id: element.id },
-                    lockRotation: true,
-                    uniformScaling: isLocked,
+                const item = new GaplessPageItem(element, img, {
                     cornerStyle: 'circle',
                     cornerColor: 'white',
                     cornerStrokeColor: '#333',
@@ -170,13 +158,19 @@ export const useCanvasObjects = ({
                     transparentCorners: false,
                     cornerSize: uiSizes.cornerSize,
                     borderScaleFactor: uiSizes.borderScaleFactor,
-                    objectCaching: true,
-                    noScaleCache: true,
                 });
 
-                canvas.add(img);
+                // Apply initial layout
+                item.applyLayout(canvasWidth, canvasHeight);
+
+                // Configure controls
+                item.set({
+                    lockRotation: true, // Usually frames don't rotate in this editor
+                });
+
+                canvas.add(item);
                 if (selectedElementIdRef.current === element.id) {
-                    canvas.setActiveObject(img);
+                    canvas.setActiveObject(item);
                 }
                 canvas.requestRenderAll();
             } catch (err) {
@@ -187,7 +181,7 @@ export const useCanvasObjects = ({
         });
 
         canvas.requestRenderAll();
-    }, [fabricCanvas, spread.id, spread.elements.length, zoom, modelWidth, modelHeight, ppi]);
+    }, [fabricCanvas, spread.id, spread.elements, zoom, canvasWidth, canvasHeight, settings]);
 
     // Update UI sizes when zoom changes
     useEffect(() => {
