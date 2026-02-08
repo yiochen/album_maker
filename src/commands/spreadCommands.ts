@@ -44,10 +44,15 @@ export class AddSpreadsCommand implements Command<Album> {
             // Calculate available slots based on maxPages setting (approx. 2 pages per spread)
             const maxPages = state.settings?.maxPages ?? 40;
             const maxSpreads = Math.ceil(maxPages / 2);
-            const availableSlots = maxSpreads - state.spreads.length;
 
-            // Default to 1 spread if count not specified in a spread-centric way
-            const spreadsToAdd = Math.min(this.count, availableSlots);
+            // Ensure state.spreads exists
+            const currentSpreadsCount = state.spreads ? state.spreads.length : 0;
+            const availableSlots = maxSpreads - currentSpreadsCount;
+
+            // Ensure count is valid positive integer
+            const requestedCount = Math.max(1, this.count);
+
+            const spreadsToAdd = Math.min(requestedCount, availableSlots);
 
             if (spreadsToAdd > 0) {
                 this.newSpreads = Array.from({ length: spreadsToAdd }, () =>

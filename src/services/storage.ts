@@ -2,10 +2,18 @@ import type { Album, Spread, TemplateId } from '../types';
 import { APP_CONFIG } from '../config';
 import { albumDB, settingsDB } from '../db';
 
+// Helper to generate ID (robust fallback)
+const generateId = (): string => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return `id-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
 // Create a new empty album
 export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
     const now = Date.now();
-    const albumId = crypto.randomUUID();
+    const albumId = generateId();
 
     return {
         id: albumId,
@@ -21,7 +29,7 @@ export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
 // Create a new empty spread
 export const createNewSpread = (templateId: TemplateId = 'fullpage'): Spread => {
     return {
-        id: crypto.randomUUID(),
+        id: generateId(),
         templateId,
         elements: [],
         background: '#ffffff',
@@ -155,7 +163,7 @@ export const importAlbumFromJson = (): Promise<Album> => {
                 const album = JSON.parse(text) as Album;
 
                 // Generate new ID for imported album to avoid conflicts
-                album.id = crypto.randomUUID();
+                album.id = generateId();
                 album.updatedAt = Date.now();
 
                 // Save to IndexedDB
