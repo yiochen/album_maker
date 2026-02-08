@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import { APP_CONFIG } from '../config';
 import type { PoolImage } from '../types';
 import type { SourceImage } from '../sources';
 import { getAllSources, getSource } from '../sources';
@@ -8,6 +7,7 @@ import {
     calculateThumbnailSize,
     calculateCanvasMaxDimensions,
 } from '../utils/imageUtils';
+import { DraggablePoolImage } from './DraggablePoolImage';
 
 interface ImagePoolProps {
     images: PoolImage[];
@@ -26,85 +26,6 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
     const activeSource = getSource(activeSourceId);
     const pageWidth = usePageWidth();
     const pageHeight = usePageHeight();
-
-    const handleDragStart = useCallback((e: React.DragEvent, image: PoolImage) => {
-        e.dataTransfer.setData('application/json', JSON.stringify(image));
-        e.dataTransfer.effectAllowed = 'copy';
-
-        // Create drag preview
-        const createPreview = () => {
-            const size = APP_CONFIG.DRAG_PREVIEW_SIZE;
-            const preview = document.createElement('div');
-            preview.style.width = `${size}px`;
-            preview.style.height = `${size}px`;
-            preview.style.background = `url(${image.thumbnailUrl || image.baseUrl}) center/cover`;
-            preview.style.borderRadius = '8px';
-            preview.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-            preview.style.position = 'fixed';
-            preview.style.zIndex = '9999';
-            preview.style.pointerEvents = 'none';
-            preview.style.opacity = '0.8';
-            return preview;
-        };
-
-        const preview = createPreview();
-        document.body.appendChild(preview);
-        e.dataTransfer.setDragImage(preview, APP_CONFIG.DRAG_PREVIEW_SIZE / 2, APP_CONFIG.DRAG_PREVIEW_SIZE / 2);
-
-        setTimeout(() => document.body.removeChild(preview), 0);
-    }, []);
-
-    const handleTouchStart = useCallback((e: React.TouchEvent, image: PoolImage) => {
-        const touch = e.touches[0];
-        const startX = touch.clientX;
-        const startY = touch.clientY;
-        const size = APP_CONFIG.DRAG_PREVIEW_SIZE;
-
-        const preview = document.createElement('div');
-        preview.id = 'drag-preview';
-        preview.style.width = `${size}px`;
-        preview.style.height = `${size}px`;
-        preview.style.background = `url(${image.thumbnailUrl || image.baseUrl}) center/cover`;
-        preview.style.borderRadius = '8px';
-        preview.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-        preview.style.position = 'fixed';
-        preview.style.left = `${startX - size / 2}px`;
-        preview.style.top = `${startY - size / 2}px`;
-        preview.style.zIndex = '9999';
-        preview.style.pointerEvents = 'none';
-        preview.style.opacity = '0.8';
-
-        document.body.appendChild(preview);
-
-        const handleTouchMove = (moveEvent: TouchEvent) => {
-            moveEvent.preventDefault(); // Prevent scrolling while dragging
-            const moveTouch = moveEvent.touches[0];
-            preview.style.left = `${moveTouch.clientX - size / 2}px`;
-            preview.style.top = `${moveTouch.clientY - size / 2}px`;
-        };
-
-        const handleTouchEnd = (endEvent: TouchEvent) => {
-            const endTouch = endEvent.changedTouches[0];
-            if (preview.parentNode) {
-                document.body.removeChild(preview);
-            }
-            window.removeEventListener('touchmove', handleTouchMove);
-            window.removeEventListener('touchend', handleTouchEnd);
-
-            // Dispatch custom event for drop
-            const dropEvent = new CustomEvent('app:image-drop', {
-                detail: {
-                    image,
-                    x: endTouch.clientX,
-                    y: endTouch.clientY
-                }
-            });
-            window.dispatchEvent(dropEvent);
-        };
-
-        window.addEventListener('touchmove', handleTouchMove, { passive: false });
-        window.addEventListener('touchend', handleTouchEnd);
-    }, []);
 
     const handleImportFromSource = useCallback(async () => {
         if (!activeSource || !pageWidth || !pageHeight) return;
@@ -231,24 +152,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                 ) : (
                     <div className="image-grid" data-testid="image-grid">
                         {images.map(image => (
-                            <div
-                                key={image.id}
-                                className="pool-image"
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, image)}
-                                onTouchStart={(e) => handleTouchStart(e, image)}
-                                data-testid="pool-image"
-                                style={{ aspectRatio: image.width && image.height ? `${image.width} / ${image.height}` : '1 / 1' }}
-                            >
-                                <img
-                                    src={image.thumbnailUrl || image.baseUrl}
-                                    alt={image.filename}
-                                    title={image.filename}
-                                    loading="lazy"
-                                    data-width-px={image.width}
-                                    data-height-px={image.height}
-                                />
-                            </div>
+                            <DraggablePoolImage key={image.id} image={image} />
                         ))}
                     </div>
                 )}

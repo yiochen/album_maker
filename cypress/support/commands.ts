@@ -43,6 +43,13 @@ declare global {
              * Get the interaction layer (for drag/drop operations)
              */
             getInteractionLayer(): Chainable<JQuery<HTMLElement>>;
+
+            /**
+             * Drag and drop an element onto a target using @dnd-kit pointer events.
+             * Works with useDraggable/useDroppable from @dnd-kit/core.
+             * @param targetSelector - CSS selector for the drop target
+             */
+            dndKitDragTo(targetSelector: string): Chainable<void>;
         }
     }
 }
@@ -93,11 +100,18 @@ Cypress.Commands.add('importDummyImages', () => {
     // Open image pool if not already open
     cy.openImagePool();
 
-    // Make sure dummy colors source is selected
-    cy.get('[data-testid="source-selector"]').select('dummy-colors');
+    // Make sure dummy colors source is selected and wait for state to propagate
+    cy.get('[data-testid="source-selector"]')
+        .select('dummy-colors')
+        .should('have.value', 'dummy-colors');
 
-    // Click import button
-    cy.get('[data-testid="import-button"]').click();
+    // Small delay to let React state catch up if needed
+    cy.wait(100);
+
+    // Click import button when ready
+    cy.get('[data-testid="import-button"]')
+        .should('not.be.disabled')
+        .click();
 
     // Wait for images to load
     cy.get('[data-testid="pool-image"]', { timeout: 10000 }).should('have.length.at.least', 1);
@@ -117,5 +131,78 @@ Cypress.Commands.add('getCanvasLayer', () => {
 Cypress.Commands.add('getInteractionLayer', () => {
     return cy.get('[data-testid="interaction-layer"]');
 });
+
+/**
+ * Drag and drop using @dnd-kit pointer events.
+ * 
+ * @dnd-kit uses PointerSensor which listens for pointer events, not HTML5 drag events.
+ * This command simulates the pointer event sequence that @dnd-kit expects:
+ * 1. pointerdown on source element
+ * 2. pointermove on document (with distance > activation threshold)
+ * 3. pointermove on document (to target position)
+ * 4. pointerup on document/source
+ */
+Cypress.Commands.add('dndKitDragTo', { prevSubject: 'element' }, ($source: JQuery<HTMLElement>, targetSelector: string) => {
+    const sourceRect = $source[0].getBoundingClientRect();
+    const sourceX = sourceRect.left + sourceRect.width / 2;
+    const sourceY = sourceRect.top + sourceRect.height / 2;
+
+    cy.get(targetSelector).then(($target) => {
+        const targetRect = $target[0].getBoundingClientRect();
+        const targetX = targetRect.left + targetRect.width / 2;
+        const targetY = targetRect.top + targetRect.height / 2;
+
+        // Common event properties
+        const eventProps = {
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+            bubbles: true,
+            cancelable: true,
+        };
+
+        // 1. pointerdown on source
+        cy.wrap($source).trigger('pointerdown', {
+            ...eventProps,
+            clientX: sourceX,
+            clientY: sourceY,
+            button: 0,
+            force: true,
+        });
+
+        // Small wait for sensor activation
+        cy.wait(100);
+
+        // 2. pointermove on body to activate sensor (distance constraint)
+        cy.get('body').trigger('pointermove', {
+            ...eventProps,
+            clientX: sourceX + 10,
+            clientY: sourceY + 10,
+            force: true,
+        });
+
+        cy.wait(50);
+
+        // 3. pointermove on body to reach target
+        cy.get('body').trigger('pointermove', {
+            ...eventProps,
+            clientX: targetX,
+            clientY: targetY,
+            force: true,
+        });
+
+        cy.wait(50);
+
+        // 4. pointerup on body to complete drop
+        cy.get('body').trigger('pointerup', {
+            ...eventProps,
+            clientX: targetX,
+            clientY: targetY,
+            force: true,
+        });
+    });
+});
+
+export { };
 
 export { };

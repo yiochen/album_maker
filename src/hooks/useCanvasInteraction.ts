@@ -4,7 +4,6 @@ import type { Spread, PoolImage, PageElement } from '../types';
 import { CustomFabricObject } from './fabricTypes';
 import { useCanvasSelection } from './useCanvasSelection';
 import { useCanvasSnapping } from './useCanvasSnapping';
-import { useCanvasDragDrop } from './useCanvasDragDrop';
 
 interface UseCanvasInteractionProps {
     fabricCanvas: fabric.Canvas | null;
@@ -19,10 +18,21 @@ interface UseCanvasInteractionProps {
     onElementSelect: (elementId: string | null) => void;
     onElementUpdate: (spreadId: string, elementId: string, updates: Partial<PageElement>) => void;
     onElementDelete: (spreadId: string, elementId: string) => void;
+    /** @deprecated Kept for compatibility, but drops are now handled by @dnd-kit via DndWrapper */
     onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
     onCanvasChange?: (dataUrl: string) => void;
 }
 
+/**
+ * useCanvasInteraction - Orchestrates canvas interaction behaviors.
+ *
+ * This hook coordinates:
+ * - Keyboard shortcuts (delete key for removing elements)
+ * - Selection handling (via useCanvasSelection)
+ * - Snapping behavior (via useCanvasSnapping)
+ *
+ * Note: Drag-and-drop from ImagePool is now handled by @dnd-kit via DndWrapper.
+ */
 export const useCanvasInteraction = ({
     fabricCanvas,
     canvasWidth,
@@ -31,11 +41,9 @@ export const useCanvasInteraction = ({
     isSnappingEnabled,
     zoom,
     snapLinesRef,
-    wrapperRef,
     onElementSelect,
     onElementUpdate,
     onElementDelete,
-    onImageDrop,
     onCanvasChange,
 }: UseCanvasInteractionProps) => {
 
@@ -107,23 +115,7 @@ export const useCanvasInteraction = ({
         onCanvasChange,
     });
 
-    const { isDragOver, handleDragOver, handleDragLeave, handleDrop, handleTouchDrop } = useCanvasDragDrop({
-        spreadId: spread.id,
-        zoom,
-        wrapperRef,
-        onImageDrop,
-    });
-
-    useEffect(() => {
-        window.addEventListener('app:image-drop', handleTouchDrop);
-        return () => window.removeEventListener('app:image-drop', handleTouchDrop);
-    }, [handleTouchDrop]);
-
     return {
-        isDragOver,
         hasSelection,
-        handleDragOver,
-        handleDragLeave,
-        handleDrop,
     };
 };

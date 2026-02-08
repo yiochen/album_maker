@@ -14,6 +14,7 @@ import { Canvas } from './Canvas';
 import { PropertiesPanel } from './PropertiesPanel';
 import { ImagePool } from './ImagePool';
 import { AlbumSelector } from './AlbumSelector';
+import { DndWrapper } from './DndWrapper';
 import { Modal } from './Modal';
 import { LoadingScreen } from './LoadingScreen';
 
@@ -123,7 +124,7 @@ export const AlbumEditor: React.FC = () => {
         </button>
       </div>
 
-      <main className={`main-content ${isImagePoolOpen ? 'image-pool-open' : ''}`}>
+      <DndWrapper className={`main-content ${isImagePoolOpen ? 'image-pool-open' : ''}`}>
         <PageNavigator />
 
         <Canvas
@@ -171,7 +172,7 @@ export const AlbumEditor: React.FC = () => {
             onClose={() => setImagePoolOpen(false)}
           />
         )}
-      </main>
+      </DndWrapper>
 
       {isSettingsOpen && (
         <Modal

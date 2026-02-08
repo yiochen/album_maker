@@ -1,9 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import type { PageElement, PoolImage, Spread } from '../types';
 import { useCanvasRender } from '../hooks/useCanvasRender';
 import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
+import { DroppableCanvas } from './DroppableCanvas';
 import { useSelectedElementId, useIsSnappingEnabled, useSetSelectedElementId } from '../states/uiStore';
 import { useAlbumSettings } from '../states/albumStore';
+import { useDndDropContext } from '../contexts/DndDropContext';
 
 interface CanvasProps {
     spread: Spread;
@@ -27,6 +29,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const isSnappingEnabled = useIsSnappingEnabled();
     const setSelectedElementId = useSetSelectedElementId();
     const settings = useAlbumSettings()!;
+    const { registerCanvasDropTarget } = useDndDropContext();
 
     const canvasElRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -52,11 +55,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     // Initialize interaction logic
     const {
-        isDragOver,
         hasSelection,
-        handleDragOver,
-        handleDragLeave,
-        handleDrop,
     } = useCanvasInteraction({
         fabricCanvas,
         canvasWidth,
@@ -73,6 +72,20 @@ export const Canvas: React.FC<CanvasProps> = ({
         onImageDrop,
         onCanvasChange,
     });
+
+    // Register this canvas as a drop target for dnd-kit
+    useEffect(() => {
+        registerCanvasDropTarget({
+            wrapperRef,
+            zoom,
+            spreadId: spread.id,
+            onImageDrop,
+        });
+
+        return () => {
+            registerCanvasDropTarget(null);
+        };
+    }, [registerCanvasDropTarget, wrapperRef, zoom, spread.id, onImageDrop]);
 
     // Styles
     const canvasStyle = {
@@ -93,24 +106,22 @@ export const Canvas: React.FC<CanvasProps> = ({
                 tabIndex={0}
                 style={{ outline: 'none', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
             >
-                <div
-                    ref={wrapperRef}
+                <DroppableCanvas
+                    id="canvas"
                     style={canvasStyle}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    className={isDragOver ? 'drop-active' : ''}
                     data-testid="interaction-layer"
                 >
-                    <canvas ref={canvasElRef} data-testid="canvas-layer" />
-                    {spread.elements.length === 0 && (
-                        <div className="canvas-placeholder" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', textAlign: 'center', width: '100%' }}>
-                            <span className="text-muted" style={{ opacity: 0.5 }}>
-                                Drag images here
-                            </span>
-                        </div>
-                    )}
-                </div>
+                    <div ref={wrapperRef}>
+                        <canvas ref={canvasElRef} data-testid="canvas-layer" />
+                        {spread.elements.length === 0 && (
+                            <div className="canvas-placeholder" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', textAlign: 'center', width: '100%' }}>
+                                <span className="text-muted" style={{ opacity: 0.5 }}>
+                                    Drag images here
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </DroppableCanvas>
             </div>
 
             <div className="canvas-controls">
