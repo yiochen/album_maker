@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AlbumMetadata } from '../types';
 import { albumStorage } from '../services/storage';
+import { MenuIcon } from './icons/MenuIcon';
+import { ChevronDownIcon } from './icons/ChevronDownIcon';
+import { PlusIcon } from './icons/PlusIcon';
+import { TrashIcon } from './icons/TrashIcon';
 
 interface AlbumSelectorProps {
     currentAlbumId: string | null;
@@ -68,20 +72,13 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
                 className="album-selector-trigger"
                 onClick={() => setIsOpen(!isOpen)}
             >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                <MenuIcon width="16" height="16" />
                 <span>{currentAlbum?.name || 'Select Album'}</span>
-                <svg
+                <ChevronDownIcon
                     width="12"
                     height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
                     style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
-                >
-                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                />
             </button>
 
             {isOpen && (
@@ -92,9 +89,7 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
                             className="btn btn-ghost btn-sm"
                             onClick={() => setIsCreating(true)}
                         >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                            </svg>
+                            <PlusIcon width="14" height="14" />
                             New
                         </button>
                     </div>
@@ -149,9 +144,7 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
                                             onClick={(e) => handleDelete(album.id, e)}
                                             title="Delete album"
                                         >
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                            </svg>
+                                            <TrashIcon width="14" height="14" />
                                         </button>
                                     )}
                                 </div>
