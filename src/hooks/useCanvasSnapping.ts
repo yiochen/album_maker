@@ -8,24 +8,22 @@
  *
  * FabricJS uses center origin (originX/originY: 'center'), so left/top represent the center position.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
 import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 import { CustomFabricObject } from './fabricTypes';
 import { APP_CONFIG } from '../config';
-import type { Spread, PageElement } from '../types';
 import { getZoomCompensatedSizes } from './useCanvasObjects';
 import { CanvasPageElement } from './CanvasPageElement';
+import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
+import { useAlbumSpreads, useUpdateElement } from '../states/albumStore';
 
 interface UseCanvasSnappingProps {
     fabricCanvas: fabric.Canvas | null;
     canvasWidth: number;
     canvasHeight: number;
-    spread: Spread;
-    isSnappingEnabled: boolean;
     zoom: number;
     snapLinesRef: React.RefObject<fabric.Line[]>;
-    onElementUpdate: (spreadId: string, elementId: string, updates: Partial<PageElement>) => void;
     onCanvasChange?: (dataUrl: string) => void;
 }
 
@@ -33,13 +31,15 @@ export const useCanvasSnapping = ({
     fabricCanvas,
     canvasWidth,
     canvasHeight,
-    spread,
-    isSnappingEnabled,
     zoom,
     snapLinesRef,
-    onElementUpdate,
     onCanvasChange,
 }: UseCanvasSnappingProps) => {
+    const isSnappingEnabled = useIsSnappingEnabled();
+    const spreads = useAlbumSpreads();
+    const currentSpreadIndex = useCurrentSpreadIndex();
+    const spread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
+    const onElementUpdate = useUpdateElement();
 
     const onElementUpdateRef = useRef(onElementUpdate);
     const onCanvasChangeRef = useRef(onCanvasChange);

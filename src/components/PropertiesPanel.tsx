@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Spread, PageElement, AlbumSettings } from '../types';
-import { useAlbumStore } from '../states/albumStore';
+import { useAlbumImagePool } from '../states/albumStore';
 import { applyCoverTransform } from '../utils/imageUtils';
 
 interface PropertiesPanelProps {
@@ -9,7 +9,7 @@ interface PropertiesPanelProps {
     selectedElement: PageElement | null;
     selectedPageId: string | null;
     onTemplateChange: (spreadId: string, templateId: string) => void;
-    onElementUpdate: (updates: Partial<PageElement>) => void;
+    onElementUpdate: (updates: Partial<PageElement>, groupId?: string) => void;
     onElementDelete: () => void;
 }
 
@@ -88,7 +88,7 @@ const SpreadProperties: React.FC<SpreadPropertiesProps> = ({
 interface ElementPropertiesProps {
     element: PageElement;
     settings: AlbumSettings;
-    onUpdate: (updates: Partial<PageElement>) => void;
+    onUpdate: (updates: Partial<PageElement>, groupId?: string) => void;
     onDelete: () => void;
 }
 
@@ -98,6 +98,15 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     onUpdate,
     onDelete,
 }) => {
+    const groupIdRef = React.useRef<string | null>(null);
+
+    const handleInteractionStart = () => {
+        groupIdRef.current = crypto.randomUUID();
+    };
+
+    const handleInteractionEnd = () => {
+        groupIdRef.current = null;
+    };
     const [zoom, setZoom] = React.useState(element.contentTransform?.zoom || 1);
     const [panX, setPanX] = React.useState(element.contentTransform?.panX ?? 0.5);
     const [panY, setPanY] = React.useState(element.contentTransform?.panY ?? 0.5);
@@ -114,7 +123,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     const spreadHeight = settings.pageHeight * ppi;
 
     // Get original image dimensions from image pool
-    const pool = useAlbumStore(state => state.album?.imagePool || []);
+    const pool = useAlbumImagePool();
     const sourceImage = pool.find(img =>
         img.sourceId === element.sourceId &&
         img.sourceImageId === element.sourceImageId
@@ -226,7 +235,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
 
         onUpdate({
             contentTransform: newTransform,
-        });
+        }, groupIdRef.current || undefined);
     };
 
     return (
@@ -302,7 +311,12 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         step="0.01"
                         value={zoom}
                         onChange={(e) => handleTransformChange('zoom', parseFloat(e.target.value))}
-                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            handleInteractionStart();
+                        }}
+                        onPointerUp={handleInteractionEnd}
+                        onPointerCancel={handleInteractionEnd}
                         style={{ flex: 1 }}
                     />
                 </div>
@@ -323,7 +337,12 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         value={panX}
                         disabled={!coverage?.canPanX}
                         onChange={(e) => handleTransformChange('panX', parseFloat(e.target.value))}
-                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            handleInteractionStart();
+                        }}
+                        onPointerUp={handleInteractionEnd}
+                        onPointerCancel={handleInteractionEnd}
                         style={{ flex: 1 }}
                     />
                 </div>
@@ -344,7 +363,12 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         value={panY}
                         disabled={!coverage?.canPanY}
                         onChange={(e) => handleTransformChange('panY', parseFloat(e.target.value))}
-                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            handleInteractionStart();
+                        }}
+                        onPointerUp={handleInteractionEnd}
+                        onPointerCancel={handleInteractionEnd}
                         style={{ flex: 1 }}
                     />
                 </div>

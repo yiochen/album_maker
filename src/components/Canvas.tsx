@@ -1,34 +1,25 @@
-import React, { useRef, useEffect } from 'react';
-import type { PageElement, PoolImage, Spread } from '../types';
+import React, { useRef, useEffect, useMemo } from 'react';
+import type { PoolImage } from '../types';
 import { useCanvasRender } from '../hooks/useCanvasRender';
 import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
 import { DroppableCanvas } from './DroppableCanvas';
-import { useSelectedElementId, useIsSnappingEnabled, useSetSelectedElementId } from '../states/uiStore';
-import { useAlbumSettings } from '../states/albumStore';
+import { useAlbumSpreads } from '../states/albumStore';
+import { useCurrentSpreadIndex } from '../states/uiStore';
 import { useDndDropContext } from '../contexts/DndDropContext';
 
 interface CanvasProps {
-    spread: Spread;
-    selectedElementId: string | null;
-    isSnappingEnabled: boolean;
-    onElementSelect: (elementId: string | null) => void;
-    onElementUpdate: (spreadId: string, elementId: string, updates: Partial<PageElement>) => void;
-    onElementDelete: (spreadId: string, elementId: string) => void;
     onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
     onCanvasChange?: (dataUrl: string) => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
-    spread,
-    onElementUpdate,
-    onElementDelete,
     onImageDrop,
     onCanvasChange,
 }) => {
-    const selectedElementId = useSelectedElementId();
-    const isSnappingEnabled = useIsSnappingEnabled();
-    const setSelectedElementId = useSetSelectedElementId();
-    const settings = useAlbumSettings()!;
+    const spreads = useAlbumSpreads();
+    const currentSpreadIndex = useCurrentSpreadIndex();
+    const currentSpread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
+
     const { registerCanvasDropTarget } = useDndDropContext();
 
     const canvasElRef = useRef<HTMLCanvasElement>(null);
@@ -47,9 +38,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     } = useCanvasRender({
         canvasElRef,
         containerRef,
-        spread,
-        settings,
-        selectedElementId,
         onCanvasChange,
     });
 
@@ -60,38 +48,34 @@ export const Canvas: React.FC<CanvasProps> = ({
         fabricCanvas,
         canvasWidth,
         canvasHeight,
-        spread,
-        selectedElementId,
-        isSnappingEnabled,
         zoom,
         snapLinesRef,
-        wrapperRef,
-        onElementSelect: (id) => setSelectedElementId(id),
-        onElementUpdate,
-        onElementDelete,
-        onImageDrop,
         onCanvasChange,
     });
 
     // Register this canvas as a drop target for dnd-kit
     useEffect(() => {
+        if (!currentSpread) return;
+
         registerCanvasDropTarget({
             wrapperRef,
             zoom,
-            spreadId: spread.id,
+            spreadId: currentSpread.id,
             onImageDrop,
         });
 
         return () => {
             registerCanvasDropTarget(null);
         };
-    }, [registerCanvasDropTarget, wrapperRef, zoom, spread.id, onImageDrop]);
+    }, [registerCanvasDropTarget, wrapperRef, zoom, currentSpread?.id, onImageDrop, currentSpread]);
 
     // Styles
     const canvasStyle = {
         transform: `scale(${zoom / 100})`,
         transformOrigin: 'center center',
     };
+
+    if (!currentSpread) return null;
 
     return (
         <section
@@ -113,7 +97,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 >
                     <div ref={wrapperRef}>
                         <canvas ref={canvasElRef} data-testid="canvas-layer" />
-                        {spread.elements.length === 0 && (
+                        {currentSpread.elements.length === 0 && (
                             <div className="canvas-placeholder" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', textAlign: 'center', width: '100%' }}>
                                 <span className="text-muted" style={{ opacity: 0.5 }}>
                                     Drag images here

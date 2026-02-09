@@ -1,7 +1,28 @@
 import React, { useMemo } from 'react';
-import type { TemplateId } from '../types';
-import { useAlbumStore } from '../states/albumStore';
-import { useUIStore } from '../states/uiStore';
+import type { PageElement, TemplateId } from '../types';
+import {
+  useAlbum,
+  useSetName,
+  useSetSettings,
+  useAddToPool,
+  useUndo,
+  useRedo,
+  useCanUndo,
+  useCanRedo,
+  useUpdateSpread
+} from '../states/albumStore';
+import {
+  useCurrentSpreadIndex,
+  useSelectedElementId,
+  useSelectedPageId,
+  useIsImagePoolOpen,
+  useIsSettingsOpen,
+  useIsSnappingEnabled,
+  useSetCurrentSpreadIndex,
+  useSetImagePoolOpen,
+  useSetSettingsOpen,
+  useSetSnappingEnabled
+} from '../states/uiStore';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useElementActions } from '../hooks/useElementActions';
@@ -19,39 +40,34 @@ import { Modal } from './Modal';
 import { LoadingScreen } from './LoadingScreen';
 
 export const AlbumEditor: React.FC = () => {
-  // Global State
-  const {
-    album,
-    setName,
-    setSettings,
-    addToPool,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    updateSpread
-  } = useAlbumStore();
+  // Global State (Album)
+  const album = useAlbum();
+  const setName = useSetName();
+  const setSettings = useSetSettings();
+  const addToPool = useAddToPool();
+  const undo = useUndo();
+  const redo = useRedo();
+  const canUndo = useCanUndo();
+  const canRedo = useCanRedo();
+  const updateSpread = useUpdateSpread();
 
-  const {
-    currentSpreadIndex,
-    selectedElementId,
-    selectedPageId,
-    isImagePoolOpen,
-    isSettingsOpen,
-    isSnappingEnabled,
-    setCurrentSpreadIndex,
-    setSelectedElementId,
-    setSelectedPageId,
-    setImagePoolOpen,
-    setSettingsOpen,
-    setSnappingEnabled,
-  } = useUIStore();
+  // UI State
+  const currentSpreadIndex = useCurrentSpreadIndex();
+  const selectedElementId = useSelectedElementId();
+  const selectedPageId = useSelectedPageId();
+  const isImagePoolOpen = useIsImagePoolOpen();
+  const isSettingsOpen = useIsSettingsOpen();
+  const isSnappingEnabled = useIsSnappingEnabled();
+  const setCurrentSpreadIndex = useSetCurrentSpreadIndex();
+  const setImagePoolOpen = useSetImagePoolOpen();
+  const setSettingsOpen = useSetSettingsOpen();
+  const setSnappingEnabled = useSetSnappingEnabled();
 
   // Auto-save
-  useAutoSave(album);
+  useAutoSave();
 
   // Keyboard shortcuts
-  useKeyboardShortcuts({ undo, redo, canUndo, canRedo });
+  useKeyboardShortcuts();
 
   // Element actions (drop, update, delete)
   const { handleImageDrop, handleElementUpdate, handleElementDelete } = useElementActions();
@@ -75,7 +91,7 @@ export const AlbumEditor: React.FC = () => {
 
   const selectedElement = useMemo(() => {
     if (!selectedElementId || !currentSpread) return null;
-    return currentSpread.elements.find(e => e.id === selectedElementId) || null;
+    return currentSpread.elements.find((e: PageElement) => e.id === selectedElementId) || null;
   }, [currentSpread, selectedElementId]);
 
   // Ensure currentSpreadIndex is valid
@@ -128,19 +144,6 @@ export const AlbumEditor: React.FC = () => {
         <PageNavigator />
 
         <Canvas
-          spread={currentSpread}
-          selectedElementId={selectedElementId}
-          isSnappingEnabled={isSnappingEnabled}
-          onElementSelect={(id) => {
-            setSelectedElementId(id);
-            if (id) {
-              setSelectedPageId(currentSpread.id);
-            } else {
-              setSelectedPageId(null);
-            }
-          }}
-          onElementUpdate={handleElementUpdate}
-          onElementDelete={handleElementDelete}
           onImageDrop={handleImageDrop}
           onCanvasChange={handleCanvasChange}
         />
@@ -153,9 +156,9 @@ export const AlbumEditor: React.FC = () => {
           onTemplateChange={(spreadId, templateId) => {
             updateSpread(spreadId, { templateId: templateId as TemplateId });
           }}
-          onElementUpdate={(updates) => {
+          onElementUpdate={(updates, groupId) => {
             if (selectedElementId && selectedPageId) {
-              handleElementUpdate(selectedPageId, selectedElementId, updates);
+              handleElementUpdate(selectedPageId, selectedElementId, updates, groupId);
             }
           }}
           onElementDelete={() => {

@@ -1,25 +1,17 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
-import type { Spread, PoolImage, PageElement } from '../types';
 import { CustomFabricObject } from './fabricTypes';
 import { useCanvasSelection } from './useCanvasSelection';
 import { useCanvasSnapping } from './useCanvasSnapping';
+import { useCurrentSpreadIndex } from '../states/uiStore';
+import { useAlbumSpreads, useDeleteElement } from '../states/albumStore';
 
 interface UseCanvasInteractionProps {
     fabricCanvas: fabric.Canvas | null;
     canvasWidth: number;
     canvasHeight: number;
-    spread: Spread;
-    selectedElementId: string | null;
-    isSnappingEnabled: boolean;
     zoom: number;
     snapLinesRef: React.RefObject<fabric.Line[]>;
-    wrapperRef: React.RefObject<HTMLDivElement | null>;
-    onElementSelect: (elementId: string | null) => void;
-    onElementUpdate: (spreadId: string, elementId: string, updates: Partial<PageElement>) => void;
-    onElementDelete: (spreadId: string, elementId: string) => void;
-    /** @deprecated Kept for compatibility, but drops are now handled by @dnd-kit via DndWrapper */
-    onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
     onCanvasChange?: (dataUrl: string) => void;
 }
 
@@ -37,15 +29,15 @@ export const useCanvasInteraction = ({
     fabricCanvas,
     canvasWidth,
     canvasHeight,
-    spread,
-    isSnappingEnabled,
     zoom,
     snapLinesRef,
-    onElementSelect,
-    onElementUpdate,
-    onElementDelete,
     onCanvasChange,
 }: UseCanvasInteractionProps) => {
+    const spreads = useAlbumSpreads();
+    const currentSpreadIndex = useCurrentSpreadIndex();
+    const spread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
+
+    const onElementDelete = useDeleteElement();
 
     const onElementDeleteRef = useRef(onElementDelete);
     const spreadRef = useRef(spread);
@@ -100,18 +92,14 @@ export const useCanvasInteraction = ({
 
     const { hasSelection } = useCanvasSelection({
         fabricCanvas,
-        onElementSelect,
     });
 
     useCanvasSnapping({
         fabricCanvas,
         canvasWidth,
         canvasHeight,
-        spread,
-        isSnappingEnabled,
         zoom,
         snapLinesRef,
-        onElementUpdate,
         onCanvasChange,
     });
 

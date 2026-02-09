@@ -1,25 +1,11 @@
 import { useEffect } from 'react';
-import { useAlbumStore } from '../states/albumStore';
+import { useUndo, useRedo, useCanUndo, useCanRedo } from '../states/albumStore';
 
-interface UseKeyboardShortcutsProps {
-    undo: () => void;
-    redo: () => void;
-    canUndo: boolean;
-    canRedo: boolean;
-}
-
-export const useKeyboardShortcuts = ({
-    undo,
-    redo,
-    canUndo,
-    canRedo
-}: UseKeyboardShortcutsProps) => {
-    const store = useAlbumStore();
-
-    const effectiveUndo = undo || store.undo;
-    const effectiveRedo = redo || store.redo;
-    const effectiveCanUndo = canUndo ?? store.canUndo;
-    const effectiveCanRedo = canRedo ?? store.canRedo;
+export const useKeyboardShortcuts = () => {
+    const undo = useUndo();
+    const redo = useRedo();
+    const canUndo = useCanUndo();
+    const canRedo = useCanRedo();
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -28,19 +14,19 @@ export const useKeyboardShortcuts = ({
                 e.preventDefault();
                 if (e.shiftKey) {
                     // Redo: Ctrl+Shift+Z
-                    if (effectiveCanRedo) effectiveRedo();
+                    if (canRedo) redo();
                 } else {
-                    if (effectiveCanUndo) effectiveUndo();
+                    if (canUndo) undo();
                 }
             }
             // Redo: Ctrl+Y or Meta+Y
             else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
                 e.preventDefault();
-                if (effectiveCanRedo) effectiveRedo();
+                if (canRedo) redo();
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [effectiveUndo, effectiveRedo, effectiveCanUndo, effectiveCanRedo]);
+    }, [undo, redo, canUndo, canRedo]);
 };

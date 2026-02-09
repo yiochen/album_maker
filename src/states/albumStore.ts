@@ -312,3 +312,15 @@ export const useUndo = () => useAlbumStore(state => state.undo);
 
 /** Select redo action */
 export const useRedo = () => useAlbumStore(state => state.redo);
+
+/** Select setName action */
+export const useSetName = () => useAlbumStore(state => state.setName);
+
+/** Select setSettings action */
+export const useSetSettings = () => useAlbumStore(state => state.setSettings);
+
+/** Select addToPool action */
+export const useAddToPool = () => useAlbumStore(state => state.addToPool);
+
+/** Select updateSpread action */
+export const useUpdateSpread = () => useAlbumStore(state => state.updateSpread);

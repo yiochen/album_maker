@@ -1,37 +1,11 @@
-/**
- * useCanvasObjects - Syncs PageElement state to FabricJS canvas objects.
- *
- * PIXEL COORDINATE SYSTEM:
- * - PageElement position/size are in MODEL PIXELS (at PPI, e.g., 300 PPI)
- * - FabricJS left/top/scale are in CANVAS PIXELS (at SCREEN_PPI, e.g., 96 PPI)
- * - Uses toCanvasPx() to convert from model → canvas when rendering
- *
- * FabricJS uses center origin (originX/originY: 'center'), so left/top represent the center position.
- *
- * DATA FLOW - Avoiding Circular Updates:
- * 
- * During editing, data flows: FabricJS → React State (via object:modified)
- * - User drags/resizes on canvas → FabricJS updates visually in real-time
- * - object:modified fires ONCE when mouse is released
- * - useCanvasSnapping converts canvas position → model pixels, calls updateElement()
- * - Zustand store updates, triggering React re-render
- * 
- * This useEffect runs when `spread` changes, but it intentionally SKIPS
- * re-positioning existing objects UNLESS:
- * 1. The user switched to a different spread (isSpreadChange check)
- * 2. AND the object is not currently being moved (isMoving flag)
- * 
- * This prevents FabricJS and React from fighting over object positions during editing.
- * FabricJS is the source of truth during interaction; React state is the source of 
- * truth when switching spreads or on initial load.
- */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
-import type { Spread, PageElement, AlbumSettings } from '../types';
 import { APP_CONFIG } from '../config';
 import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
 import { toCanvasPx } from '../utils/imageUtils';
 import { CanvasPageElement } from './CanvasPageElement';
+import { useAlbumSettings, useAlbumSpreads } from '../states/albumStore';
+import { useSelectedElementId, useCurrentSpreadIndex } from '../states/uiStore';
 
 export const getZoomCompensatedSizes = (zoomPercent: number) => {
     const scale = zoomPercent / 100;
@@ -50,23 +24,23 @@ export const getZoomCompensatedSizes = (zoomPercent: number) => {
 
 interface UseCanvasObjectsProps {
     fabricCanvas: fabric.Canvas | null;
-    spread: Spread;
-    settings: AlbumSettings;
-    selectedElementId: string | null;
     zoom: number;
 }
 
 export const useCanvasObjects = ({
     fabricCanvas,
-    spread,
-    settings,
-    selectedElementId,
     zoom,
 }: UseCanvasObjectsProps) => {
+    const spreads = useAlbumSpreads();
+    const currentSpreadIndex = useCurrentSpreadIndex();
+    const spread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
+    const settings = useAlbumSettings();
+    const selectedElementId = useSelectedElementId();
+
     const ppi = APP_CONFIG.PPI;
     const loadingIds = useRef<Set<string>>(new Set());
 
-    // Refs for props
+    // Refs for props/state
     const spreadRef = useRef(spread);
     spreadRef.current = spread;
     const selectedElementIdRef = useRef(selectedElementId);
@@ -75,8 +49,8 @@ export const useCanvasObjects = ({
     // Track the last spread ID
     const lastSyncedSpreadId = useRef<string | null>(null);
 
-    const modelWidth = settings.pageWidth * 2 * ppi;
-    const modelHeight = settings.pageHeight * ppi;
+    const modelWidth = settings ? settings.pageWidth * 2 * ppi : 0;
+    const modelHeight = settings ? settings.pageHeight * ppi : 0;
 
     const isObjectMoving = (obj: fabric.Object) => {
         return (obj as ExtendedFabricObject).isMoving;
@@ -85,7 +59,7 @@ export const useCanvasObjects = ({
     // Sync State to Fabric
     useEffect(() => {
         const canvas = fabricCanvas;
-        if (!canvas) return;
+        if (!canvas || !spread || !settings) return;
 
         const currentSpread = spreadRef.current;
 
@@ -93,7 +67,7 @@ export const useCanvasObjects = ({
 
         const currentObjects = canvas.getObjects() as CustomFabricObject[];
         const validIds = new Set<string>();
-        const elementsToLoad: PageElement[] = [];
+        const elementsToLoad: typeof currentSpread.elements = [];
 
         currentSpread.elements.forEach(element => {
             validIds.add(element.id);
@@ -164,7 +138,7 @@ export const useCanvasObjects = ({
         });
 
         canvas.requestRenderAll();
-    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, ppi]);
+    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, ppi, settings]);
 
     // Update UI sizes when zoom changes
     useEffect(() => {

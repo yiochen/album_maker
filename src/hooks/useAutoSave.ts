@@ -1,13 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { Album } from '../types';
 import { debouncedSave, immediatelyFlushSave } from '../services/storage';
-import { useAlbumStore } from '../states/albumStore';
+import { useAlbum } from '../states/albumStore';
 
-export const useAutoSave = (albumProp?: Album | null) => {
-    // Use store if albumProp not provided
-    const storeAlbum = useAlbumStore((state) => state.album);
-    const album = albumProp ?? storeAlbum;
-
+export const useAutoSave = () => {
+    const album = useAlbum();
     const lastSavedRef = useRef<string>('');
 
     useEffect(() => {

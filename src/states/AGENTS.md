@@ -13,9 +13,8 @@ We use **Zustand** for state management to avoid prop drilling and separate conc
     -   `isSnappingEnabled`: Interaction preferences.
 
 ## Rules of Engagement
--   **Do** use stores directly in components to access state or actions (`useAlbumStore`, `useUIStore`).
--   **Do not** duplicate state between stores if possible. `albumStore` is the source of truth for document data; `uiStore` is for view state.
--   **Do** use selectors to minimize re-renders (e.g., `useAlbumStore(state => state.album)`).
+-   **Do** use individual selector hooks (e.g., `useAlbum()`, `useCurrentSpreadIndex()`) in components to minimize re-renders.
+-   **Do not** destructure the entire store object (e.g., `const { ... } = useAlbumStore()`) in large components, as this causes re-renders on any state change.
 -   **Command Pattern**: Mutations to the album MUST go through the `CommandManager` (wrapped by `albumStore` actions) to ensure Undo/Redo works.
 
 ## Integration

@@ -88,3 +88,12 @@ export const useIsSnappingEnabled = () => useUIStore(state => state.isSnappingEn
 
 /** Select the toggleSnapping action */
 export const useToggleSnapping = () => useUIStore(state => state.toggleSnapping);
+
+/** Select the setImagePoolOpen action */
+export const useSetImagePoolOpen = () => useUIStore(state => state.setImagePoolOpen);
+
+/** Select the setSettingsOpen action */
+export const useSetSettingsOpen = () => useUIStore(state => state.setSettingsOpen);
+
+/** Select the setSnappingEnabled action */
+export const useSetSnappingEnabled = () => useUIStore(state => state.setSnappingEnabled);
