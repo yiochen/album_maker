@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
-import type { Spread, AlbumSettings } from '../types';
+import { Spread, AlbumSettings } from '../types';
+import { calculateGaplessRect, applyCoverTransform } from '../utils/imageUtils';
 
 interface ThumbnailOptions {
     width: number;
@@ -49,86 +50,80 @@ export function useCanvasThumbnail() {
         });
     }, []);
 
-    // Generate thumbnail for a spread
-    const generateSpreadThumbnail = useCallback(async (
-        spread: Spread | Spread[], // Support array for transition, but prefer single Spread
+    // Helper for rendering a spread onto a context
+    const renderSpreadToCtx = useCallback(async (
+        ctx: CanvasRenderingContext2D,
+        spread: Spread,
         settings: AlbumSettings,
-        options: Partial<ThumbnailOptions> = {}
-    ): Promise<string | null> => {
-        const targetSpread = Array.isArray(spread) ? spread[0] : spread;
-        if (!targetSpread) return null;
-
-        const opts = { ...DEFAULT_OPTIONS, ...options };
-
-        // Calculate aspect ratio from settings
-        const spreadRealWidth = settings.pageWidth * 2 * PPI;
-        const spreadRealHeight = settings.pageHeight * PPI;
-        const spreadAspect = spreadRealWidth / spreadRealHeight;
-
-        let width = opts.width;
-        let height = Math.round(width / spreadAspect);
-
-        // Ensure height doesn't exceed max
-        if (height > opts.height) {
-            height = opts.height;
-            width = Math.round(height * spreadAspect);
-        }
-
-        const canvas = getCanvas(width, height);
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return null;
-
-        // Calculate scale factor (Thumbnail Px / Real Px)
-        const scale = width / spreadRealWidth;
-
+        targetWidth: number,
+        scale: number
+    ) => {
         // Clear canvas with white background
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, width, height);
+        ctx.fillRect(0, 0, targetWidth, targetWidth / (settings.pageWidth * 2 / settings.pageHeight));
 
         // Draw seam line
-        const seamX = width / 2;
+        const seamX = targetWidth / 2;
         ctx.strokeStyle = '#cccccc';
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.moveTo(seamX, 0);
-        ctx.lineTo(seamX, height);
+        ctx.lineTo(seamX, targetWidth / (settings.pageWidth * 2 / settings.pageHeight));
         ctx.stroke();
         ctx.setLineDash([]);
 
         // Draw elements
-        for (const element of targetSpread.elements) {
+        const spreadWidth = settings.pageWidth * 2 * PPI;
+        const spreadHeight = settings.pageHeight * PPI;
+
+        for (const element of spread.elements) {
             if (element.type !== 'image') continue;
 
-            const x = element.position.x * scale;
-            const y = element.position.y * scale;
-            const w = element.size.width * scale;
-            const h = element.size.height * scale;
+            const rect = calculateGaplessRect(element.box, spreadWidth, spreadHeight);
+
+            // Apply scale to the high-res pixels
+            const x = rect.left * scale;
+            const y = rect.top * scale;
+            const w = rect.width * scale;
+            const h = rect.height * scale;
 
             try {
-                const img = await loadImage(element.thumbnailUrl || element.imageUrl);
-                ctx.drawImage(img, x, y, w, h);
-            } catch {
-                // Placeholder
+                const img = await loadImage(element.imageUrl);
+
+                // SmartFrame Cover Logic
+                const transform = element.contentTransform || { zoom: 1, panX: 0.5, panY: 0.5 };
+                const cover = applyCoverTransform(w, h, img.width, img.height, transform);
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(x, y, w, h);
+                ctx.clip();
+
+                ctx.drawImage(
+                    img,
+                    x + cover.left,
+                    y + cover.top,
+                    cover.width,
+                    cover.height
+                );
+                ctx.restore();
+            } catch (err) {
+                console.error("Failed to load image for thumbnail", element.imageUrl, err);
                 ctx.fillStyle = '#f0f0f0';
                 ctx.fillRect(x, y, w, h);
                 ctx.strokeStyle = '#cccccc';
                 ctx.strokeRect(x, y, w, h);
             }
         }
+    }, [loadImage]);
 
-        // Return as data URL
-        return canvas.toDataURL('image/jpeg', 0.7);
-    }, [getCanvas, loadImage]);
-
-    // Generate thumbnail as Blob
-    const generateSpreadThumbnailBlob = useCallback(async (
-        spread: Spread | Spread[],
+    // Generate thumbnail for a spread
+    const generateSpreadThumbnail = useCallback(async (
+        spread: Spread,
         settings: AlbumSettings,
         options: Partial<ThumbnailOptions> = {}
-    ): Promise<Blob | null> => {
-        // Handle array shim
-        const targetSpread = Array.isArray(spread) ? spread[0] : spread;
-        if (!targetSpread) return null;
+    ): Promise<string | null> => {
+        if (!spread) return null;
 
         const opts = { ...DEFAULT_OPTIONS, ...options };
 
@@ -150,46 +145,49 @@ export function useCanvasThumbnail() {
         const ctx = canvas.getContext('2d');
         if (!ctx) return null;
 
-        // Calculate scale factor
         const scale = width / spreadRealWidth;
+        await renderSpreadToCtx(ctx, spread, settings, width, scale);
 
-        // Clear canvas with white background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, width, height);
+        // Return as data URL
+        return canvas.toDataURL('image/jpeg', 0.7);
+    }, [getCanvas, renderSpreadToCtx]);
 
-        // Seam
-        const seamX = width / 2;
-        ctx.strokeStyle = '#cccccc';
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(seamX, 0);
-        ctx.lineTo(seamX, height);
-        ctx.stroke();
-        ctx.setLineDash([]);
+    // Generate thumbnail as Blob
+    const generateSpreadThumbnailBlob = useCallback(async (
+        spread: Spread,
+        settings: AlbumSettings,
+        options: Partial<ThumbnailOptions> = {}
+    ): Promise<Blob | null> => {
+        if (!spread) return null;
 
-        // Draw elements
-        for (const element of targetSpread.elements) {
-            if (element.type !== 'image') continue;
+        const opts = { ...DEFAULT_OPTIONS, ...options };
 
-            const x = element.position.x * scale;
-            const y = element.position.y * scale;
-            const w = element.size.width * scale;
-            const h = element.size.height * scale;
+        // Calculate aspect ratio from settings
+        const spreadRealWidth = settings.pageWidth * 2 * PPI;
+        const spreadRealHeight = settings.pageHeight * PPI;
+        const spreadAspect = spreadRealWidth / spreadRealHeight;
 
-            try {
-                const img = await loadImage(element.thumbnailUrl || element.imageUrl);
-                ctx.drawImage(img, x, y, w, h);
-            } catch {
-                ctx.fillStyle = '#f0f0f0';
-                ctx.fillRect(x, y, w, h);
-            }
+        let width = opts.width;
+        let height = Math.round(width / spreadAspect);
+
+        // Ensure height doesn't exceed max
+        if (height > opts.height) {
+            height = opts.height;
+            width = Math.round(height * spreadAspect);
         }
+
+        const canvas = getCanvas(width, height);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+
+        const scale = width / spreadRealWidth;
+        await renderSpreadToCtx(ctx, spread, settings, width, scale);
 
         // Return as Blob
         return new Promise((resolve) => {
             canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7);
         });
-    }, [getCanvas, loadImage]);
+    }, [getCanvas, renderSpreadToCtx]);
 
     // Clear image cache
     const clearCache = useCallback(() => {

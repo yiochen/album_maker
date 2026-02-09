@@ -4,25 +4,25 @@
 Contains custom React hooks that encapsulate state management and complex logic, separating it from UI components.
 
 ## Pixel Coordinate System
+The application uses a **normalized box model** for storage and a two-tier pixel system for rendering:
 
-The application uses two coordinate systems:
+### 1. Normalized Box (Storage)
+-   Stored in `PageElement.box` as unit-less floats (`0.0` to `1.0`).
+-   `x1, y1` is top-left, `x2, y2` is bottom-right.
+-   Allows for spread resizing without complex math.
 
-### Model Pixels (at PPI, e.g., 300 PPI)
-- Used for **storage** and **state** (PageElement position/size)
-- Represents print-resolution coordinates
-- 1 inch = PPI pixels (e.g., 300 pixels for 300 PPI)
+### 2. Model Pixels (Print Resolution, 300 PPI)
+-   Used for high-precision calculations.
+-   Layouts are defined relative to a 300 PPI print resolution.
 
-### Canvas/Screen Pixels (at SCREEN_PPI, e.g., 96 PPI)
-- Used for **rendering** on the FabricJS canvas
-- Represents screen display coordinates
-- 1 inch = SCREEN_PPI pixels (e.g., 96 pixels)
+### 3. Canvas Pixels (Screen Resolution, 96 PPI)
+-   Used for FabricJS rendering.
+-   Converted via `toCanvasPx(modelPx)` and `toModelPx(canvasPx)`.
 
-### Conversion Functions (in `utils/imageUtils.ts`)
-- `toCanvasPx(modelPx)`: Model → Canvas (multiply by SCREEN_PPI/PPI)
-- `toModelPx(canvasPx)`: Canvas → Model (multiply by PPI/SCREEN_PPI)
-
-### FabricJS Origin
-All objects use **center origin** (`originX: 'center'`, `originY: 'center'`), so `left`/`top` represent the center position of an element, not the top-left corner.
+### FabricJS Origin & Grouping
+-   **`CanvasPageElement`**: Uses `originX: 'left', originY: 'top'` for the container group.
+-   **Internal Offsets**: Fabric groups use center-relative coordinates for children by default. To align images correctly, internal children (rects, images) are offset by `-width/2` and `-height/2` within the group. 
+-   **Gapless Rendering**: `useCanvasObjects` calls `calculateGaplessRect()` to convert normalized floats to integer-rounded pixels, ensuring adjacent elements touch perfectly without white seams.
 
 ---
 
@@ -36,6 +36,8 @@ All objects use **center origin** (`originX: 'center'`, `originY: 'center'`), so
 - **`useCanvasRender`**: Manages the Fabric.js canvas instance, initialization, rendering cycle, zoom state, and syncing React state to Fabric objects.
 
 - **`useCanvasInteraction`**: Handles user interactions on the canvas, including selection, movement/snapping, and modification updates.
+-   **Resolution**: While layout is normalized, the application targets **300 PPI** (Pixels Per Inch) as the base print resolution for all scaling calculations.
+-   **No Bleed**: This project does not currently handle print bleed. The canvas edges are treated as the final trim edges, and elements can be positioned freely across them if desired for simple overflow, but no explicit bleed safety logic is enforced.
   > **Note**: Snapping is a runtime-only interaction behavior. Snap constraints are calculated during drag/resize to guide positioning but are **not persisted** in the state or database. Elements retain their absolute position once placed.
   > **Note**: Drag-and-drop from the ImagePool is handled by `@dnd-kit/core` via `DndWrapper` component. See `src/components/DndWrapper.tsx` and `src/contexts/DndDropContext.ts`.
 - **`useCanvasThumbnail`**: Logic for generating spread thumbnails.
@@ -49,8 +51,7 @@ All objects use **center origin** (`originX: 'center'`, `originY: 'center'`), so
   - Zustand update triggers React re-render, but `useCanvasObjects` **intentionally skips** re-positioning objects unless the user switched spreads
   - This prevents FabricJS and React from fighting over positions during editing
 
-- **`useCanvasSnapping`**: Handles snapping/constraints. Works in CANVAS PIXELS internally, converts to MODEL PIXELS for state updates.
-  > **Gotcha - Snap Line Pooling**: Do NOT attempt to pre-create pooled snap lines (show/hide instead of add/remove). FabricJS canvas object references become stale or corrupted after `object:modified` events due to how `useCanvasObjects` syncs React state to canvas objects. The current approach of creating fresh line instances per move event and removing them on release is intentional and works reliably.
+- **`useCanvasSnapping`**: Handles snapping. Works in CANVAS PIXELS internally, converts to MODEL PIXELS for state updates. Note: This project does not enforce bleed constraints; elements can be positioned freely beyond canvas boundaries.
 
 - **`useElementActions`**: Creates/updates elements. All inputs and outputs are in MODEL PIXELS.
 

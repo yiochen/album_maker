@@ -4,8 +4,8 @@
 We use **Zustand** for state management to avoid prop drilling and separate concerns. The state is divided into multiple stores:
 
 1.  **`albumStore.ts`**: Manages the core data model (`Album`) and Undo/Redo logic.
-    -   Wraps the `CommandManager` to execute commands (AddSpread, UpdateElement, etc.).
-    -   Handles persistent state synchronization.
+    -   **Data Model**: Uses a **normalized box model** (`x1, y1, x2, y2` floats) for element positioning.
+    -   **Command Pattern**: Mutations to the album MUST go through the `CommandManager`.
 2.  **`uiStore.ts`**: Manages ephemeral UI state.
     -   `currentSpreadIndex`: Which spread is currently being viewed/edited.
     -   `selectedElementId` / `selectedPageId`: Selection state.

@@ -1,5 +1,7 @@
 import React from 'react';
 import type { Spread, PageElement, AlbumSettings } from '../types';
+import { useAlbumStore } from '../states/albumStore';
+import { applyCoverTransform } from '../utils/imageUtils';
 
 interface PropertiesPanelProps {
     spread: Spread;
@@ -10,8 +12,6 @@ interface PropertiesPanelProps {
     onElementUpdate: (updates: Partial<PageElement>) => void;
     onElementDelete: () => void;
 }
-
-const PPI = 300;
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     spread,
@@ -98,9 +98,44 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     onUpdate,
     onDelete,
 }) => {
+    const [zoom, setZoom] = React.useState(element.contentTransform?.zoom || 1);
+    const [panX, setPanX] = React.useState(element.contentTransform?.panX ?? 0.5);
+    const [panY, setPanY] = React.useState(element.contentTransform?.panY ?? 0.5);
+
+    // Sync local state when element changes (e.g. via undo/redo or different selection)
+    React.useEffect(() => {
+        setZoom(element.contentTransform?.zoom || 1);
+        setPanX(element.contentTransform?.panX ?? 0.5);
+        setPanY(element.contentTransform?.panY ?? 0.5);
+    }, [element.contentTransform]);
+
+    const ppi = 300;
+    const spreadWidth = settings.pageWidth * 2 * ppi;
+    const spreadHeight = settings.pageHeight * ppi;
+
+    // Get original image dimensions from image pool
+    const pool = useAlbumStore(state => state.album?.imagePool || []);
+    const sourceImage = pool.find(img =>
+        img.sourceId === element.sourceId &&
+        img.sourceImageId === element.sourceImageId
+    );
+
+    const box = element.box;
+    const currentWidthPx = (box.x2 - box.x1) * spreadWidth;
+    const currentHeightPx = (box.y2 - box.y1) * spreadHeight;
+
+    // Calculate coverage info
+    const coverage = sourceImage?.width && sourceImage?.height ? applyCoverTransform(
+        currentWidthPx,
+        currentHeightPx,
+        sourceImage.width,
+        sourceImage.height,
+        element.contentTransform
+    ) : null;
+
     // Conversion Helper: Pixels to Units (Inch/CM)
     const pxToUnit = (px: number) => {
-        const inches = px / PPI;
+        const inches = px / ppi;
         if (settings.unit === 'cm') {
             return inches * 2.54;
         }
@@ -112,56 +147,85 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
         if (settings.unit === 'cm') {
             inches = unitVal / 2.54;
         }
-        return inches * PPI;
+        return inches * ppi;
     };
 
-    const widthInUnits = pxToUnit(element.size.width);
-    const heightInUnits = pxToUnit(element.size.height);
-    const xInUnits = pxToUnit(element.position.x);
-    const yInUnits = pxToUnit(element.position.y);
+    const currentXPx = box.x1 * spreadWidth;
+    const currentYPx = box.y1 * spreadHeight;
+
+    const widthInUnits = pxToUnit(currentWidthPx);
+    const heightInUnits = pxToUnit(currentHeightPx);
+    const xInUnits = pxToUnit(currentXPx);
+    const yInUnits = pxToUnit(currentYPx);
 
     const handlePositionChange = (axis: 'x' | 'y', value: string) => {
         const numValue = parseFloat(value) || 0;
         const pxValue = unitToPx(numValue);
-        onUpdate({
-            position: {
-                ...element.position,
-                [axis]: pxValue,
-            },
-        });
+
+        const newBox = { ...element.box };
+        if (axis === 'x') {
+            const width = newBox.x2 - newBox.x1;
+            newBox.x1 = pxValue / spreadWidth;
+            newBox.x2 = newBox.x1 + width;
+        } else {
+            const height = newBox.y2 - newBox.y1;
+            newBox.y1 = pxValue / spreadHeight;
+            newBox.y2 = newBox.y1 + height;
+        }
+
+        onUpdate({ box: newBox });
     };
 
     const handleSizeChange = (dimension: 'width' | 'height', value: string) => {
         const numValue = parseFloat(value) || 0;
-        let newPx = unitToPx(numValue);
-        newPx = Math.max(1, newPx); // Safety 1px min
+        const newPx = Math.max(1, unitToPx(numValue));
 
-        let newWidth = dimension === 'width' ? newPx : element.size.width;
-        let newHeight = dimension === 'height' ? newPx : element.size.height;
+        const newBox = { ...element.box };
+        if (dimension === 'width') {
+            const oldWidth = (newBox.x2 - newBox.x1) * spreadWidth;
+            const oldHeight = (newBox.y2 - newBox.y1) * spreadHeight;
+            newBox.x2 = newBox.x1 + (newPx / spreadWidth);
 
-        // Enforce aspect ratio if locked
-        if (element.lockAspectRatio) {
-            const currentRatio = element.size.width / element.size.height;
-            if (dimension === 'width') {
-                newHeight = newWidth / currentRatio;
-            } else {
-                // Height changed
-                newWidth = newHeight * currentRatio;
+            if (element.lockAspectRatio) {
+                const ratio = oldWidth / oldHeight;
+                const newHeightPx = newPx / ratio;
+                newBox.y2 = newBox.y1 + (newHeightPx / spreadHeight);
+            }
+        } else {
+            const oldWidth = (newBox.x2 - newBox.x1) * spreadWidth;
+            const oldHeight = (newBox.y2 - newBox.y1) * spreadHeight;
+            newBox.y2 = newBox.y1 + (newPx / spreadHeight);
+
+            if (element.lockAspectRatio) {
+                const ratio = oldWidth / oldHeight;
+                const newWidthPx = newPx * ratio;
+                newBox.x2 = newBox.x1 + (newWidthPx / spreadWidth);
             }
         }
 
-        onUpdate({
-            size: {
-                width: newWidth,
-                height: newHeight,
-            },
-        });
+        onUpdate({ box: newBox });
     };
 
     const handleAspectRatioToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newLocked = e.target.checked;
+        onUpdate({ lockAspectRatio: e.target.checked });
+    };
+
+    const handleTransformChange = (key: 'zoom' | 'panX' | 'panY', value: number) => {
+        // Update local state immediately for smoothness
+        if (key === 'zoom') setZoom(value);
+        if (key === 'panX') setPanX(value);
+        if (key === 'panY') setPanY(value);
+
+        const newTransform = {
+            zoom: 1,
+            panX: 0.5,
+            panY: 0.5,
+            ...(element.contentTransform || {}),
+            [key]: value,
+        };
+
         onUpdate({
-            lockAspectRatio: newLocked,
+            contentTransform: newTransform,
         });
     };
 
@@ -228,8 +292,88 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
             </div>
 
             <div className="property-section">
+                <h3 className="property-section-title">SmartFrame</h3>
+                <div className="property-row">
+                    <span className="property-label">Zoom</span>
+                    <input
+                        type="range"
+                        min="1"
+                        max="3"
+                        step="0.01"
+                        value={zoom}
+                        onChange={(e) => handleTransformChange('zoom', parseFloat(e.target.value))}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        style={{ flex: 1 }}
+                    />
+                </div>
+                <div className="property-row" style={{ opacity: coverage?.canPanX ? 1 : 0.5 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: 'var(--space-1)' }}>
+                        <span className="property-label">Pan X</span>
+                        {coverage?.canPanX && (
+                            <span className="text-muted" style={{ fontSize: 'var(--font-xs)' }}>
+                                {pxToUnit(coverage.overflowWidth).toFixed(1)} {settings.unit} overflow
+                            </span>
+                        )}
+                    </div>
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.005"
+                        value={panX}
+                        disabled={!coverage?.canPanX}
+                        onChange={(e) => handleTransformChange('panX', parseFloat(e.target.value))}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        style={{ flex: 1 }}
+                    />
+                </div>
+                <div className="property-row" style={{ opacity: coverage?.canPanY ? 1 : 0.5 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: 'var(--space-1)' }}>
+                        <span className="property-label">Pan Y</span>
+                        {coverage?.canPanY && (
+                            <span className="text-muted" style={{ fontSize: 'var(--font-xs)' }}>
+                                {pxToUnit(coverage.overflowHeight).toFixed(1)} {settings.unit} overflow
+                            </span>
+                        )}
+                    </div>
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.005"
+                        value={panY}
+                        disabled={!coverage?.canPanY}
+                        onChange={(e) => handleTransformChange('panY', parseFloat(e.target.value))}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        style={{ flex: 1 }}
+                    />
+                </div>
+                {!coverage?.canPanX && !coverage?.canPanY && (
+                    <div className="text-muted" style={{ fontSize: 'var(--font-xs)', marginTop: 'var(--space-1)', textAlign: 'center' }}>
+                        Image fits perfectly - no room to pan.
+                    </div>
+                )}
+            </div>
+
+            <div className="property-section">
                 <h3 className="property-section-title">Quick Actions</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                            setPanX(0.5);
+                            setPanY(0.5);
+                            onUpdate({
+                                contentTransform: {
+                                    ...(element.contentTransform || { zoom: 1 }),
+                                    panX: 0.5,
+                                    panY: 0.5,
+                                }
+                            });
+                        }}
+                    >
+                        Center Content
+                    </button>
                     <button
                         className="btn btn-secondary"
                         onClick={onDelete}

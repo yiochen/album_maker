@@ -55,34 +55,39 @@ export interface PageElement {
   /** The unique ID of this image within its source (e.g., Google Photos media item ID) */
   sourceImageId: string;
   /**
-   * Center position in MODEL PIXELS (at print PPI, e.g., 300 PPI).
-   * Use toCanvasPx() to convert to screen pixels for rendering.
+   * Normalized relative coordinates (0.0 to 1.0) representing the edges.
+   * x1: Left, y1: Top, x2: Right, y2: Bottom.
    */
-  position: Position;
+  box: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  };
+
   /**
-   * Dimensions in MODEL PIXELS (at print PPI, e.g., 300 PPI).
-   * Use toCanvasPx() to convert to screen pixels for rendering.
+   * For inner image positioning within the frame (SmartFrame).
+   * Replacing the old 'crop' property.
    */
-  size: Size;
-  crop?: CropArea;
+  contentTransform?: {
+    zoom: number;    // Scale relative to 'cover' size
+    panX: number;    // 0.0 - 1.0 (relative to frame)
+    panY: number;    // 0.0 - 1.0
+  };
+
   lockAspectRatio?: boolean;
 
   originalAspectRatio?: number;
 }
 
+// Position and Size kept for legacy use or general purposes if needed, 
+// though box model is now preferred for PageElements.
 export interface Position {
   x: number;
   y: number;
 }
 
 export interface Size {
-  width: number;
-  height: number;
-}
-
-export interface CropArea {
-  x: number;
-  y: number;
   width: number;
   height: number;
 }

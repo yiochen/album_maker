@@ -32,12 +32,12 @@ The application is structured into modular layers. Please refer to the `AGENTS.m
 ### Spread Model
 The application operates on **Spreads** (typically 2 pages side-by-side) as the fundamental unit of design. While previously using "Pages", the datamodel and UI now focus on Spreads to enable seamless cross-page designing.
 
-### Absolute Coordinate System
-Elements are positioned using **Absolute Pixels** (at 300 PPI) relative to the top-left of the Spread.
--   **Resolution**: 300 PPI (Pixels Per Inch) is the base resolution.
--   **Storage**: Database stores `x`, `y`, `width`, `height` in pixels.
--   **Display**: UI converts these to user-friendly units (Inches, CM) for display and editing.
--   **Zoom**: Canvas scaling is purely visual; underlying data remains absolute.
+### Gapless Layout Engine (Normalized Coordinates)
+Elements are positioned using **Normalized Coordinates** (0.0 to 1.0) stored in a `box` object (`x1, y1, x2, y2`). This allows for seamless resizing of spreads and resolution-independent layouts.
+-   **Storage**: Database stores the normalized `box` model.
+-   **Rendering**: The **Gapless Engine** converts these floats to integer pixels at render time using `calculateGaplessRect()`. This ensures that adjacent elements share the exact same integer pixel boundary, eliminating "white seams" caused by floating-point rounding errors.
+-   **Resolution**: While layout is normalized, the application targets **300 PPI** (Pixels Per Inch) as the base print resolution for all scaling calculations.
+-   **No Bleed**: This project does not currently handle print bleed. The canvas edges are treated as the final trim edges, and elements can be positioned freely across them if desired for simple overflow, but no explicit bleed safety logic is enforced.
 
 ## Directory Structure & Quick Links
 

@@ -14,8 +14,8 @@ import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 import { CustomFabricObject } from './fabricTypes';
 import { APP_CONFIG } from '../config';
 import type { Spread, PageElement } from '../types';
-import { toCanvasPx, toModelPx } from '../utils/imageUtils';
 import { getZoomCompensatedSizes } from './useCanvasObjects';
+import { CanvasPageElement } from './CanvasPageElement';
 
 interface UseCanvasSnappingProps {
     fabricCanvas: fabric.Canvas | null;
@@ -77,11 +77,12 @@ export const useCanvasSnapping = ({
                 snapLines.length = 0;
             }
 
-            // With center origin, convert center position to top-left for snapping calculations
+            // Convert current position to top-left for snapping calculations
+            const isCenterOrigin = obj.originX === 'center';
             const halfWidth = scaledWidth / 2;
             const halfHeight = scaledHeight / 2;
-            const topLeftX = obj.left! - halfWidth;
-            const topLeftY = obj.top! - halfHeight;
+            const topLeftX = isCenterOrigin ? obj.left! - halfWidth : obj.left!;
+            const topLeftY = isCenterOrigin ? obj.top! - halfHeight : obj.top!;
 
             // Only calculate snapping if enabled
             if (isSnappingEnabledRef.current) {
@@ -96,11 +97,11 @@ export const useCanvasSnapping = ({
                 );
 
                 if (snapResult.snappedEdges.length > 0) {
-                    // Convert snapped top-left back to center position
+                    // Convert snapped top-left back to object position
                     const snappedTopLeftX = (snapResult.position.x / 100) * canvasWidth;
                     const snappedTopLeftY = (snapResult.position.y / 100) * canvasHeight;
-                    newLeft = snappedTopLeftX + halfWidth;
-                    newTop = snappedTopLeftY + halfHeight;
+                    newLeft = isCenterOrigin ? snappedTopLeftX + halfWidth : snappedTopLeftX;
+                    newTop = isCenterOrigin ? snappedTopLeftY + halfHeight : snappedTopLeftY;
 
                     const activeLines = getActiveSnapLines(snapResult.snappedEdges);
                     const uiSizes = uiSizesRef.current;
@@ -135,35 +136,24 @@ export const useCanvasSnapping = ({
                 obj.left = newLeft;
                 obj.top = newTop;
             }
-
-            // Bleed constraints - using center origin
-            const bleedMargin = toCanvasPx(APP_CONFIG.BLEED_MARGIN);
-            const minCenterX = -halfWidth + bleedMargin;
-            const maxCenterX = canvasWidth + halfWidth - bleedMargin;
-            const minCenterY = -halfHeight + bleedMargin;
-            const maxCenterY = canvasHeight + halfHeight - bleedMargin;
-
-            if (obj.left! < minCenterX) obj.left = minCenterX;
-            else if (obj.left! > maxCenterX) obj.left = maxCenterX;
-            if (obj.top! < minCenterY) obj.top = minCenterY;
-            else if (obj.top! > maxCenterY) obj.top = maxCenterY;
+            // No constraints - allow elements to move freely including outside canvas (bleed)
         };
 
-        const handleObjectModified = (e: { target?: fabric.Object }) => {
-            const obj = e.target as CustomFabricObject;
-            if (!obj || !obj.data) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const handleObjectModified = (e: { target?: fabric.Object; transform?: any }) => {
+            const obj = e.target as CanvasPageElement;
+            if (!obj || !(obj instanceof CanvasPageElement)) return;
 
             if (snapLinesRef.current) {
                 snapLinesRef.current.forEach(line => canvas.remove(line));
                 snapLinesRef.current.length = 0;
             }
 
-            onElementUpdateRef.current(spreadRef.current.id, obj.data.id, {
-                position: { x: toModelPx(obj.left!), y: toModelPx(obj.top!) },
-                size: {
-                    width: toModelPx(obj.getScaledWidth()),
-                    height: toModelPx(obj.getScaledHeight()),
-                },
+            // Implementation of anchor locking and normalization
+            obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
+
+            onElementUpdateRef.current(spreadRef.current.id, obj.pageElement.id, {
+                box: obj.pageElement.box,
             });
 
             if (onCanvasChangeRef.current) {

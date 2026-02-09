@@ -205,15 +205,15 @@ export const spreadThumbnailDB = {
 
 // Generate a simple hash from spread content for cache invalidation
 // Updated to be clearer about Spread structure assumption
-export function generateSpreadContentHash(spread: { elements: Array<{ id: string; position: { x: number; y: number }; size: { width: number; height: number } }> }): string {
-    const content = spread.elements.map(e =>
-        `${e.id}:${e.position.x.toFixed(1)},${e.position.y.toFixed(1)}:${e.size.width.toFixed(1)},${e.size.height.toFixed(1)}`
+export function generateSpreadContentHash(spread: { elements: Array<{ id: string; box: { x1: number; y1: number; x2: number; y2: number } }> }): string {
+    const elementsHash = spread.elements.map(e =>
+        `${e.id}:${e.box.x1.toFixed(4)},${e.box.y1.toFixed(4)},${e.box.x2.toFixed(4)},${e.box.y2.toFixed(4)}`
     ).join('|');
 
     // Simple hash function
     let hash = 0;
-    for (let i = 0; i < content.length; i++) {
-        const char = content.charCodeAt(i);
+    for (let i = 0; i < elementsHash.length; i++) {
+        const char = elementsHash.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
         hash = hash & hash;
     }

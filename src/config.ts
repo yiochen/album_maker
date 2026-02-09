@@ -5,7 +5,6 @@ export const APP_CONFIG = {
   // Canvas Settings
   PPI: 300,
   SCREEN_PPI: 96,
-  BLEED_MARGIN: 50,
 
   // UI Sizes (Zoom compensated base values)
   BASE_UI_SIZES: {

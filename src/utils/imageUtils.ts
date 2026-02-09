@@ -86,3 +86,88 @@ export function toCanvasPx(value: number): number {
 export function toModelPx(value: number): number {
     return value * (APP_CONFIG.PPI / APP_CONFIG.SCREEN_PPI);
 }
+/**
+ * Calculate integer pixel boundaries for a normalized box to prevent gaps.
+ * This ensures that adjacent elements share the exact same integer pixel boundary.
+ *
+ * @param box - Normalized box model with x1, y1, x2, y2 (0.0 to 1.0)
+ * @param canvasWidth - Current canvas width in screen or print pixels
+ * @param canvasHeight - Current canvas height in screen or print pixels
+ * @returns Integer pixel coordinates and dimensions
+ */
+export function calculateGaplessRect(
+    box: { x1: number; y1: number; x2: number; y2: number },
+    canvasWidth: number,
+    canvasHeight: number
+) {
+    const left = Math.round(box.x1 * canvasWidth);
+    const top = Math.round(box.y1 * canvasHeight);
+    const right = Math.round(box.x2 * canvasWidth);
+    const bottom = Math.round(box.y2 * canvasHeight);
+
+    return {
+        left,
+        top,
+        width: right - left,
+        height: bottom - top,
+    };
+}
+
+/**
+ * Calculates scale and position for an image to "cover" a frame (background-size: cover).
+ * Supports additional zoom and panning within the frame.
+ *
+ * @param frameWidth - Width of the container/frame
+ * @param frameHeight - Height of the container/frame
+ * @param imageWidth - Natural width of the image
+ * @param imageHeight - Natural height of the image
+ * @param transform - Zoom and pan parameters (panX/panY 0.0 to 1.0)
+ */
+export function applyCoverTransform(
+    frameWidth: number,
+    frameHeight: number,
+    imageWidth: number,
+    imageHeight: number,
+    partialTransform: Partial<{ zoom: number; panX: number; panY: number }> = {}
+) {
+    const transform = {
+        zoom: 1,
+        panX: 0.5,
+        panY: 0.5,
+        ...partialTransform
+    };
+    const frameRatio = frameWidth / frameHeight;
+    const imageRatio = imageWidth / imageHeight;
+
+    let scale: number;
+    if (imageRatio > frameRatio) {
+        // Image is wider than frame - fit to height
+        scale = frameHeight / imageHeight;
+    } else {
+        // Image is taller than frame - fit to width
+        scale = frameWidth / imageWidth;
+    }
+
+    // Apply additional zoom relative to the "cover" scale
+    scale *= transform.zoom;
+
+    const scaledWidth = imageWidth * scale;
+    const scaledHeight = imageHeight * scale;
+
+    // Pan (0.0 to 1.0). 0.5 is centered.
+    // We calculate left/top so the image stays within the frame if pan=0.5 and zoom=1.
+    const left = (frameWidth - scaledWidth) * transform.panX;
+    const top = (frameHeight - scaledHeight) * transform.panY;
+
+    return {
+        left,
+        top,
+        scale,
+        width: scaledWidth,
+        height: scaledHeight,
+        canPanX: scaledWidth > frameWidth + 0.1, // Float tolerance
+        canPanY: scaledHeight > frameHeight + 0.1,
+        overflowWidth: Math.max(0, scaledWidth - frameWidth),
+        overflowHeight: Math.max(0, scaledHeight - frameHeight),
+    };
+}

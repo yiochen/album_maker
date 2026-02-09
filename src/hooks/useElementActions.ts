@@ -10,8 +10,10 @@
  */
 import { useCallback } from 'react';
 import type { PageElement, PoolImage } from '../types';
-import { useAddElement, useUpdateElement, useDeleteElement } from '../states/albumStore';
+import { useAddElement, useUpdateElement, useDeleteElement, useAlbumSettings } from '../states/albumStore';
 import { useSetSelectedElementId, useSetSelectedPageId } from '../states/uiStore';
+import { calculateThumbnailSize } from '../utils/imageUtils';
+import { APP_CONFIG } from '../config';
 
 /**
  * Pixel Coordinate System Notes:
@@ -32,17 +34,39 @@ export const useElementActions = () => {
     const setSelectedElementId = useSetSelectedElementId();
     const setSelectedPageId = useSetSelectedPageId();
 
+    const settings = useAlbumSettings();
+    const ppi = APP_CONFIG.PPI;
+
     /**
      * Handles dropping an image from the pool onto a spread.
-     * Stores dimensions in model pixels (at PPI) - rendering converts to screen pixels.
      */
     const handleImageDrop = useCallback(
         (spreadId: string, image: PoolImage, position: { x: number; y: number }) => {
-            // Store original dimensions as model pixels (at PPI)
-            // Position is the center point - FabricJS will use originX/originY: 'center'
-            const imageWidth = image.width || 300;
-            const imageHeight = image.height || 300;
-            const aspectRatio = imageWidth / imageHeight;
+            if (!settings) return;
+
+            const spreadWidth = settings.pageWidth * 2 * ppi;
+            const spreadHeight = settings.pageHeight * ppi;
+
+            // Determine initial size - fit within the spread
+            const targetSize = calculateThumbnailSize(
+                image.width,
+                image.height,
+                spreadWidth,
+                spreadHeight
+            );
+
+            // Convert to normalized coordinates (0.0 to 1.0)
+            const normWidth = targetSize.width / spreadWidth;
+            const normHeight = targetSize.height / spreadHeight;
+            const normCenterX = position.x / spreadWidth;
+            const normCenterY = position.y / spreadHeight;
+
+            const box = {
+                x1: normCenterX - normWidth / 2,
+                y1: normCenterY - normHeight / 2,
+                x2: normCenterX + normWidth / 2,
+                y2: normCenterY + normHeight / 2,
+            };
 
             const newElement: PageElement = {
                 id: crypto.randomUUID(),
@@ -51,15 +75,13 @@ export const useElementActions = () => {
                 thumbnailUrl: image.thumbnailUrl || image.baseUrl,
                 sourceId: image.sourceId,
                 sourceImageId: image.sourceImageId,
-                position: {
-                    x: position.x,  // center position
-                    y: position.y,  // center position
+                box,
+                contentTransform: {
+                    zoom: 1,
+                    panX: 0.5,
+                    panY: 0.5,
                 },
-                size: {
-                    width: imageWidth,
-                    height: imageHeight,
-                },
-                originalAspectRatio: aspectRatio,
+                originalAspectRatio: (image.width || 1) / (image.height || 1),
                 lockAspectRatio: true,
             };
 
@@ -67,7 +89,7 @@ export const useElementActions = () => {
             setSelectedElementId(newElement.id);
             setSelectedPageId(spreadId);
         },
-        [addElement, setSelectedElementId, setSelectedPageId]
+        [addElement, setSelectedElementId, setSelectedPageId, settings, ppi]
     );
 
     /**

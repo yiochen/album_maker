@@ -1,4 +1,5 @@
 import type { Album, Spread, PageElement, ExportOptions, ExportProgress, AlbumSettings } from '../types';
+import { calculateGaplessRect, applyCoverTransform } from '../utils/imageUtils';
 
 const DEFAULT_OPTIONS: ExportOptions = {
     format: 'png',
@@ -54,7 +55,7 @@ export const exportSpread = async (
 
     // Draw each element
     for (const element of spread.elements) {
-        await drawElement(ctx, element);
+        await drawElement(ctx, element, canvasWidth, canvasHeight);
     }
 
     // Add page numbers if requested (Left and Right)
@@ -87,37 +88,50 @@ export const exportSpread = async (
 // Draw a single element on the canvas
 const drawElement = async (
     ctx: CanvasRenderingContext2D,
-    element: PageElement
+    element: PageElement,
+    canvasWidth: number,
+    canvasHeight: number
 ): Promise<void> => {
     if (element.type !== 'image') return;
 
     try {
-        // Use image URL directly (sources provide full URLs)
-        const imageUrl = element.imageUrl;
-        const img = await loadImage(imageUrl);
+        const img = await loadImage(element.imageUrl);
 
-        // Position and Size are already in Absolute Pixels (at 300 PPI)
-        const x = element.position.x;
-        const y = element.position.y;
-        const width = element.size.width;
-        const height = element.size.height;
+        // Calculate discrete pixel boundaries
+        const rect = calculateGaplessRect(element.box, canvasWidth, canvasHeight);
 
-        // Draw with optional cropping
-        if (element.crop) {
-            const srcX = (element.crop.x / 100) * img.width;
-            const srcY = (element.crop.y / 100) * img.height;
-            const srcWidth = (element.crop.width / 100) * img.width;
-            const srcHeight = (element.crop.height / 100) * img.height;
+        // SmartFrame Logic (Cover + Zoom/Pan)
+        const transform = element.contentTransform || { zoom: 1, panX: 0.5, panY: 0.5 };
+        const cover = applyCoverTransform(
+            rect.width,
+            rect.height,
+            img.width,
+            img.height,
+            transform
+        );
 
-            ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, x, y, width, height);
-        } else {
-            ctx.drawImage(img, x, y, width, height);
-        }
+        ctx.save();
+        // 1. Clip to the frame area
+        ctx.beginPath();
+        ctx.rect(rect.left, rect.top, rect.width, rect.height);
+        ctx.clip();
+
+        // 2. Draw the image
+        // cover.left/top are relative to the frame origin
+        ctx.drawImage(
+            img,
+            rect.left + cover.left,
+            rect.top + cover.top,
+            cover.width,
+            cover.height
+        );
+        ctx.restore();
     } catch (error) {
         console.error('Failed to draw element:', error);
         // Draw placeholder for failed images
+        const rect = calculateGaplessRect(element.box, canvasWidth, canvasHeight);
         ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(element.position.x, element.position.y, element.size.width, element.size.height);
+        ctx.fillRect(rect.left, rect.top, rect.width, rect.height);
     }
 };
 

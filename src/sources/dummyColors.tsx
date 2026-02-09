@@ -73,9 +73,25 @@ const generateColorImages = (): SourceImage[] => {
     return images;
 };
 
-// Generate SVG data URL for a solid color
+// Generate SVG data URL with a checkerboard pattern overlay
 const generateColorSvg = (color: string, width: number, height: number): string => {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="${color}"/></svg>`;
+    // Determine checkerboard tile size based on dimensions
+    const tileSize = Math.max(20, Math.floor(Math.min(width, height) / 10));
+    const patternSize = tileSize * 2;
+
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+  <defs>
+    <pattern id="checkerboard" width="${patternSize}" height="${patternSize}" patternUnits="userSpaceOnUse">
+      <rect width="${tileSize}" height="${tileSize}" fill="white" fill-opacity="0.2"/>
+      <rect x="${tileSize}" y="${tileSize}" width="${tileSize}" height="${tileSize}" fill="white" fill-opacity="0.2"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="${color}"/>
+  <rect width="100%" height="100%" fill="url(#checkerboard)"/>
+  <text x="50%" y="50%" font-family="sans-serif" font-size="${tileSize}" fill="white" fill-opacity="0.5" text-anchor="middle" dominant-baseline="middle" style="pointer-events: none;">${width}x${height}</text>
+</svg>`.trim();
+
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
 

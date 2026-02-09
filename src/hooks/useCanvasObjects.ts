@@ -31,6 +31,7 @@ import type { Spread, PageElement, AlbumSettings } from '../types';
 import { APP_CONFIG } from '../config';
 import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
 import { toCanvasPx } from '../utils/imageUtils';
+import { CanvasPageElement } from './CanvasPageElement';
 
 export const getZoomCompensatedSizes = (zoomPercent: number) => {
     const scale = zoomPercent / 100;
@@ -87,50 +88,35 @@ export const useCanvasObjects = ({
         if (!canvas) return;
 
         const currentSpread = spreadRef.current;
-        const isSpreadChange = lastSyncedSpreadId.current !== currentSpread.id;
 
         lastSyncedSpreadId.current = currentSpread.id;
 
         const currentObjects = canvas.getObjects() as CustomFabricObject[];
         const validIds = new Set<string>();
-        const elementsToLoad: { element: PageElement, width: number, height: number }[] = [];
+        const elementsToLoad: PageElement[] = [];
 
         currentSpread.elements.forEach(element => {
             validIds.add(element.id);
-            const existingObj = currentObjects.find(o => o.data?.id === element.id);
+            const existingObj = currentObjects.find(o => o.data?.id === element.id) as CustomFabricObject;
 
             if (existingObj) {
-                if (existingObj instanceof fabric.Image) {
-                    const img = existingObj;
+                if (existingObj instanceof CanvasPageElement) {
+                    const canvasEl = existingObj;
                     const isLocked = element.lockAspectRatio;
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    if ((img as any).uniformScaling !== isLocked) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        (img as any).uniformScaling = isLocked;
-                        img.setCoords();
+                    if (canvasEl.uniformScaling !== !!isLocked) {
+                        canvasEl.uniformScaling = !!isLocked;
+                        canvasEl.setCoords();
                     }
 
-                    if (isSpreadChange && !isObjectMoving(existingObj)) {
-                        const targetWidth = element.size.width;
-                        const targetHeight = element.size.height;
-                        img.set({
-                            left: toCanvasPx(element.position.x),
-                            top: toCanvasPx(element.position.y),
-                            originX: 'center',
-                            originY: 'center',
-                            scaleX: toCanvasPx(targetWidth) / (img.width || 1),
-                            scaleY: toCanvasPx(targetHeight) / (img.height || 1),
-                        });
-                        img.setCoords();
+                    // Update layout/properties if not moving
+                    if (!isObjectMoving(existingObj)) {
+                        canvasEl.pageElement = element;
+                        canvasEl.applyLayout(toCanvasPx(modelWidth), toCanvasPx(modelHeight));
                     }
                 }
             } else {
                 if (!loadingIds.current.has(element.id)) {
-                    elementsToLoad.push({
-                        element,
-                        width: element.size.width,
-                        height: element.size.height
-                    });
+                    elementsToLoad.push(element);
                 }
             }
         });
@@ -143,26 +129,14 @@ export const useCanvasObjects = ({
         });
 
         const zoomValue = zoom;
-        elementsToLoad.forEach(async ({ element, width, height }) => {
+        elementsToLoad.forEach(async (element) => {
             if (loadingIds.current.has(element.id)) return;
             loadingIds.current.add(element.id);
 
             try {
-                const img = await fabric.Image.fromURL(element.imageUrl, { crossOrigin: 'anonymous' });
-
-                const isLocked = element.lockAspectRatio;
                 const uiSizes = getZoomCompensatedSizes(zoomValue);
 
-                img.set({
-                    left: toCanvasPx(element.position.x),
-                    top: toCanvasPx(element.position.y),
-                    originX: 'center',
-                    originY: 'center',
-                    scaleX: toCanvasPx(width) / (img.width || 1),
-                    scaleY: toCanvasPx(height) / (img.height || 1),
-                    data: { id: element.id },
-                    lockRotation: true,
-                    uniformScaling: isLocked,
+                const canvasEl = new CanvasPageElement(element, {
                     cornerStyle: 'circle',
                     cornerColor: 'white',
                     cornerStrokeColor: '#333',
@@ -174,9 +148,12 @@ export const useCanvasObjects = ({
                     noScaleCache: true,
                 });
 
-                canvas.add(img);
+                await canvasEl.loadImage();
+                canvasEl.applyLayout(toCanvasPx(modelWidth), toCanvasPx(modelHeight));
+
+                canvas.add(canvasEl);
                 if (selectedElementIdRef.current === element.id) {
-                    canvas.setActiveObject(img);
+                    canvas.setActiveObject(canvasEl);
                 }
                 canvas.requestRenderAll();
             } catch (err) {
@@ -187,7 +164,7 @@ export const useCanvasObjects = ({
         });
 
         canvas.requestRenderAll();
-    }, [fabricCanvas, spread.id, spread.elements.length, zoom, modelWidth, modelHeight, ppi]);
+    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, ppi]);
 
     // Update UI sizes when zoom changes
     useEffect(() => {
