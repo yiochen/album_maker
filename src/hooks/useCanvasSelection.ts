@@ -4,10 +4,19 @@ import { CustomFabricObject } from './fabricTypes';
 import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
 
+/**
+ * Props for useCanvasSelection.
+ */
 interface UseCanvasSelectionProps {
+    /** The Fabric.js canvas instance. */
     fabricCanvas: fabric.Canvas | null;
 }
 
+/**
+ * Hook to handle object selection events on the canvas.
+ *
+ * It syncs the selection state from Fabric.js to the global UI store (selectedElementId, selectedPageId).
+ */
 export const useCanvasSelection = ({
     fabricCanvas,
 }: UseCanvasSelectionProps) => {

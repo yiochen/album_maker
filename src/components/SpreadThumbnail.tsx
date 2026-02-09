@@ -5,20 +5,38 @@ import { useCanvasThumbnail } from '../hooks/useCanvasThumbnail';
 import { spreadThumbnailDB, generateSpreadContentHash } from '../db';
 import { TrashIcon } from './icons/TrashIcon';
 
+/**
+ * Props for the SpreadThumbnail component.
+ */
 interface SpreadThumbnailProps {
+    /** The spread to display. */
     spread: Spread;
+    /** The index of the spread in the album. */
     spreadIndex: number;
+    /** The ID of the album the spread belongs to. */
     albumId: string;
+    /** The global album settings. */
     settings: AlbumSettings;
+    /** Whether this spread is currently active (being edited). */
     isActive: boolean;
+    /** Whether this spread is selected (for multi-select actions). */
     isSelected: boolean;
+    /** Whether the spread can be deleted (must have at least one spread remaining). */
     canDelete: boolean;
+    /** Whether to show the selection checkbox. */
     showCheckbox: boolean;
+    /** Callback fired when the thumbnail is clicked. */
     onClick: (e: React.MouseEvent) => void;
+    /** Callback fired when the selection checkbox is toggled. */
     onCheckboxChange: (checked: boolean) => void;
+    /** Callback fired when the delete button is clicked. */
     onDelete: () => void;
 }
 
+/**
+ * SpreadThumbnail component renders a preview of a spread for the PageNavigator.
+ * It uses the useCanvasThumbnail hook to generate previews and caches them in IndexedDB.
+ */
 export const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
     spread,
     spreadIndex,

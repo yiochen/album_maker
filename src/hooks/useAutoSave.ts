@@ -2,6 +2,12 @@ import { useEffect, useRef } from 'react';
 import { debouncedSave, immediatelyFlushSave } from '../services/storage';
 import { useAlbum } from '../states/albumStore';
 
+/**
+ * Hook to automatically save the album state to IndexedDB.
+ *
+ * It uses a debounced save function to prevent excessive writes during rapid changes,
+ * but ensures an immediate flush when the component unmounts or the page unloads.
+ */
 export const useAutoSave = () => {
     const album = useAlbum();
     const lastSavedRef = useRef<string>('');

@@ -7,6 +7,13 @@ interface HistoryState<T> {
     future: Command<T>[];
 }
 
+/**
+ * Hook to manage undo/redo history for a state using the Command pattern.
+ *
+ * @template T The type of the state being managed.
+ * @param initialState The initial state.
+ * @returns An object containing the current state, dispatch function, undo/redo controls, and history status.
+ */
 export function useHistory<T>(initialState: T) {
     const [history, setHistory] = useState<HistoryState<T>>({
         past: [],

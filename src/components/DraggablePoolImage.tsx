@@ -9,7 +9,11 @@ import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import type { PoolImage } from '../types';
 
+/**
+ * Props for the DraggablePoolImage component.
+ */
 interface DraggablePoolImageProps {
+    /** The image object to display and drag. */
     image: PoolImage;
 }
 

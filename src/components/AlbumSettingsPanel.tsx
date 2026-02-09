@@ -2,12 +2,22 @@ import React from 'react';
 import type { AlbumSettings, Unit } from '../types';
 import { NumberInput } from './common/NumberInput';
 
+/**
+ * Props for the AlbumSettingsPanel component.
+ */
 interface AlbumSettingsPanelProps {
+    /** The current album settings. */
     settings: AlbumSettings;
+    /** Callback fired when settings are changed. */
     onSettingsChange: (settings: Partial<AlbumSettings>) => void;
+    /** The current number of pages in the album (for validation). */
     currentPageCount: number;
 }
 
+/**
+ * AlbumSettingsPanel component allows users to configure album-wide settings
+ * such as page dimensions, units, and maximum page count.
+ */
 export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
     settings,
     onSettingsChange,

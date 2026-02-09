@@ -21,6 +21,12 @@ interface PendingRequest {
     size?: number;
 }
 
+/**
+ * Hook to manage image fetching via a dedicated Web Worker.
+ *
+ * Provides methods to fetch individual images or batches of images, prioritizing
+ * thumbnails and handling caching via IndexedDB.
+ */
 export const useImageWorker = () => {
     const workerRef = useRef<Worker | null>(null);
     const pendingRef = useRef<Map<string, PendingRequest>>(new Map());

@@ -22,11 +22,23 @@ export const getZoomCompensatedSizes = (zoomPercent: number) => {
     };
 };
 
+/**
+ * Props for useReactToFabricSync.
+ */
 interface UseReactToFabricSyncProps {
+    /** The Fabric.js canvas instance. */
     fabricCanvas: fabric.Canvas | null;
+    /** The current zoom level percentage. */
     zoom: number;
 }
 
+/**
+ * Hook to synchronize the React state (album spread data) to the Fabric.js canvas.
+ *
+ * It monitors the spread elements and updates the canvas objects accordingly.
+ * It also handles creating new Fabric objects for new elements and removing deleted ones.
+ * It ensures UI elements (controls, borders) scale inversely with zoom to maintain constant visual size.
+ */
 export const useReactToFabricSync = ({
     fabricCanvas,
     zoom,
