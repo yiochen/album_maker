@@ -2,6 +2,7 @@ import React from 'react';
 import type { Spread, PageElement, AlbumSettings } from '../types';
 import { useAlbumImagePool } from '../states/albumStore';
 import { applyCoverTransform } from '../utils/imageUtils';
+import { NumberInput } from './common/NumberInput';
 
 interface PropertiesPanelProps {
     spread: Spread;
@@ -246,22 +247,22 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                 </h3>
                 <div className="property-row">
                     <span className="property-label">Width</span>
-                    <input
-                        type="number"
+                    <NumberInput
                         className="property-input"
-                        value={widthInUnits.toFixed(2)}
-                        onChange={(e) => handleSizeChange('width', e.target.value)}
+                        value={widthInUnits}
+                        onChange={(val) => handleSizeChange('width', val)}
                         step={0.1}
+                        immediate={true}
                     />
                 </div>
                 <div className="property-row">
                     <span className="property-label">Height</span>
-                    <input
-                        type="number"
+                    <NumberInput
                         className="property-input"
-                        value={heightInUnits.toFixed(2)}
-                        onChange={(e) => handleSizeChange('height', e.target.value)}
+                        value={heightInUnits}
+                        onChange={(val) => handleSizeChange('height', val)}
                         step={0.1}
+                        immediate={true}
                     />
                 </div>
 
@@ -280,22 +281,22 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                 <h3 className="property-section-title">Position ({settings.unit})</h3>
                 <div className="property-row">
                     <span className="property-label">X</span>
-                    <input
-                        type="number"
+                    <NumberInput
                         className="property-input"
-                        value={xInUnits.toFixed(2)}
-                        onChange={(e) => handlePositionChange('x', e.target.value)}
+                        value={xInUnits}
+                        onChange={(val) => handlePositionChange('x', val)}
                         step={0.1}
+                        immediate={true}
                     />
                 </div>
                 <div className="property-row">
                     <span className="property-label">Y</span>
-                    <input
-                        type="number"
+                    <NumberInput
                         className="property-input"
-                        value={yInUnits.toFixed(2)}
-                        onChange={(e) => handlePositionChange('y', e.target.value)}
+                        value={yInUnits}
+                        onChange={(val) => handlePositionChange('y', val)}
                         step={0.1}
+                        immediate={true}
                     />
                 </div>
             </div>

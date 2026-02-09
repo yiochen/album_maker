@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import type { AlbumSettings, Unit } from '../types';
+import { NumberInput } from './common/NumberInput';
 
 interface AlbumSettingsPanelProps {
     settings: AlbumSettings;
@@ -12,32 +13,8 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
     onSettingsChange,
     currentPageCount,
 }) => {
-    // Local state for input values to allow temporary empty state
-    const [widthValue, setWidthValue] = useState(String(settings.pageWidth));
-    const [heightValue, setHeightValue] = useState(String(settings.pageHeight));
-    const [maxPagesValue, setMaxPagesValue] = useState(String(settings.maxPages));
-
-    // Sync local state when settings change externally
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setWidthValue(String(settings.pageWidth));
-    }, [settings.pageWidth]);
-
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setHeightValue(String(settings.pageHeight));
-    }, [settings.pageHeight]);
-
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setMaxPagesValue(String(settings.maxPages));
-    }, [settings.maxPages]);
-
-    const handleWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const inputValue = e.target.value;
-        setWidthValue(inputValue);
-
-        const value = parseFloat(inputValue);
+    const handleWidthChange = (val: string) => {
+        const value = parseFloat(val);
         if (!isNaN(value) && value >= 1) {
             if (settings.isSquare) {
                 onSettingsChange({ pageWidth: value, pageHeight: value });
@@ -47,29 +24,17 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
         }
     };
 
-    const handleWidthBlur = () => {
-        // Revert to current setting if empty or invalid
-        const value = parseFloat(widthValue);
-        if (isNaN(value) || value < 1) {
-            setWidthValue(String(settings.pageWidth));
-        }
-    };
-
-    const handleHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const inputValue = e.target.value;
-        setHeightValue(inputValue);
-
-        const value = parseFloat(inputValue);
+    const handleHeightChange = (val: string) => {
+        const value = parseFloat(val);
         if (!isNaN(value) && value >= 1) {
             onSettingsChange({ pageHeight: value });
         }
     };
 
-    const handleHeightBlur = () => {
-        // Revert to current setting if empty or invalid
-        const value = parseFloat(heightValue);
-        if (isNaN(value) || value < 1) {
-            setHeightValue(String(settings.pageHeight));
+    const handleMaxPagesChange = (val: string) => {
+        const value = parseInt(val);
+        if (!isNaN(value) && value >= currentPageCount) {
+            onSettingsChange({ maxPages: value });
         }
     };
 
@@ -87,23 +52,6 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
         }
     };
 
-    const handleMaxPagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const inputValue = e.target.value;
-        setMaxPagesValue(inputValue);
-
-        const value = parseInt(inputValue);
-        if (!isNaN(value) && value >= currentPageCount) {
-            onSettingsChange({ maxPages: value });
-        }
-    };
-
-    const handleMaxPagesBlur = () => {
-        // Revert to current setting if empty or invalid
-        const value = parseInt(maxPagesValue);
-        if (isNaN(value) || value < currentPageCount) {
-            setMaxPagesValue(String(settings.maxPages));
-        }
-    };
 
     return (
         <div data-testid="album-settings-panel">
@@ -117,15 +65,13 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
                         <label htmlFor="page-width">
                             {settings.isSquare ? 'Size' : 'Width'}
                         </label>
-                        <input
+                        <NumberInput
                             id="page-width"
-                            type="number"
-                            step="0.25"
-                            min="1"
-                            max="24"
-                            value={widthValue}
+                            step={0.25}
+                            min={1}
+                            max={24}
+                            value={settings.pageWidth}
                             onChange={handleWidthChange}
-                            onBlur={handleWidthBlur}
                             className="settings-input"
                             data-testid="page-width-input"
                         />
@@ -134,15 +80,13 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
                     {!settings.isSquare && (
                         <div className="input-group">
                             <label htmlFor="page-height">Height</label>
-                            <input
+                            <NumberInput
                                 id="page-height"
-                                type="number"
-                                step="0.25"
-                                min="1"
-                                max="24"
-                                value={heightValue}
+                                step={0.25}
+                                min={1}
+                                max={24}
+                                value={settings.pageHeight}
                                 onChange={handleHeightChange}
-                                onBlur={handleHeightBlur}
                                 className="settings-input"
                                 data-testid="page-height-input"
                             />
@@ -182,14 +126,12 @@ export const AlbumSettingsPanel: React.FC<AlbumSettingsPanelProps> = ({
                 <label className="settings-label">
                     <span>Max Pages</span>
                 </label>
-                <input
-                    type="number"
-                    step="2"
+                <NumberInput
+                    step={2}
                     min={currentPageCount}
-                    max="200"
-                    value={maxPagesValue}
+                    max={200}
+                    value={settings.maxPages}
                     onChange={handleMaxPagesChange}
-                    onBlur={handleMaxPagesBlur}
                     className="settings-input"
                     data-testid="max-pages-input"
                 />

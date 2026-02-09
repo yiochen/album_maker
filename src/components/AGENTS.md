@@ -23,6 +23,9 @@ Contains all React UI components for the application, including the main Canvas,
 ### Modals
 - **Modals (`Modal.tsx`)**: Reusable dialog component handling overlays and keyboard (Escape) interactions.
 
+### Shared Components (`src/components/common`)
+- **NumberInput (`NumberInput.tsx`)**: A number input that only commits changes on blur or Enter, preventing formatting "jank" while typing.
+
 ### Drag and Drop (@dnd-kit)
 - **DndWrapper (`DndWrapper.tsx`)**: The main context provider for @dnd-kit, managing drag state and `DragOverlay`.
 - **DroppableCanvas (`DroppableCanvas.tsx`)**: Wrapper for the canvas element that makes it a valid drop target.
