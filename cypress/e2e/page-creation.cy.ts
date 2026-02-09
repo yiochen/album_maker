@@ -19,7 +19,7 @@ describe('Page Creation', () => {
             const initialCount = $spreads.length;
 
             // Click add pages button
-            cy.get('[data-testid="add-pages-button"]').click();
+            cy.get('[data-testid="add-pages-button"]').should('not.be.disabled').click();
 
             // Should have one more spread
             cy.get('[data-testid="spread-thumbnail"]').should('have.length', initialCount + 1);
@@ -27,18 +27,17 @@ describe('Page Creation', () => {
     });
 
     it('should navigate between spreads', () => {
-        // Add another spread first if only one exists
-        cy.get('[data-testid="spread-thumbnail"]').then(($spreads) => {
-            if ($spreads.length < 2) {
-                cy.get('[data-testid="add-pages-button"]').should('not.be.disabled').click();
-            }
-        });
+        // Add another spread first to ensure we have at least 2
+        cy.get('[data-testid="add-pages-button"]').should('not.be.disabled').click();
 
         // Ensure we have at least 2 spreads before trying to interact
-        cy.get('[data-testid="spread-thumbnail"]').should('have.length.at.least', 2);
+        // Chain the visible check and click to ensure we operate on the found element
+        cy.get('[data-testid="spread-thumbnail"]')
+            .should('have.length.at.least', 2)
+            .eq(1)
+            .should('be.visible')
+            .click();
 
-        // Wait for the second spread to be fully rendered and clickable
-        cy.get('[data-testid="spread-thumbnail"]').eq(1).should('be.visible').click();
         cy.get('[data-testid="spread-thumbnail"]').eq(1).should('have.class', 'active');
 
         // Click on the first spread
