@@ -13,7 +13,7 @@ import * as fabric from 'fabric';
 import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 import { CustomFabricObject } from './fabricTypes';
 import { APP_CONFIG } from '../config';
-import { getZoomCompensatedSizes } from './useCanvasObjects';
+import { getZoomCompensatedSizes } from './useReactToFabricSync';
 import { CanvasPageElement } from './CanvasPageElement';
 import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads, useUpdateElement } from '../states/albumStore';

@@ -33,6 +33,8 @@ export class CanvasPageElement extends fabric.Group {
         this.pageElement = element;
         this.innerImage = innerImage;
 
+        this.updateControlVisibility(options.uniformScaling !== undefined ? options.uniformScaling : true);
+
         // Create clip path for the frame
         this.clipRect = new fabric.Rect({
             originX: 'left',
@@ -180,5 +182,22 @@ export class CanvasPageElement extends fabric.Group {
         }
 
         this.pageElement.box = newBox;
+    }
+
+    /**
+     * Shows corner handles and hides middle handles if aspect ratio is locked.
+     */
+    updateControlVisibility(isLocked: boolean) {
+        this.setControlsVisibility({
+            mt: !isLocked,
+            mb: !isLocked,
+            ml: !isLocked,
+            mr: !isLocked,
+            tl: true,
+            tr: true,
+            bl: true,
+            br: true,
+            mtr: false, // Rotation is already locked at group level, but let's be explicit
+        });
     }
 }

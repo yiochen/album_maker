@@ -22,7 +22,7 @@ The application uses a **normalized box model** for storage and a two-tier pixel
 ### FabricJS Origin & Grouping
 -   **`CanvasPageElement`**: Uses `originX: 'left', originY: 'top'` for the container group.
 -   **Internal Offsets**: Fabric groups use center-relative coordinates for children by default. To align images correctly, internal children (rects, images) are offset by `-width/2` and `-height/2` within the group. 
--   **Gapless Rendering**: `useCanvasObjects` calls `calculateGaplessRect()` to convert normalized floats to integer-rounded pixels, ensuring adjacent elements touch perfectly without white seams.
+-   **Gapless Rendering**: `useReactToFabricSync` calls `calculateGaplessRect()` to convert normalized floats to integer-rounded pixels, ensuring adjacent elements touch perfectly without white seams.
 
 ---
 
@@ -42,13 +42,13 @@ The application uses a **normalized box model** for storage and a two-tier pixel
   > **Note**: Drag-and-drop from the ImagePool is handled by `@dnd-kit/core` via `DndWrapper` component. See `src/components/DndWrapper.tsx` and `src/contexts/DndDropContext.ts`.
 - **`useCanvasThumbnail`**: Logic for generating spread thumbnails.
 
-- **`useCanvasObjects`**: Syncs PageElement state to FabricJS objects. Converts MODEL PIXELS → CANVAS PIXELS for rendering.
+- **`useReactToFabricSync`**: Syncs PageElement state to FabricJS objects. Converts MODEL PIXELS → CANVAS PIXELS for rendering.
   
   **Data Flow - Avoiding Circular Updates:**
   - During editing: FabricJS → React State (via `object:modified`)
   - User drags/resizes → FabricJS updates visually in real-time (no React)
   - Mouse release → `object:modified` → `useCanvasSnapping` → `updateElement()` → Zustand store
-  - Zustand update triggers React re-render, but `useCanvasObjects` **intentionally skips** re-positioning objects unless the user switched spreads
+  - Zustand update triggers React re-render, but `useReactToFabricSync` **intentionally skips** re-positioning objects unless the user switched spreads
   - This prevents FabricJS and React from fighting over positions during editing
 
 - **`useCanvasSnapping`**: Handles snapping. Works in CANVAS PIXELS internally, converts to MODEL PIXELS for state updates. Note: This project does not enforce bleed constraints; elements can be positioned freely beyond canvas boundaries.

@@ -22,15 +22,15 @@ export const getZoomCompensatedSizes = (zoomPercent: number) => {
     };
 };
 
-interface UseCanvasObjectsProps {
+interface UseReactToFabricSyncProps {
     fabricCanvas: fabric.Canvas | null;
     zoom: number;
 }
 
-export const useCanvasObjects = ({
+export const useReactToFabricSync = ({
     fabricCanvas,
     zoom,
-}: UseCanvasObjectsProps) => {
+}: UseReactToFabricSyncProps) => {
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const spread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
@@ -82,10 +82,10 @@ export const useCanvasObjects = ({
                             uniformScaling: !!isLocked,
                             lockUniScaling: !!isLocked,
                         });
-                        console.log("setting uniformScaling", {
-                            uniformScaling: !!isLocked,
-                            lockUniScaling: !!isLocked,
-                        });
+                        if (canvas.getActiveObject() === canvasEl) {
+                            canvas.uniformScaling = !!isLocked;
+                        }
+                        canvasEl.updateControlVisibility(!!isLocked);
                         canvasEl.setCoords();
                     }
 
@@ -155,7 +155,7 @@ export const useCanvasObjects = ({
         if (!canvas) return;
 
         const uiSizes = getZoomCompensatedSizes(zoom);
-        canvas.getObjects().forEach(obj => {
+        canvas.getObjects().forEach((obj: fabric.Object) => {
             const customObj = obj as CustomFabricObject;
             if (customObj.data?.id === 'seam') {
                 (obj as fabric.Line).set({

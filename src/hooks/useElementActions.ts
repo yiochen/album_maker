@@ -20,7 +20,7 @@ import { APP_CONFIG } from '../config';
  * - PageElement stores dimensions in MODEL PIXELS (at APP_CONFIG.PPI resolution)
  * - position.x/y are the CENTER of the element (FabricJS uses originX/originY: 'center')
  * - size.width/height are in model pixels
- * - Conversion to canvas/screen pixels happens in useCanvasObjects during rendering
+ * - Conversion to canvas/screen pixels happens in useReactToFabricSync during rendering
  */
 
 /**

@@ -34,6 +34,8 @@ export const useCanvasSelection = ({
                     if (currentSpreadId) {
                         setSelectedPageId(currentSpreadId);
                     }
+                    // Sync canvas uniformScaling with the selected object's setting
+                    canvas.uniformScaling = obj.get('uniformScaling') !== false;
                 }
             } else {
                 setSelectedElementId(null);
@@ -45,6 +47,9 @@ export const useCanvasSelection = ({
             setHasSelection(false);
             setSelectedElementId(null);
             setSelectedPageId(null);
+            if (canvas) {
+                canvas.uniformScaling = true;
+            }
         };
 
         canvas.on('selection:created', handleSelection);

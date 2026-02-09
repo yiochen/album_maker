@@ -3,7 +3,7 @@ import * as fabric from 'fabric';
 import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
 import { useCanvasInitialization } from './useCanvasInitialization';
 import { useCanvasZoom } from './useCanvasZoom';
-import { useCanvasObjects, getZoomCompensatedSizes } from './useCanvasObjects';
+import { useReactToFabricSync, getZoomCompensatedSizes } from './useReactToFabricSync';
 import { useAlbumSettings } from '../states/albumStore';
 import { toCanvasPx } from '../utils/imageUtils';
 import { APP_CONFIG } from '../config';
@@ -49,7 +49,7 @@ export const useCanvasRender = ({
         onCanvasChange,
     });
 
-    useCanvasObjects({
+    useReactToFabricSync({
         fabricCanvas,
         zoom,
     });
