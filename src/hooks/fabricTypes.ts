@@ -7,5 +7,10 @@ export interface CustomFabricObject extends fabric.Object {
 }
 
 export interface ExtendedFabricObject extends fabric.Object {
-    isMoving?: boolean;
+    /**
+     * When true, useCanvasObjects will skip applying the model layout to the Fabric object.
+     * This prevents React-state-to-Fabric synchronization from "fighting" with active 
+     * user interactions like dragging, scaling, or resizing.
+     */
+    preventLayoutSync?: boolean;
 }

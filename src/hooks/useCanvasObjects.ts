@@ -52,8 +52,8 @@ export const useCanvasObjects = ({
     const modelWidth = settings ? settings.pageWidth * 2 * ppi : 0;
     const modelHeight = settings ? settings.pageHeight * ppi : 0;
 
-    const isObjectMoving = (obj: fabric.Object) => {
-        return (obj as ExtendedFabricObject).isMoving;
+    const shouldSkipLayoutSync = (obj: fabric.Object) => {
+        return (obj as ExtendedFabricObject).preventLayoutSync;
     };
 
     // Sync State to Fabric
@@ -77,13 +77,20 @@ export const useCanvasObjects = ({
                 if (existingObj instanceof CanvasPageElement) {
                     const canvasEl = existingObj;
                     const isLocked = element.lockAspectRatio;
-                    if (canvasEl.uniformScaling !== !!isLocked) {
-                        canvasEl.uniformScaling = !!isLocked;
+                    if (canvasEl.get('uniformScaling') !== !!isLocked) {
+                        canvasEl.set({
+                            uniformScaling: !!isLocked,
+                            lockUniScaling: !!isLocked,
+                        });
+                        console.log("setting uniformScaling", {
+                            uniformScaling: !!isLocked,
+                            lockUniScaling: !!isLocked,
+                        });
                         canvasEl.setCoords();
                     }
 
-                    // Update layout/properties if not moving
-                    if (!isObjectMoving(existingObj)) {
+                    // Update layout/properties if not moving/scaling
+                    if (!shouldSkipLayoutSync(existingObj)) {
                         canvasEl.pageElement = element;
                         canvasEl.applyLayout(toCanvasPx(modelWidth), toCanvasPx(modelHeight));
                     }
@@ -120,6 +127,8 @@ export const useCanvasObjects = ({
                     borderScaleFactor: uiSizes.borderScaleFactor,
                     objectCaching: true,
                     noScaleCache: true,
+                    uniformScaling: !!element.lockAspectRatio,
+                    lockUniScaling: !!element.lockAspectRatio,
                 });
 
                 await canvasEl.loadImage();

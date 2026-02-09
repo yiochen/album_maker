@@ -6,7 +6,6 @@ export class CanvasPageElement extends fabric.Group {
     public pageElement: PageElement;
     private innerImage: fabric.Image;
     private clipRect: fabric.Rect;
-    public uniformScaling: boolean = true;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(element: PageElement, options: any = {}) {
@@ -27,12 +26,12 @@ export class CanvasPageElement extends fabric.Group {
             interactive: true,
             data: { id: element.id },
             lockRotation: true,
-            uniformScaling: options.uniformScaling ?? true,
+            uniformScaling: options.uniformScaling !== undefined ? options.uniformScaling : true,
+            lockUniScaling: options.uniformScaling !== undefined ? options.uniformScaling : true,
         });
 
         this.pageElement = element;
         this.innerImage = innerImage;
-        this.uniformScaling = options.uniformScaling ?? true;
 
         // Create clip path for the frame
         this.clipRect = new fabric.Rect({

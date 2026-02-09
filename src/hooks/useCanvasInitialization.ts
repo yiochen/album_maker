@@ -53,16 +53,18 @@ export const useCanvasInitialization = ({
         canvas.add(seam);
         canvas.sendObjectToBack(seam);
 
-        // Helper to track moving state
-        const setMoving = (e: { target?: fabric.Object }) => {
-            if (e.target) (e.target as ExtendedFabricObject).isMoving = true;
+        // Helper to track active interactions that should block React layout synchronization
+        const setPreventSync = (e: { target?: fabric.Object }) => {
+            if (e.target) (e.target as ExtendedFabricObject).preventLayoutSync = true;
         };
-        canvas.on('object:moving', setMoving);
-        canvas.on('object:rotating', setMoving);
+        canvas.on('object:moving', setPreventSync);
+        canvas.on('object:scaling', setPreventSync);
+        canvas.on('object:resizing', setPreventSync);
+        canvas.on('object:rotating', setPreventSync);
 
-        // Cleanup moved state on mouse up
+        // Cleanup interaction state on mouse up
         canvas.on('mouse:up', () => {
-            canvas.getObjects().forEach(o => (o as ExtendedFabricObject).isMoving = false);
+            canvas.getObjects().forEach(o => (o as ExtendedFabricObject).preventLayoutSync = false);
             if (snapLinesRef.current) {
                 snapLinesRef.current.forEach(line => canvas.remove(line));
                 snapLinesRef.current.length = 0;
