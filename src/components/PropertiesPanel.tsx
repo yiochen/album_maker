@@ -228,10 +228,14 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
         // Update local state immediately for smoothness
         if (key === 'zoom') setZoom(value);
 
-        const newTransform = {
+        const defaults = {
             zoom: 1,
             panX: 0.5,
             panY: 0.5,
+        };
+
+        const newTransform = {
+            ...defaults,
             ...(element.contentTransform || {}),
             [key]: value,
         };

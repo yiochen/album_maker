@@ -167,37 +167,41 @@ Cypress.Commands.add('dndKitDragTo', { prevSubject: 'element' }, ($source: JQuer
             clientX: sourceX,
             clientY: sourceY,
             button: 0,
+            buttons: 1,
             force: true,
         });
 
         // Small wait for sensor activation
-        cy.wait(100);
+        cy.wait(200);
 
         // 2. pointermove on body to activate sensor (distance constraint)
         cy.get('body').trigger('pointermove', {
             ...eventProps,
             clientX: sourceX + 10,
             clientY: sourceY + 10,
+            buttons: 1,
             force: true,
         });
 
-        cy.wait(50);
+        cy.wait(200);
 
         // 3. pointermove on body to reach target
         cy.get('body').trigger('pointermove', {
             ...eventProps,
             clientX: targetX,
             clientY: targetY,
+            buttons: 1,
             force: true,
         });
 
-        cy.wait(50);
+        cy.wait(200);
 
         // 4. pointerup on body to complete drop
         cy.get('body').trigger('pointerup', {
             ...eventProps,
             clientX: targetX,
             clientY: targetY,
+            buttons: 0,
             force: true,
         });
     });

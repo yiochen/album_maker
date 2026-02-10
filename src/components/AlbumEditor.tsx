@@ -168,7 +168,11 @@ export const AlbumEditor: React.FC = () => {
             />
           </TabPane>
           <TabPane id="images" label="Images">
-            <ImagePool images={album.imagePool} onImport={addToPool} />
+            <ImagePool
+              images={album.imagePool}
+              onImport={addToPool}
+              onClose={() => setImagePoolOpen(false)}
+            />
           </TabPane>
         </Tabs>
       </DndWrapper>

@@ -10,6 +10,7 @@ import {
 import { DraggablePoolImage } from './DraggablePoolImage';
 import { UploadIcon } from './icons/UploadIcon';
 import { AddImageIcon } from './icons/AddImageIcon';
+import { CloseIcon } from './icons/CloseIcon';
 
 /**
  * Props for the ImagePool component.
@@ -19,6 +20,8 @@ interface ImagePoolProps {
     images: PoolImage[];
     /** Callback fired when new images are imported. */
     onImport: (images: PoolImage[]) => void;
+    /** Callback fired when the pool close button is clicked. */
+    onClose?: () => void;
 }
 
 /**
@@ -28,6 +31,7 @@ interface ImagePoolProps {
 export const ImagePool: React.FC<ImagePoolProps> = ({
     images,
     onImport,
+    onClose,
 }) => {
     const [activeSourceId, setActiveSourceId] = useState<string>('dummy-colors');
     const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +101,23 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
 
     return (
         <div className="image-pool" data-testid="image-pool">
+            <div className="properties-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h2 className="properties-title" data-testid="image-pool-title">
+                    Image Pool {images.length > 0 && `(${images.length} images)`}
+                </h2>
+                {onClose && (
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={onClose}
+                        title="Close"
+                        data-testid="close-pool-button"
+                        style={{ width: 24, height: 24, padding: 4 }}
+                    >
+                        <CloseIcon width="16" height="16" />
+                    </button>
+                )}
+            </div>
+
             <div className="image-pool-actions" data-testid="image-pool-actions">
                 <select
                     className="source-selector"

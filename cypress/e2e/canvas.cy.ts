@@ -24,6 +24,15 @@ describe('Canvas', () => {
             cy.get('[data-testid="pool-image"]').first()
                 .dndKitDragTo('[data-testid="interaction-layer"]');
 
+            // Verify the placeholder is gone (image was added)
+            cy.contains('Drag images here').should('not.exist');
+
+            // Small wait to ensure state stabilizes before clicking
+            cy.wait(500);
+
+            // Switch to properties panel to see the selection
+            cy.contains('button', 'Properties').click({ force: true });
+
             // Verify element added by checking properties panel title
             cy.contains('.properties-title', 'Image Properties', { timeout: 10000 }).should('be.visible');
         });
@@ -34,6 +43,16 @@ describe('Canvas', () => {
             cy.importDummyImages();
             cy.get('[data-testid="pool-image"]').first()
                 .dndKitDragTo('[data-testid="interaction-layer"]');
+
+            // Verify the placeholder is gone (image was added)
+            cy.contains('Drag images here').should('not.exist');
+
+            // Small wait to ensure state stabilizes before clicking
+            cy.wait(500);
+
+            // Switch to properties panel to see the selection
+            cy.contains('button', 'Properties').click({ force: true });
+
             cy.contains('.properties-title', 'Image Properties', { timeout: 10000 }).should('be.visible');
         });
 
@@ -48,6 +67,16 @@ describe('Canvas', () => {
             cy.importDummyImages();
             cy.get('[data-testid="pool-image"]').first()
                 .dndKitDragTo('[data-testid="interaction-layer"]');
+
+            // Verify the placeholder is gone (image was added)
+            cy.contains('Drag images here').should('not.exist');
+
+            // Small wait to ensure state stabilizes before clicking
+            cy.wait(500);
+
+            // Switch to properties panel to see the selection
+            cy.contains('button', 'Properties').click({ force: true });
+
             cy.contains('.properties-title', 'Image Properties', { timeout: 10000 }).should('be.visible');
         });
 
