@@ -9,7 +9,6 @@ import {
 } from '../utils/imageUtils';
 import { DraggablePoolImage } from './DraggablePoolImage';
 import { UploadIcon } from './icons/UploadIcon';
-import { CloseIcon } from './icons/CloseIcon';
 import { AddImageIcon } from './icons/AddImageIcon';
 
 /**
@@ -20,8 +19,6 @@ interface ImagePoolProps {
     images: PoolImage[];
     /** Callback fired when new images are imported. */
     onImport: (images: PoolImage[]) => void;
-    /** Callback fired when the pool close button is clicked. */
-    onClose: () => void;
 }
 
 /**
@@ -31,7 +28,6 @@ interface ImagePoolProps {
 export const ImagePool: React.FC<ImagePoolProps> = ({
     images,
     onImport,
-    onClose,
 }) => {
     const [activeSourceId, setActiveSourceId] = useState<string>('dummy-colors');
     const [isLoading, setIsLoading] = useState(false);
@@ -101,50 +97,37 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
 
     return (
         <div className="image-pool" data-testid="image-pool">
-            <div className="image-pool-header">
-                <span className="image-pool-title" data-testid="image-pool-title">
-                    Image Pool
-                    {images.length > 0 && (
-                        <span className="text-muted" style={{ marginLeft: 'var(--space-2)' }}>
-                            ({images.length} images)
-                        </span>
+            <div className="image-pool-actions" data-testid="image-pool-actions">
+                <select
+                    className="source-selector"
+                    value={activeSourceId}
+                    onChange={(e) => setActiveSourceId(e.target.value)}
+                    data-testid="source-selector"
+                >
+                    {sources.map(source => (
+                        <option key={source.id} value={source.id}>
+                            {source.name}
+                        </option>
+                    ))}
+                </select>
+                <button
+                    className="btn btn-primary btn-sm"
+                    onClick={handleImportFromSource}
+                    disabled={isLoading}
+                    data-testid="import-button"
+                >
+                    {isLoading ? (
+                        <>
+                            <span className="loading-spinner" style={{ width: 14, height: 14 }} />
+                            Importing...
+                        </>
+                    ) : (
+                        <>
+                            <UploadIcon width="14" height="14" />
+                            Import
+                        </>
                     )}
-                </span>
-                <div className="image-pool-actions">
-                    <select
-                        className="source-selector"
-                        value={activeSourceId}
-                        onChange={(e) => setActiveSourceId(e.target.value)}
-                        data-testid="source-selector"
-                    >
-                        {sources.map(source => (
-                            <option key={source.id} value={source.id}>
-                                {source.name}
-                            </option>
-                        ))}
-                    </select>
-                    <button
-                        className="btn btn-primary btn-sm"
-                        onClick={handleImportFromSource}
-                        disabled={isLoading}
-                        data-testid="import-button"
-                    >
-                        {isLoading ? (
-                            <>
-                                <span className="loading-spinner" style={{ width: 14, height: 14 }} />
-                                Importing...
-                            </>
-                        ) : (
-                            <>
-                                <UploadIcon width="14" height="14" />
-                                Import
-                            </>
-                        )}
-                    </button>
-                    <button className="btn btn-ghost btn-icon" onClick={onClose} title="Close" data-testid="close-pool-button">
-                        <CloseIcon width="16" height="16" />
-                    </button>
-                </div>
+                </button>
             </div>
 
             <div className="image-pool-content">
@@ -156,7 +139,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                         </span>
                     </div>
                 ) : (
-                    <div className="image-grid" data-testid="image-grid">
+                    <div className="image-masonry" data-testid="image-grid">
                         {images.map(image => (
                             <DraggablePoolImage key={image.id} image={image} />
                         ))}

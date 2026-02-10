@@ -4,7 +4,7 @@ import { APP_CONFIG } from '../config';
 import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
 import { toCanvasPx } from '../utils/imageUtils';
 import { CanvasPageElement } from './CanvasPageElement';
-import { useAlbumSettings, useAlbumSpreads } from '../states/albumStore';
+import { useAlbumSettings, useAlbumSpreads, useUpdateElement } from '../states/albumStore';
 import { useSelectedElementId, useCurrentSpreadIndex } from '../states/uiStore';
 
 export const getZoomCompensatedSizes = (zoomPercent: number) => {
@@ -48,6 +48,7 @@ export const useReactToFabricSync = ({
     const spread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
     const settings = useAlbumSettings();
     const selectedElementId = useSelectedElementId();
+    const onElementUpdate = useUpdateElement();
 
     const ppi = APP_CONFIG.PPI;
     const loadingIds = useRef<Set<string>>(new Set());
@@ -57,6 +58,8 @@ export const useReactToFabricSync = ({
     spreadRef.current = spread;
     const selectedElementIdRef = useRef(selectedElementId);
     selectedElementIdRef.current = selectedElementId;
+    const onElementUpdateRef = useRef(onElementUpdate);
+    onElementUpdateRef.current = onElementUpdate;
 
     // Track the last spread ID
     const lastSyncedSpreadId = useRef<string | null>(null);
@@ -141,6 +144,12 @@ export const useReactToFabricSync = ({
                     noScaleCache: true,
                     uniformScaling: !!element.lockAspectRatio,
                     lockUniScaling: !!element.lockAspectRatio,
+                    panControlSize: uiSizes.cornerSize * 1.7,
+                    onContentTransformChange: (elementId: string, contentTransform) => {
+                        onElementUpdateRef.current(spreadRef.current.id, elementId, {
+                            contentTransform,
+                        });
+                    },
                 });
 
                 await canvasEl.loadImage();
@@ -188,6 +197,9 @@ export const useReactToFabricSync = ({
                 cornerSize: uiSizes.cornerSize,
                 borderScaleFactor: uiSizes.borderScaleFactor,
             });
+            if (obj instanceof CanvasPageElement) {
+                obj.setPanControlSize(uiSizes.cornerSize * 1.7);
+            }
         });
         canvas.requestRenderAll();
     }, [zoom, fabricCanvas]);

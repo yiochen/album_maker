@@ -28,7 +28,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useElementActions } from '../hooks/useElementActions';
 import { useAlbumLifecycle } from '../hooks/useAlbumLifecycle';
 import { useThumbnailSync } from '../hooks/useThumbnailSync';
-import { Toolbar } from './Toolbar';
+import { Headerbar } from './Headerbar';
 import { AlbumSettingsPanel } from './AlbumSettingsPanel';
 import { PageNavigator } from './PageNavigator';
 import { Canvas } from './Canvas';
@@ -38,7 +38,8 @@ import { AlbumSelector } from './AlbumSelector';
 import { DndWrapper } from './DndWrapper';
 import { Modal } from './Modal';
 import { LoadingScreen } from './LoadingScreen';
-import { ImageIcon } from './icons/ImageIcon';
+import { Toolbar } from './Toolbar';
+import { Tabs, TabPane } from './Tabs';
 
 export const AlbumEditor: React.FC = () => {
   // Global State (Album)
@@ -106,38 +107,34 @@ export const AlbumEditor: React.FC = () => {
 
   return (
     <div className="app-container" data-testid="album-editor">
-      <Toolbar
-        albumName={album.name}
-        onAlbumNameChange={setName}
-        isSnappingEnabled={isSnappingEnabled}
-        onSnappingToggle={() => setSnappingEnabled(!isSnappingEnabled)}
+      <Headerbar
+        albumSelector={
+          <AlbumSelector
+            currentAlbumId={album.id}
+            albumName={album.name}
+            onAlbumNameChange={setName}
+            onSelectAlbum={handleSelectAlbum}
+            onCreateAlbum={handleCreateAlbum}
+            onDeleteAlbum={handleDeleteAlbum}
+          />
+        }
         onImport={handleImportAlbum}
         onExport={handleExportAlbum}
         onSettingsClick={() => setSettingsOpen(!isSettingsOpen)}
+      />
+
+      <Toolbar
+        isSnappingEnabled={isSnappingEnabled}
+        onSnappingToggle={() => setSnappingEnabled(!isSnappingEnabled)}
         onUndo={undo}
         onRedo={redo}
         canUndo={canUndo}
         canRedo={canRedo}
+        isImagePoolOpen={isImagePoolOpen}
+        onImagePoolToggle={() => setImagePoolOpen(!isImagePoolOpen)}
       />
 
-      <div className="album-bar">
-        <AlbumSelector
-          currentAlbumId={album.id}
-          onSelectAlbum={handleSelectAlbum}
-          onCreateAlbum={handleCreateAlbum}
-          onDeleteAlbum={handleDeleteAlbum}
-        />
-        <button
-          className={`btn btn-ghost btn-icon ${isImagePoolOpen ? 'active' : ''}`}
-          onClick={() => setImagePoolOpen(!isImagePoolOpen)}
-          title="Toggle Image Pool"
-          data-testid="toggle-image-pool-button"
-        >
-          <ImageIcon width="20" height="20" />
-        </button>
-      </div>
-
-      <DndWrapper className={`main-content ${isImagePoolOpen ? 'image-pool-open' : ''}`}>
+      <DndWrapper className="main-content">
         <PageNavigator />
 
         <Canvas
@@ -145,33 +142,35 @@ export const AlbumEditor: React.FC = () => {
           onCanvasChange={handleCanvasChange}
         />
 
-        <PropertiesPanel
-          spread={currentSpread}
-          settings={album.settings}
-          selectedElement={selectedElement}
-          selectedPageId={selectedPageId}
-          onTemplateChange={(spreadId, templateId) => {
-            updateSpread(spreadId, { templateId: templateId as TemplateId });
-          }}
-          onElementUpdate={(updates, groupId) => {
-            if (selectedElementId && selectedPageId) {
-              handleElementUpdate(selectedPageId, selectedElementId, updates, groupId);
-            }
-          }}
-          onElementDelete={() => {
-            if (selectedElementId && selectedPageId) {
-              handleElementDelete(selectedPageId, selectedElementId);
-            }
-          }}
-        />
-
-        {isImagePoolOpen && (
-          <ImagePool
-            images={album.imagePool}
-            onImport={addToPool}
-            onClose={() => setImagePoolOpen(false)}
-          />
-        )}
+        <Tabs
+          activeId={isImagePoolOpen ? 'images' : 'properties'}
+          onChange={(id) => setImagePoolOpen(id === 'images')}
+        >
+          <TabPane id="properties" label="Properties">
+            <PropertiesPanel
+              spread={currentSpread}
+              settings={album.settings}
+              selectedElement={selectedElement}
+              selectedPageId={selectedPageId}
+              onTemplateChange={(spreadId, templateId) => {
+                updateSpread(spreadId, { templateId: templateId as TemplateId });
+              }}
+              onElementUpdate={(updates, groupId) => {
+                if (selectedElementId && selectedPageId) {
+                  handleElementUpdate(selectedPageId, selectedElementId, updates, groupId);
+                }
+              }}
+              onElementDelete={() => {
+                if (selectedElementId && selectedPageId) {
+                  handleElementDelete(selectedPageId, selectedElementId);
+                }
+              }}
+            />
+          </TabPane>
+          <TabPane id="images" label="Images">
+            <ImagePool images={album.imagePool} onImport={addToPool} />
+          </TabPane>
+        </Tabs>
       </DndWrapper>
 
       {isSettingsOpen && (

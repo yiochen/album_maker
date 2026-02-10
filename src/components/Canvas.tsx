@@ -118,9 +118,23 @@ export const Canvas: React.FC<CanvasProps> = ({
             </div>
 
             <div className="canvas-controls">
-                <button className="btn btn-ghost btn-icon" onClick={() => setZoom(z => Math.max(25, z - 25))} disabled={zoom <= 25}>-</button>
+                <button
+                    className="btn btn-ghost btn-icon"
+                    onClick={() => setZoom(z => Math.max(25, z - 25))}
+                    disabled={zoom <= 25}
+                    title="Zoom out"
+                >
+                    -
+                </button>
                 <span className="zoom-display">{zoom}%</span>
-                <button className="btn btn-ghost btn-icon" onClick={() => setZoom(z => Math.min(200, z + 25))} disabled={zoom >= 200}>+</button>
+                <button
+                    className="btn btn-ghost btn-icon"
+                    onClick={() => setZoom(z => Math.min(200, z + 25))}
+                    disabled={zoom >= 200}
+                    title="Zoom in"
+                >
+                    +
+                </button>
                 <button className="btn btn-ghost" onClick={fitToViewport}>Fit</button>
             </div>
         </section>

@@ -6,6 +6,8 @@ export class CanvasPageElement extends fabric.Group {
     public pageElement: PageElement;
     private innerImage: fabric.Image;
     private clipRect: fabric.Rect;
+    private onContentTransformChange?: (elementId: string, contentTransform: PageElement['contentTransform']) => void;
+    private panControlSize: number;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(element: PageElement, options: any = {}) {
@@ -32,8 +34,11 @@ export class CanvasPageElement extends fabric.Group {
 
         this.pageElement = element;
         this.innerImage = innerImage;
+        this.onContentTransformChange = options.onContentTransformChange;
+        this.panControlSize = options.panControlSize ?? 22;
 
         this.updateControlVisibility(options.uniformScaling !== undefined ? options.uniformScaling : true);
+        this.addPanControl();
 
         // Create clip path for the frame
         this.clipRect = new fabric.Rect({
@@ -125,6 +130,139 @@ export class CanvasPageElement extends fabric.Group {
             scaleX: result.scale,
             scaleY: result.scale,
         });
+    }
+
+    updatePanFromDelta(deltaX: number, deltaY: number) {
+        if (!this.innerImage.getElement()) return false;
+
+        const imgWidth = this.innerImage.width || 1;
+        const imgHeight = this.innerImage.height || 1;
+        const transform = {
+            zoom: 1,
+            panX: 0.5,
+            panY: 0.5,
+            ...(this.pageElement.contentTransform || {})
+        };
+
+        const coverage = applyCoverTransform(
+            this.width,
+            this.height,
+            imgWidth,
+            imgHeight,
+            transform
+        );
+
+        let nextPanX = transform.panX;
+        let nextPanY = transform.panY;
+
+        if (coverage.overflowWidth > 0) {
+            nextPanX = Math.min(1, Math.max(0, transform.panX - deltaX / coverage.overflowWidth));
+        }
+
+        if (coverage.overflowHeight > 0) {
+            nextPanY = Math.min(1, Math.max(0, transform.panY - deltaY / coverage.overflowHeight));
+        }
+
+        if (nextPanX === transform.panX && nextPanY === transform.panY) {
+            return false;
+        }
+
+        this.pageElement.contentTransform = {
+            ...transform,
+            panX: nextPanX,
+            panY: nextPanY,
+        };
+
+        this.applyCover();
+        this.setCoords();
+        this.onContentTransformChange?.(this.pageElement.id, this.pageElement.contentTransform);
+        return true;
+    }
+
+    setPanControlSize(size: number) {
+        this.panControlSize = size;
+        const control = this.controls?.pan;
+        if (control) {
+            control.sizeX = size;
+            control.sizeY = size;
+            control.touchSizeX = size * 1.4;
+            control.touchSizeY = size * 1.4;
+        }
+    }
+
+    private addPanControl() {
+        const size = this.panControlSize;
+        this.controls = {
+            ...this.controls,
+            pan: new fabric.Control({
+                x: 0,
+                y: 0,
+                cursorStyle: 'grab',
+                actionName: 'pan',
+                sizeX: size,
+                sizeY: size,
+                touchSizeX: size * 1.4,
+                touchSizeY: size * 1.4,
+                render: (ctx, left, top) => {
+                    ctx.save();
+                    ctx.translate(left, top);
+                    const radius = size / 2 - 2;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+                    ctx.fill();
+
+                    const line = radius * 0.55;
+                    const head = radius * 0.28;
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = Math.max(1.5, size * 0.08);
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    // Up
+                    ctx.moveTo(0, -line);
+                    ctx.lineTo(0, -radius * 0.15);
+                    ctx.moveTo(0, -line);
+                    ctx.lineTo(-head, -line + head);
+                    ctx.moveTo(0, -line);
+                    ctx.lineTo(head, -line + head);
+                    // Down
+                    ctx.moveTo(0, line);
+                    ctx.lineTo(0, radius * 0.15);
+                    ctx.moveTo(0, line);
+                    ctx.lineTo(-head, line - head);
+                    ctx.moveTo(0, line);
+                    ctx.lineTo(head, line - head);
+                    // Left
+                    ctx.moveTo(-line, 0);
+                    ctx.lineTo(-radius * 0.15, 0);
+                    ctx.moveTo(-line, 0);
+                    ctx.lineTo(-line + head, -head);
+                    ctx.moveTo(-line, 0);
+                    ctx.lineTo(-line + head, head);
+                    // Right
+                    ctx.moveTo(line, 0);
+                    ctx.lineTo(radius * 0.15, 0);
+                    ctx.moveTo(line, 0);
+                    ctx.lineTo(line - head, -head);
+                    ctx.moveTo(line, 0);
+                    ctx.lineTo(line - head, head);
+                    ctx.stroke();
+                    ctx.restore();
+                },
+                actionHandler: (_eventData, transform, x, y) => {
+                    const target = transform.target;
+                    if (!(target instanceof CanvasPageElement)) {
+                        return false;
+                    }
+                    const deltaX = x - transform.lastX;
+                    const deltaY = y - transform.lastY;
+                    transform.lastX = x;
+                    transform.lastY = y;
+                    return target.updatePanFromDelta(deltaX, deltaY);
+                },
+            }),
+        };
     }
 
     /**

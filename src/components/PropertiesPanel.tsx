@@ -1,8 +1,17 @@
 import React from 'react';
 import type { Spread, PageElement, AlbumSettings } from '../types';
-import { useAlbumImagePool } from '../states/albumStore';
-import { applyCoverTransform } from '../utils/imageUtils';
 import { NumberInput } from './common/NumberInput';
+import { LockIcon } from './icons/LockIcon';
+import { UnlockIcon } from './icons/UnlockIcon';
+import { ZoomInIcon } from './icons/ZoomInIcon';
+import { ZoomOutIcon } from './icons/ZoomOutIcon';
+import { CenterContentIcon } from './icons/CenterContentIcon';
+import { FlipHorizontalIcon } from './icons/FlipHorizontalIcon';
+import { FlipVerticalIcon } from './icons/FlipVerticalIcon';
+import { RotateCwIcon } from './icons/RotateCwIcon';
+import { RotateCcwIcon } from './icons/RotateCcwIcon';
+import { MoveForwardIcon } from './icons/MoveForwardIcon';
+import { MoveBackwardIcon } from './icons/MoveBackwardIcon';
 
 /**
  * Props for the PropertiesPanel component.
@@ -124,39 +133,19 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
         groupIdRef.current = null;
     };
     const [zoom, setZoom] = React.useState(element.contentTransform?.zoom || 1);
-    const [panX, setPanX] = React.useState(element.contentTransform?.panX ?? 0.5);
-    const [panY, setPanY] = React.useState(element.contentTransform?.panY ?? 0.5);
 
     // Sync local state when element changes (e.g. via undo/redo or different selection)
     React.useEffect(() => {
         setZoom(element.contentTransform?.zoom || 1);
-        setPanX(element.contentTransform?.panX ?? 0.5);
-        setPanY(element.contentTransform?.panY ?? 0.5);
     }, [element.contentTransform]);
 
     const ppi = 300;
     const spreadWidth = settings.pageWidth * 2 * ppi;
     const spreadHeight = settings.pageHeight * ppi;
 
-    // Get original image dimensions from image pool
-    const pool = useAlbumImagePool();
-    const sourceImage = pool.find(img =>
-        img.sourceId === element.sourceId &&
-        img.sourceImageId === element.sourceImageId
-    );
-
     const box = element.box;
     const currentWidthPx = (box.x2 - box.x1) * spreadWidth;
     const currentHeightPx = (box.y2 - box.y1) * spreadHeight;
-
-    // Calculate coverage info
-    const coverage = sourceImage?.width && sourceImage?.height ? applyCoverTransform(
-        currentWidthPx,
-        currentHeightPx,
-        sourceImage.width,
-        sourceImage.height,
-        element.contentTransform
-    ) : null;
 
     // Conversion Helper: Pixels to Units (Inch/CM)
     const pxToUnit = (px: number) => {
@@ -231,15 +220,13 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
         onUpdate({ box: newBox });
     };
 
-    const handleAspectRatioToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onUpdate({ lockAspectRatio: e.target.checked });
+    const handleAspectRatioToggle = () => {
+        onUpdate({ lockAspectRatio: !element.lockAspectRatio });
     };
 
-    const handleTransformChange = (key: 'zoom' | 'panX' | 'panY', value: number) => {
+    const handleTransformChange = (key: 'zoom', value: number) => {
         // Update local state immediately for smoothness
         if (key === 'zoom') setZoom(value);
-        if (key === 'panX') setPanX(value);
-        if (key === 'panY') setPanY(value);
 
         const newTransform = {
             zoom: 1,
@@ -260,36 +247,36 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                 <h3 className="property-section-title">
                     Size ({settings.unit})
                 </h3>
-                <div className="property-row">
+                <div className="property-size-grid">
                     <span className="property-label">Width</span>
+                    <div className="aspect-lock-cell">
+                        <button
+                            type="button"
+                            className="aspect-lock-button"
+                            onClick={handleAspectRatioToggle}
+                            aria-label={element.lockAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                            aria-pressed={element.lockAspectRatio || false}
+                            title={element.lockAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                        >
+                            {element.lockAspectRatio ? <LockIcon /> : <UnlockIcon />}
+                        </button>
+                    </div>
                     <NumberInput
-                        className="property-input"
+                        className="property-input property-size-input"
                         value={widthInUnits}
                         onChange={(val) => handleSizeChange('width', val)}
                         step={0.1}
                         immediate={true}
                     />
-                </div>
-                <div className="property-row">
                     <span className="property-label">Height</span>
                     <NumberInput
-                        className="property-input"
+                        className="property-input property-size-input"
                         value={heightInUnits}
                         onChange={(val) => handleSizeChange('height', val)}
                         step={0.1}
                         immediate={true}
                     />
                 </div>
-
-                {/* Aspect Ratio Lock Toggle */}
-                <label className="property-checkbox" style={{ marginTop: 'var(--space-2)' }}>
-                    <input
-                        type="checkbox"
-                        checked={element.lockAspectRatio || false}
-                        onChange={handleAspectRatioToggle}
-                    />
-                    <span>Lock aspect ratio</span>
-                </label>
             </div>
 
             <div className="property-section">
@@ -336,92 +323,59 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         style={{ flex: 1 }}
                     />
                 </div>
-                <div className="property-row" style={{ opacity: coverage?.canPanX ? 1 : 0.5 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: 'var(--space-1)' }}>
-                        <span className="property-label">Pan X</span>
-                        {coverage?.canPanX && (
-                            <span className="text-muted" style={{ fontSize: 'var(--font-xs)' }}>
-                                {pxToUnit(coverage.overflowWidth).toFixed(1)} {settings.unit} overflow
-                            </span>
-                        )}
-                    </div>
-                    <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.005"
-                        value={panX}
-                        disabled={!coverage?.canPanX}
-                        onChange={(e) => handleTransformChange('panX', parseFloat(e.target.value))}
-                        onPointerDown={(e) => {
-                            e.stopPropagation();
-                            handleInteractionStart();
-                        }}
-                        onPointerUp={handleInteractionEnd}
-                        onPointerCancel={handleInteractionEnd}
-                        style={{ flex: 1 }}
-                    />
-                </div>
-                <div className="property-row" style={{ opacity: coverage?.canPanY ? 1 : 0.5 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: 'var(--space-1)' }}>
-                        <span className="property-label">Pan Y</span>
-                        {coverage?.canPanY && (
-                            <span className="text-muted" style={{ fontSize: 'var(--font-xs)' }}>
-                                {pxToUnit(coverage.overflowHeight).toFixed(1)} {settings.unit} overflow
-                            </span>
-                        )}
-                    </div>
-                    <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.005"
-                        value={panY}
-                        disabled={!coverage?.canPanY}
-                        onChange={(e) => handleTransformChange('panY', parseFloat(e.target.value))}
-                        onPointerDown={(e) => {
-                            e.stopPropagation();
-                            handleInteractionStart();
-                        }}
-                        onPointerUp={handleInteractionEnd}
-                        onPointerCancel={handleInteractionEnd}
-                        style={{ flex: 1 }}
-                    />
-                </div>
-                {!coverage?.canPanX && !coverage?.canPanY && (
-                    <div className="text-muted" style={{ fontSize: 'var(--font-xs)', marginTop: 'var(--space-1)', textAlign: 'center' }}>
-                        Image fits perfectly - no room to pan.
-                    </div>
-                )}
             </div>
 
             <div className="property-section">
-                <h3 className="property-section-title">Quick Actions</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                    <button
-                        className="btn btn-secondary"
-                        onClick={() => {
-                            setPanX(0.5);
-                            setPanY(0.5);
-                            onUpdate({
-                                contentTransform: {
-                                    ...(element.contentTransform || { zoom: 1 }),
-                                    panX: 0.5,
-                                    panY: 0.5,
-                                }
-                            });
-                        }}
-                    >
-                        Center Content
+                <h3 className="property-section-title">Actions</h3>
+                <div className="image-action-grid">
+                    <button className="image-action-button" type="button" title="Zoom in">
+                        <ZoomInIcon />
+                        <span>Zoom in</span>
                     </button>
-                    <button
-                        className="btn btn-secondary"
-                        onClick={onDelete}
-                        style={{ color: 'var(--color-error)' }}
-                    >
-                        Delete Image
+                    <button className="image-action-button" type="button" title="Zoom out">
+                        <ZoomOutIcon />
+                        <span>Zoom out</span>
+                    </button>
+                    <button className="image-action-button" type="button" title="Center content">
+                        <CenterContentIcon />
+                        <span>Center</span>
+                    </button>
+                    <button className="image-action-button" type="button" title="Flip horizontal">
+                        <FlipHorizontalIcon />
+                        <span>Flip H</span>
+                    </button>
+                    <button className="image-action-button" type="button" title="Rotate 90°">
+                        <RotateCwIcon />
+                        <span>Rotate</span>
+                    </button>
+                    <button className="image-action-button" type="button" title="Rotate -90°">
+                        <RotateCcwIcon />
+                        <span>Rotate -</span>
+                    </button>
+                    <button className="image-action-button" type="button" title="Flip vertical">
+                        <FlipVerticalIcon />
+                        <span>Flip V</span>
+                    </button>
+                    <button className="image-action-button" type="button" title="Bring forward">
+                        <MoveForwardIcon />
+                        <span>Forward</span>
+                    </button>
+                    <button className="image-action-button" type="button" title="Send backward">
+                        <MoveBackwardIcon />
+                        <span>Backward</span>
                     </button>
                 </div>
+            </div>
+
+            <div className="property-section">
+                <h3 className="property-section-title">Delete</h3>
+                <button
+                    className="btn btn-secondary"
+                    onClick={onDelete}
+                    style={{ color: 'var(--color-error)' }}
+                >
+                    Delete Image
+                </button>
             </div>
         </>
     );

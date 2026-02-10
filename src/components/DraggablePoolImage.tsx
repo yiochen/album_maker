@@ -31,7 +31,6 @@ export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({ image })
             className="pool-image"
             data-testid="pool-image"
             style={{
-                aspectRatio: image.width && image.height ? `${image.width} / ${image.height}` : '1 / 1',
                 opacity: isDragging ? 0.5 : 1,
                 cursor: 'grab',
             }}

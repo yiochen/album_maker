@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AlbumMetadata } from '../types';
 import { albumStorage } from '../services/storage';
-import { MenuIcon } from './icons/MenuIcon';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { PlusIcon } from './icons/PlusIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -12,6 +11,10 @@ import { TrashIcon } from './icons/TrashIcon';
 interface AlbumSelectorProps {
     /** The ID of the currently selected album. */
     currentAlbumId: string | null;
+    /** The name of the current album. */
+    albumName: string;
+    /** Callback fired when the album name is changed. */
+    onAlbumNameChange: (name: string) => void;
     /** Callback fired when an album is selected. */
     onSelectAlbum: (id: string) => void;
     /** Callback fired when a new album is created. */
@@ -26,6 +29,8 @@ interface AlbumSelectorProps {
  */
 export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
     currentAlbumId,
+    albumName,
+    onAlbumNameChange,
     onSelectAlbum,
     onCreateAlbum,
     onDeleteAlbum,
@@ -75,22 +80,32 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
         });
     };
 
-    const currentAlbum = albums.find(a => a.id === currentAlbumId);
-
     return (
         <div className="album-selector">
-            <button
-                className="album-selector-trigger"
-                onClick={() => setIsOpen(!isOpen)}
-            >
-                <MenuIcon width="16" height="16" />
-                <span>{currentAlbum?.name || 'Select Album'}</span>
-                <ChevronDownIcon
-                    width="12"
-                    height="12"
-                    style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+            <div className="album-selector-control">
+                <input
+                    type="text"
+                    value={albumName}
+                    onChange={(e) => onAlbumNameChange(e.target.value)}
+                    className="album-selector-name-input"
+                    placeholder="Album name..."
+                    data-testid="album-name-input"
                 />
-            </button>
+                <button
+                    type="button"
+                    className="album-selector-toggle"
+                    onClick={() => setIsOpen(!isOpen)}
+                    aria-label={isOpen ? 'Close album list' : 'Open album list'}
+                    aria-expanded={isOpen}
+                    title={isOpen ? 'Close album list' : 'Open album list'}
+                >
+                    <ChevronDownIcon
+                        width="12"
+                        height="12"
+                        style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+                    />
+                </button>
+            </div>
 
             {isOpen && (
                 <div className="album-selector-dropdown">
