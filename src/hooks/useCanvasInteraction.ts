@@ -6,17 +6,26 @@ import { useCanvasSnapping } from './useCanvasSnapping';
 import { useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads, useDeleteElement } from '../states/albumStore';
 
+/**
+ * Props for useCanvasInteraction.
+ */
 interface UseCanvasInteractionProps {
+    /** The Fabric.js canvas instance. */
     fabricCanvas: fabric.Canvas | null;
+    /** Width of the canvas in pixels. */
     canvasWidth: number;
+    /** Height of the canvas in pixels. */
     canvasHeight: number;
+    /** Current zoom level percentage. */
     zoom: number;
+    /** Ref to store active snap lines. */
     snapLinesRef: React.RefObject<fabric.Line[]>;
+    /** Optional callback when canvas content changes. */
     onCanvasChange?: (dataUrl: string) => void;
 }
 
 /**
- * useCanvasInteraction - Orchestrates canvas interaction behaviors.
+ * Orchestrates canvas interaction behaviors.
  *
  * This hook coordinates:
  * - Keyboard shortcuts (delete key for removing elements)

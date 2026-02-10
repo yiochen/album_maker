@@ -3,15 +3,30 @@ import * as fabric from 'fabric';
 import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
 import { APP_CONFIG } from '../config';
 
+/**
+ * Props for useCanvasInitialization.
+ */
 interface UseCanvasInitializationProps {
+    /** Ref to the canvas HTML element. */
     canvasElRef: React.RefObject<HTMLCanvasElement | null>;
+    /** Ref to the container div element (for focus management). */
     containerRef: React.RefObject<HTMLDivElement | null>;
+    /** Width of the canvas in pixels. */
     canvasWidth: number;
+    /** Height of the canvas in pixels. */
     canvasHeight: number;
+    /** Ref to store active snap lines. */
     snapLinesRef: React.RefObject<fabric.Line[]>;
+    /** Optional callback when canvas content changes (for thumbnails). */
     onCanvasChange?: (dataUrl: string) => void;
 }
 
+/**
+ * Hook to initialize the Fabric.js canvas instance.
+ *
+ * It sets up the canvas, background color, and default objects like the seam line.
+ * It also handles basic event listeners for blocking React sync during interaction.
+ */
 export const useCanvasInitialization = ({
     canvasElRef,
     containerRef,

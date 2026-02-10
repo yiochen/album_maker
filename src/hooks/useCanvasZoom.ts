@@ -1,11 +1,22 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 
+/**
+ * Props for useCanvasZoom.
+ */
 interface UseCanvasZoomProps {
+    /** The width of the canvas content. */
     canvasWidth: number;
+    /** The height of the canvas content. */
     canvasHeight: number;
+    /** Ref to the container element that limits the viewport. */
     containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
+/**
+ * Hook to manage the canvas zoom level.
+ *
+ * Handles initial auto-fitting to the viewport and window resize events.
+ */
 export const useCanvasZoom = ({
     canvasWidth,
     canvasHeight,

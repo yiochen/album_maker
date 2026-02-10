@@ -18,15 +18,28 @@ import { CanvasPageElement } from './CanvasPageElement';
 import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads, useUpdateElement } from '../states/albumStore';
 
+/**
+ * Props for useCanvasSnapping.
+ */
 interface UseCanvasSnappingProps {
+    /** The Fabric.js canvas instance. */
     fabricCanvas: fabric.Canvas | null;
+    /** Width of the canvas in pixels. */
     canvasWidth: number;
+    /** Height of the canvas in pixels. */
     canvasHeight: number;
+    /** Current zoom level percentage. */
     zoom: number;
+    /** Ref to store active snap lines. */
     snapLinesRef: React.RefObject<fabric.Line[]>;
+    /** Optional callback when canvas content changes. */
     onCanvasChange?: (dataUrl: string) => void;
 }
 
+/**
+ * Hook to handle snapping of objects to the canvas edges and center during movement.
+ * Also handles updating the element's layout in the global store after modification.
+ */
 export const useCanvasSnapping = ({
     fabricCanvas,
     canvasWidth,

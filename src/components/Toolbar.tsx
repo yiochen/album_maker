@@ -4,20 +4,38 @@ import { RedoIcon } from './icons/RedoIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
 import { SnappingIcon } from './icons/SnappingIcon';
 
+/**
+ * Props for the Toolbar component.
+ */
 interface ToolbarProps {
+    /** The name of the current album. */
     albumName: string;
+    /** Callback fired when the album name is changed. */
     onAlbumNameChange: (name: string) => void;
+    /** Whether snapping is currently enabled. */
     isSnappingEnabled: boolean;
+    /** Callback fired when the snapping toggle is clicked. */
     onSnappingToggle: () => void;
+    /** Callback fired when the import button is clicked. */
     onImport: () => void;
+    /** Callback fired when the export button is clicked. */
     onExport: () => void;
+    /** Callback fired when the settings button is clicked. */
     onSettingsClick: () => void;
+    /** Callback fired when the undo button is clicked. */
     onUndo: () => void;
+    /** Callback fired when the redo button is clicked. */
     onRedo: () => void;
+    /** Whether undo is currently available. */
     canUndo: boolean;
+    /** Whether redo is currently available. */
     canRedo: boolean;
 }
 
+/**
+ * Toolbar component displays the top navigation bar with album name, global controls,
+ * and history (undo/redo) buttons.
+ */
 export const Toolbar: React.FC<ToolbarProps> = ({
     albumName,
     onAlbumNameChange,

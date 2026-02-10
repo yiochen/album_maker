@@ -4,16 +4,31 @@ import { useAlbumImagePool } from '../states/albumStore';
 import { applyCoverTransform } from '../utils/imageUtils';
 import { NumberInput } from './common/NumberInput';
 
+/**
+ * Props for the PropertiesPanel component.
+ */
 interface PropertiesPanelProps {
+    /** The current spread being edited. */
     spread: Spread;
+    /** The global album settings. */
     settings: AlbumSettings;
+    /** The currently selected element (if any). */
     selectedElement: PageElement | null;
+    /** The ID of the currently selected page (spread). */
     selectedPageId: string | null;
+    /** Callback fired when the spread template is changed. */
     onTemplateChange: (spreadId: string, templateId: string) => void;
+    /** Callback fired when an element's properties are updated. */
     onElementUpdate: (updates: Partial<PageElement>, groupId?: string) => void;
+    /** Callback fired when the selected element is deleted. */
     onElementDelete: () => void;
 }
 
+/**
+ * PropertiesPanel component displays context-aware properties for the current selection.
+ * If an element is selected, it shows image properties (size, position, crop).
+ * Otherwise, it shows general spread properties.
+ */
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     spread,
     settings,

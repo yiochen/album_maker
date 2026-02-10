@@ -1,13 +1,24 @@
 import React, { useEffect } from 'react';
 import { CloseIcon } from './icons/CloseIcon';
 
+/**
+ * Props for the Modal component.
+ */
 interface ModalProps {
+    /** The title text to display in the modal header. */
     title: string;
+    /** Callback fired when the modal should be closed (e.g., overlay click, escape key, close button). */
     onClose: () => void;
+    /** The content to render inside the modal body. */
     children: React.ReactNode;
+    /** Optional test ID for the title element. */
     titleTestId?: string;
 }
 
+/**
+ * Modal component renders a dialog overlay with a header and content area.
+ * Handles "Escape" key press and outside clicks to close the modal.
+ */
 export const Modal: React.FC<ModalProps> = ({ title, onClose, children, titleTestId }) => {
     // Close on Escape key
     useEffect(() => {

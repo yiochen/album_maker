@@ -11,6 +11,17 @@ import { initializeSources } from '../sources';
 import { useAlbumStore } from '../states/albumStore';
 import { db } from '../db';
 
+/**
+ * Hook for initializing the application state.
+ *
+ * Responsibilities:
+ * 1. Initializes external photo sources.
+ * 2. Checks for legacy data in localStorage and migrates it to IndexedDB.
+ * 3. Loads the most recent album from IndexedDB (or creates a new one).
+ * 4. Handles database errors by optionally clearing the DB and resetting.
+ *
+ * @returns An object containing the loading state.
+ */
 export const useAppInitialization = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { setAlbum } = useAlbumStore();

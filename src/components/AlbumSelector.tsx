@@ -6,13 +6,24 @@ import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { PlusIcon } from './icons/PlusIcon';
 import { TrashIcon } from './icons/TrashIcon';
 
+/**
+ * Props for the AlbumSelector component.
+ */
 interface AlbumSelectorProps {
+    /** The ID of the currently selected album. */
     currentAlbumId: string | null;
+    /** Callback fired when an album is selected. */
     onSelectAlbum: (id: string) => void;
+    /** Callback fired when a new album is created. */
     onCreateAlbum: (name: string) => void;
+    /** Callback fired when an album is deleted. */
     onDeleteAlbum: (id: string) => void;
 }
 
+/**
+ * AlbumSelector component allows users to switch between albums, create new ones,
+ * and delete existing ones via a dropdown menu.
+ */
 export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
     currentAlbumId,
     onSelectAlbum,

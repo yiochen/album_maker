@@ -13,12 +13,26 @@ export type { CustomFabricObject, ExtendedFabricObject };
 // Re-export util function if needed
 export { getZoomCompensatedSizes };
 
+/**
+ * Props for useCanvasRender.
+ */
 interface UseCanvasRenderProps {
+    /** Ref to the canvas HTML element. */
     canvasElRef: React.RefObject<HTMLCanvasElement | null>;
+    /** Ref to the container div element. */
     containerRef: React.RefObject<HTMLDivElement | null>;
+    /** Optional callback when canvas content changes. */
     onCanvasChange?: (dataUrl: string) => void;
 }
 
+/**
+ * Hook that orchestrates the rendering of the canvas.
+ *
+ * It composes:
+ * - Initialization (useCanvasInitialization)
+ * - Zoom/Viewport management (useCanvasZoom)
+ * - React-to-Fabric state synchronization (useReactToFabricSync)
+ */
 export const useCanvasRender = ({
     canvasElRef,
     containerRef,

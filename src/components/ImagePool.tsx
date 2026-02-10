@@ -12,12 +12,22 @@ import { UploadIcon } from './icons/UploadIcon';
 import { CloseIcon } from './icons/CloseIcon';
 import { AddImageIcon } from './icons/AddImageIcon';
 
+/**
+ * Props for the ImagePool component.
+ */
 interface ImagePoolProps {
+    /** List of images currently in the pool. */
     images: PoolImage[];
+    /** Callback fired when new images are imported. */
     onImport: (images: PoolImage[]) => void;
+    /** Callback fired when the pool close button is clicked. */
     onClose: () => void;
 }
 
+/**
+ * ImagePool component manages the library of images available for use in the album.
+ * It allows importing images from various sources and dragging them onto the canvas.
+ */
 export const ImagePool: React.FC<ImagePoolProps> = ({
     images,
     onImport,

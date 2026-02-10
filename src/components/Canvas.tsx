@@ -7,11 +7,20 @@ import { useAlbumSpreads } from '../states/albumStore';
 import { useCurrentSpreadIndex } from '../states/uiStore';
 import { useDndDropContext } from '../contexts/DndDropContext';
 
+/**
+ * Props for the Canvas component.
+ */
 interface CanvasProps {
+    /** Callback fired when an image is dropped onto the canvas. */
     onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
+    /** Optional callback fired when the canvas content changes (e.g., for thumbnail generation). */
     onCanvasChange?: (dataUrl: string) => void;
 }
 
+/**
+ * Canvas component renders the interactive Fabric.js canvas for editing the album spread.
+ * It handles rendering, interactions (selection, snapping), and drag-and-drop.
+ */
 export const Canvas: React.FC<CanvasProps> = ({
     onImageDrop,
     onCanvasChange,
