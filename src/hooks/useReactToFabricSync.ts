@@ -125,6 +125,11 @@ export const useReactToFabricSync = ({
         });
 
         const zoomValue = zoom;
+        // Capture the selected ID at the start of the sync (e.g. when drop occurred)
+        // This ensures that even if selection is temporarily cleared (e.g. by dnd-kit pointer events),
+        // we still select the element once it finishes loading if it was intended to be selected.
+        const pendingSelectedId = selectedElementIdRef.current;
+
         elementsToLoad.forEach(async (element) => {
             if (loadingIds.current.has(element.id)) return;
             loadingIds.current.add(element.id);
@@ -156,7 +161,8 @@ export const useReactToFabricSync = ({
                 canvasEl.applyLayout(toCanvasPx(modelWidth), toCanvasPx(modelHeight));
 
                 canvas.add(canvasEl);
-                if (selectedElementIdRef.current === element.id) {
+                // Select if it matches the current selection OR the selection at the start of the load
+                if (selectedElementIdRef.current === element.id || pendingSelectedId === element.id) {
                     canvas.setActiveObject(canvasEl);
                 }
                 canvas.requestRenderAll();

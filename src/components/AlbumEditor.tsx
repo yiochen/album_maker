@@ -72,12 +72,7 @@ export const AlbumEditor: React.FC = () => {
   useKeyboardShortcuts();
 
   // Element actions (drop, update, delete)
-  const { handleImageDrop: originalHandleImageDrop, handleElementUpdate, handleElementDelete } = useElementActions();
-
-  const handleImageDrop = (spreadId: string, image: PoolImage, position: { x: number; y: number }) => {
-    originalHandleImageDrop(spreadId, image, position);
-    setImagePoolOpen(false);
-  };
+  const { handleImageDrop, handleElementUpdate, handleElementDelete } = useElementActions();
 
   // Album lifecycle (CRUD, import/export)
   const {
