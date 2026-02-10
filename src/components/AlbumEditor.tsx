@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { PageElement, TemplateId, PoolImage } from '../types';
+import type { PageElement, TemplateId } from '../types';
 import {
   useAlbum,
   useSetName,
