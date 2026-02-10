@@ -145,7 +145,7 @@ export const useReactToFabricSync = ({
                     uniformScaling: !!element.lockAspectRatio,
                     lockUniScaling: !!element.lockAspectRatio,
                     panControlSize: uiSizes.cornerSize * 1.7,
-                    onContentTransformChange: (elementId: string, contentTransform) => {
+                    onContentTransformChange: (elementId: string, contentTransform: { zoom: number; panX: number; panY: number }) => {
                         onElementUpdateRef.current(spreadRef.current.id, elementId, {
                             contentTransform,
                         });
