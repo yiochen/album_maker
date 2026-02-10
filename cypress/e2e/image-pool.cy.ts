@@ -108,17 +108,17 @@ describe('Image Pool', () => {
         });
     });
 
-    it('should be horizontally scrollable when many images are imported', () => {
+    it('should be vertically scrollable when many images are imported', () => {
         cy.importDummyImages(); // Imports 200 images
 
         cy.get('.image-pool-content').then(($el) => {
             const el = $el[0];
-            // The scrollWidth should be significantly larger than clientWidth
-            expect(el.scrollWidth).to.be.greaterThan(el.clientWidth);
+            // The scrollHeight should be significantly larger than clientHeight
+            expect(el.scrollHeight).to.be.greaterThan(el.clientHeight);
 
             // Should be able to scroll
-            $el.scrollLeft(200);
-            expect(el.scrollLeft).to.be.greaterThan(0);
+            $el.scrollTop(200);
+            expect(el.scrollTop).to.be.greaterThan(0);
         });
     });
 });

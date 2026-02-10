@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { PageElement, TemplateId } from '../types';
+import type { PageElement, TemplateId, PoolImage } from '../types';
 import {
   useAlbum,
   useSetName,
@@ -72,7 +72,12 @@ export const AlbumEditor: React.FC = () => {
   useKeyboardShortcuts();
 
   // Element actions (drop, update, delete)
-  const { handleImageDrop, handleElementUpdate, handleElementDelete } = useElementActions();
+  const { handleImageDrop: originalHandleImageDrop, handleElementUpdate, handleElementDelete } = useElementActions();
+
+  const handleImageDrop = (spreadId: string, image: PoolImage, position: { x: number; y: number }) => {
+    originalHandleImageDrop(spreadId, image, position);
+    setImagePoolOpen(false);
+  };
 
   // Album lifecycle (CRUD, import/export)
   const {
@@ -168,7 +173,11 @@ export const AlbumEditor: React.FC = () => {
             />
           </TabPane>
           <TabPane id="images" label="Images">
-            <ImagePool images={album.imagePool} onImport={addToPool} />
+            <ImagePool
+              images={album.imagePool}
+              onImport={addToPool}
+              onClose={() => setImagePoolOpen(false)}
+            />
           </TabPane>
         </Tabs>
       </DndWrapper>
