@@ -28,3 +28,6 @@ cypress/videos/
 cypress/screenshots/
 cypress/downloads/
 **/__diff__/**
+
+# Generated Schemas
+src/schemas/
