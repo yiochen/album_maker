@@ -1,6 +1,11 @@
 import type { Album, Spread, TemplateId } from '../types';
 import { APP_CONFIG } from '../config';
 import { albumDB, settingsDB } from '../db';
+import Ajv from 'ajv';
+import albumSchema from '../schemas/albumSchema.json';
+
+const ajv = new Ajv();
+const validateAlbum = ajv.compile(albumSchema);
 
 // Create a new empty album
 export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
@@ -45,12 +50,22 @@ export const albumStorage = {
         const record = await albumDB.get(id);
         if (!record) return null;
 
+        let data: unknown;
         try {
-            return JSON.parse(record.data) as Album;
+            data = JSON.parse(record.data);
         } catch {
             console.error('Failed to parse album data');
             return null;
         }
+
+        if (!validateAlbum(data)) {
+            console.error('Schema validation failed:', validateAlbum.errors);
+            // Throwing here allows useAppInitialization to catch this error and optionally clear the DB
+            // based on APP_CONFIG.CLEAR_INDEX_DB_ON_LOAD_ERROR.
+            throw new Error('Schema validation failed');
+        }
+
+        return data as Album;
     },
 
     // Save an album

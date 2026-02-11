@@ -1,0 +1,266 @@
+{
+  "$ref": "#/definitions/Album",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Album": {
+      "additionalProperties": false,
+      "properties": {
+        "createdAt": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "imagePool": {
+          "items": {
+            "$ref": "#/definitions/PoolImage"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/definitions/AlbumSettings"
+        },
+        "spreads": {
+          "items": {
+            "$ref": "#/definitions/Spread"
+          },
+          "type": "array"
+        },
+        "updatedAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "settings",
+        "createdAt",
+        "updatedAt",
+        "spreads",
+        "imagePool"
+      ],
+      "type": "object"
+    },
+    "AlbumSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "isSquare": {
+          "type": "boolean"
+        },
+        "maxPages": {
+          "type": "number"
+        },
+        "pageHeight": {
+          "type": "number"
+        },
+        "pageWidth": {
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/definitions/Unit"
+        }
+      },
+      "required": [
+        "pageWidth",
+        "pageHeight",
+        "unit",
+        "isSquare",
+        "maxPages"
+      ],
+      "type": "object"
+    },
+    "PageElement": {
+      "additionalProperties": false,
+      "properties": {
+        "box": {
+          "additionalProperties": false,
+          "description": "Normalized relative coordinates (0.0 to 1.0) representing the edges. x1: Left, y1: Top, x2: Right, y2: Bottom.",
+          "properties": {
+            "x1": {
+              "type": "number"
+            },
+            "x2": {
+              "type": "number"
+            },
+            "y1": {
+              "type": "number"
+            },
+            "y2": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "x1",
+            "y1",
+            "x2",
+            "y2"
+          ],
+          "type": "object"
+        },
+        "contentTransform": {
+          "additionalProperties": false,
+          "description": "For inner image positioning within the frame (SmartFrame). Replacing the old 'crop' property.",
+          "properties": {
+            "panX": {
+              "type": "number"
+            },
+            "panY": {
+              "type": "number"
+            },
+            "zoom": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "zoom",
+            "panX",
+            "panY"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        },
+        "imageUrl": {
+          "type": "string"
+        },
+        "lockAspectRatio": {
+          "type": "boolean"
+        },
+        "originalAspectRatio": {
+          "type": "number"
+        },
+        "sourceId": {
+          "description": "Identifies which photo source/provider this image came from (e.g., \"google-photos\", \"dummy-colors\")",
+          "type": "string"
+        },
+        "sourceImageId": {
+          "description": "The unique ID of this image within its source (e.g., Google Photos media item ID)",
+          "type": "string"
+        },
+        "thumbnailUrl": {
+          "type": "string"
+        },
+        "type": {
+          "const": "image",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "imageUrl",
+        "thumbnailUrl",
+        "sourceId",
+        "sourceImageId",
+        "box"
+      ],
+      "type": "object"
+    },
+    "PoolImage": {
+      "additionalProperties": false,
+      "description": "Image stored in the album's image pool, imported from any photo source. The combination of sourceId + sourceImageId uniquely identifies an image globally.",
+      "properties": {
+        "baseUrl": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "height": {
+          "description": "Original height of the image in pixels (full resolution)",
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": "string"
+        },
+        "sourceId": {
+          "description": "Identifies which photo source/provider this image came from (e.g., \"google-photos\", \"dummy-colors\")",
+          "type": "string"
+        },
+        "sourceImageId": {
+          "description": "The unique ID of this image within its source (e.g., Google Photos media item ID)",
+          "type": "string"
+        },
+        "thumbnailHeight": {
+          "description": "Actual height of the thumbnail image in pixels",
+          "type": "number"
+        },
+        "thumbnailUrl": {
+          "type": "string"
+        },
+        "thumbnailWidth": {
+          "description": "Actual width of the thumbnail image in pixels",
+          "type": "number"
+        },
+        "width": {
+          "description": "Original width of the image in pixels (full resolution)",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "sourceId",
+        "sourceImageId",
+        "baseUrl",
+        "filename",
+        "mimeType"
+      ],
+      "type": "object"
+    },
+    "Spread": {
+      "additionalProperties": false,
+      "properties": {
+        "background": {
+          "type": "string"
+        },
+        "elements": {
+          "items": {
+            "$ref": "#/definitions/PageElement"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "templateId": {
+          "$ref": "#/definitions/TemplateId"
+        }
+      },
+      "required": [
+        "id",
+        "templateId",
+        "elements"
+      ],
+      "type": "object"
+    },
+    "TemplateId": {
+      "enum": [
+        "fullpage",
+        "square-center",
+        "portrait",
+        "landscape",
+        "polaroid",
+        "grid-2x2",
+        "grid-1-2"
+      ],
+      "type": "string"
+    },
+    "Unit": {
+      "enum": [
+        "inch",
+        "cm"
+      ],
+      "type": "string"
+    }
+  }
+}
