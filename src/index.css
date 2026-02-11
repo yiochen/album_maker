@@ -788,6 +788,7 @@ body {
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
+  min-height: 86px;
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
@@ -803,8 +804,21 @@ body {
   border-color: var(--color-text-tertiary);
 }
 
+.image-action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-tertiary);
+}
+
 .image-action-button span {
   text-align: center;
+  line-height: 1.1;
+  min-height: calc(2em * 1.1);
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .property-size-input {

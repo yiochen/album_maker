@@ -1,5 +1,7 @@
 import React from 'react';
 import type { Spread, PageElement, AlbumSettings } from '../types';
+import { useAlbumImagePool } from '../states/albumStore';
+import { applyCoverTransform } from '../utils/imageUtils';
 import { NumberInput } from './common/NumberInput';
 import { LockIcon } from './icons/LockIcon';
 import { UnlockIcon } from './icons/UnlockIcon';
@@ -123,21 +125,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     onUpdate,
     onDelete,
 }) => {
-    const groupIdRef = React.useRef<string | null>(null);
-
-    const handleInteractionStart = () => {
-        groupIdRef.current = crypto.randomUUID();
-    };
-
-    const handleInteractionEnd = () => {
-        groupIdRef.current = null;
-    };
-    const [zoom, setZoom] = React.useState(element.contentTransform?.zoom || 1);
-
-    // Sync local state when element changes (e.g. via undo/redo or different selection)
-    React.useEffect(() => {
-        setZoom(element.contentTransform?.zoom || 1);
-    }, [element.contentTransform]);
+    const currentZoom = element.contentTransform?.zoom ?? 1;
 
     const ppi = 300;
     const spreadWidth = settings.pageWidth * 2 * ppi;
@@ -224,25 +212,76 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
         onUpdate({ lockAspectRatio: !element.lockAspectRatio });
     };
 
-    const handleTransformChange = (key: 'zoom', value: number) => {
-        // Update local state immediately for smoothness
-        if (key === 'zoom') setZoom(value);
+    const pool = useAlbumImagePool();
+    const sourceImage = pool.find(img =>
+        img.sourceId === element.sourceId &&
+        img.sourceImageId === element.sourceImageId
+    );
 
+    /**
+     * Update zoom in 0.1 steps and normalize pan when zoom returns to 1.0.
+     * If there's no overflow on an axis at zoom=1, reset that pan axis to center (0.5)
+     * so images don't appear off-center.
+     */
+    const handleZoomChange = (value: number) => {
         const defaults = {
             zoom: 1,
             panX: 0.5,
             panY: 0.5,
         };
 
+        const nextZoom = Math.min(3, Math.max(1, Math.round(value * 10) / 10));
+        let nextPanX = element.contentTransform?.panX ?? defaults.panX;
+        let nextPanY = element.contentTransform?.panY ?? defaults.panY;
+
+        if (nextZoom === 1) {
+            if (!sourceImage?.width || !sourceImage?.height) {
+                nextPanX = 0.5;
+                nextPanY = 0.5;
+            } else {
+                const coverage = applyCoverTransform(
+                    currentWidthPx,
+                    currentHeightPx,
+                    sourceImage.width,
+                    sourceImage.height,
+                    {
+                        zoom: nextZoom,
+                        panX: nextPanX,
+                        panY: nextPanY,
+                    }
+                );
+                if (!coverage.canPanX) nextPanX = 0.5;
+                if (!coverage.canPanY) nextPanY = 0.5;
+            }
+        }
         const newTransform = {
             ...defaults,
             ...(element.contentTransform || {}),
-            [key]: value,
+            zoom: nextZoom,
+            panX: nextPanX,
+            panY: nextPanY,
         };
 
         onUpdate({
             contentTransform: newTransform,
-        }, groupIdRef.current || undefined);
+        });
+    };
+
+    const handleCenterContent = () => {
+        const defaults = {
+            zoom: 1,
+            panX: 0.5,
+            panY: 0.5,
+        };
+
+        onUpdate({
+            contentTransform: {
+                ...defaults,
+                ...(element.contentTransform || {}),
+                panX: 0.5,
+                panY: 0.5,
+            },
+        });
     };
 
     return (
@@ -308,65 +347,60 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
             </div>
 
             <div className="property-section">
-                <h3 className="property-section-title">SmartFrame</h3>
-                <div className="property-row">
-                    <span className="property-label">Zoom</span>
-                    <input
-                        type="range"
-                        min="1"
-                        max="3"
-                        step="0.01"
-                        value={zoom}
-                        onChange={(e) => handleTransformChange('zoom', parseFloat(e.target.value))}
-                        onPointerDown={(e) => {
-                            e.stopPropagation();
-                            handleInteractionStart();
-                        }}
-                        onPointerUp={handleInteractionEnd}
-                        onPointerCancel={handleInteractionEnd}
-                        style={{ flex: 1 }}
-                    />
-                </div>
-            </div>
-
-            <div className="property-section">
                 <h3 className="property-section-title">Actions</h3>
                 <div className="image-action-grid">
-                    <button className="image-action-button" type="button" title="Zoom in">
+                    <button
+                        className="image-action-button"
+                        type="button"
+                        title="Zoom in"
+                        onClick={() => handleZoomChange(currentZoom + 0.1)}
+                        disabled={currentZoom >= 3}
+                    >
                         <ZoomInIcon />
                         <span>Zoom in</span>
                     </button>
-                    <button className="image-action-button" type="button" title="Zoom out">
+                    <button
+                        className="image-action-button"
+                        type="button"
+                        title="Zoom out"
+                        onClick={() => handleZoomChange(currentZoom - 0.1)}
+                        disabled={currentZoom <= 1}
+                    >
                         <ZoomOutIcon />
                         <span>Zoom out</span>
                     </button>
-                    <button className="image-action-button" type="button" title="Center content">
+                    <button
+                        className="image-action-button"
+                        type="button"
+                        title="Center content"
+                        onClick={handleCenterContent}
+                    >
                         <CenterContentIcon />
-                        <span>Center</span>
+                        <span>Center content</span>
                     </button>
                     <button className="image-action-button" type="button" title="Flip horizontal">
                         <FlipHorizontalIcon />
-                        <span>Flip H</span>
+                        <span>Flip horizontal</span>
                     </button>
                     <button className="image-action-button" type="button" title="Rotate 90°">
                         <RotateCwIcon />
-                        <span>Rotate</span>
+                        <span>Rotate 90°</span>
                     </button>
                     <button className="image-action-button" type="button" title="Rotate -90°">
                         <RotateCcwIcon />
-                        <span>Rotate -</span>
+                        <span>Rotate -90°</span>
                     </button>
                     <button className="image-action-button" type="button" title="Flip vertical">
                         <FlipVerticalIcon />
-                        <span>Flip V</span>
+                        <span>Flip vertical</span>
                     </button>
                     <button className="image-action-button" type="button" title="Bring forward">
                         <MoveForwardIcon />
-                        <span>Forward</span>
+                        <span>Bring forward</span>
                     </button>
                     <button className="image-action-button" type="button" title="Send backward">
                         <MoveBackwardIcon />
-                        <span>Backward</span>
+                        <span>Send backward</span>
                     </button>
                 </div>
             </div>
