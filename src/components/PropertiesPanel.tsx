@@ -11,7 +11,6 @@ import { CenterContentIcon } from './icons/CenterContentIcon';
 import { FlipHorizontalIcon } from './icons/FlipHorizontalIcon';
 import { FlipVerticalIcon } from './icons/FlipVerticalIcon';
 import { RotateCwIcon } from './icons/RotateCwIcon';
-import { RotateCcwIcon } from './icons/RotateCcwIcon';
 import { MoveForwardIcon } from './icons/MoveForwardIcon';
 import { MoveBackwardIcon } from './icons/MoveBackwardIcon';
 
@@ -284,6 +283,45 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
         });
     };
 
+    const handleRotate = () => {
+        const currentRotation = element.contentTransform?.rotation ?? 0;
+        const newRotation = (currentRotation + 90) % 360;
+        onUpdate({
+            contentTransform: {
+                ...(element.contentTransform || {}),
+                rotation: newRotation,
+            }
+        });
+    };
+
+    const handleFlipHorizontal = () => {
+        const transform = element.contentTransform || {};
+        const rotation = transform.rotation ?? 0;
+        const newTransform = { ...transform };
+
+        if (rotation % 180 === 0) {
+            newTransform.flipH = !transform.flipH;
+        } else {
+            newTransform.flipV = !transform.flipV;
+        }
+
+        onUpdate({ contentTransform: newTransform });
+    };
+
+    const handleFlipVertical = () => {
+        const transform = element.contentTransform || {};
+        const rotation = transform.rotation ?? 0;
+        const newTransform = { ...transform };
+
+        if (rotation % 180 === 0) {
+            newTransform.flipV = !transform.flipV;
+        } else {
+            newTransform.flipH = !transform.flipH;
+        }
+
+        onUpdate({ contentTransform: newTransform });
+    };
+
     return (
         <>
             <div className="property-section">
@@ -378,19 +416,30 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         <CenterContentIcon />
                         <span>Center content</span>
                     </button>
-                    <button className="image-action-button" type="button" title="Flip horizontal">
+                    <button
+                        className="image-action-button"
+                        type="button"
+                        title="Flip horizontal"
+                        onClick={handleFlipHorizontal}
+                    >
                         <FlipHorizontalIcon />
                         <span>Flip horizontal</span>
                     </button>
-                    <button className="image-action-button" type="button" title="Rotate 90°">
+                    <button
+                        className="image-action-button"
+                        type="button"
+                        title="Rotate 90°"
+                        onClick={handleRotate}
+                    >
                         <RotateCwIcon />
                         <span>Rotate 90°</span>
                     </button>
-                    <button className="image-action-button" type="button" title="Rotate -90°">
-                        <RotateCcwIcon />
-                        <span>Rotate -90°</span>
-                    </button>
-                    <button className="image-action-button" type="button" title="Flip vertical">
+                    <button
+                        className="image-action-button"
+                        type="button"
+                        title="Flip vertical"
+                        onClick={handleFlipVertical}
+                    >
                         <FlipVerticalIcon />
                         <span>Flip vertical</span>
                     </button>

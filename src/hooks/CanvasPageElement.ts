@@ -109,6 +109,9 @@ export class CanvasPageElement extends fabric.Group {
             zoom: 1,
             panX: 0.5,
             panY: 0.5,
+            rotation: 0,
+            flipH: false,
+            flipV: false,
             ...(this.pageElement.contentTransform || {})
         };
 
@@ -120,15 +123,30 @@ export class CanvasPageElement extends fabric.Group {
             transform
         );
 
-        // Position relative to group top-left (0,0)
-        // Fabric groups with origin top-left usually position children relative to their center
-        // unless they are initialized with absolute coordinates.
-        // However, we want strict top-left alignment for the frame.
+        // Position relative to group center
+        // We set origin to center to handle rotation and flipping correctly around the image center
         this.innerImage.set({
-            left: result.left - this.width / 2,
-            top: result.top - this.height / 2,
-            scaleX: result.scale,
-            scaleY: result.scale,
+            originX: 'center',
+            originY: 'center',
+            angle: transform.rotation,
+        });
+
+        const scaleX = result.scale * (transform.flipH ? -1 : 1);
+        const scaleY = result.scale * (transform.flipV ? -1 : 1);
+
+        // Calculate center position relative to the group center.
+        // result.left/top is the top-left of the bounding box relative to the frame top-left.
+        // The group center is at (width/2, height/2) relative to frame top-left.
+        // So we offset by -width/2, -height/2.
+        // We also need to add half the bounding box size to get the center from the top-left.
+        const centerX = result.left + result.width / 2 - this.width / 2;
+        const centerY = result.top + result.height / 2 - this.height / 2;
+
+        this.innerImage.set({
+            left: centerX,
+            top: centerY,
+            scaleX: scaleX,
+            scaleY: scaleY,
         });
     }
 
@@ -141,6 +159,9 @@ export class CanvasPageElement extends fabric.Group {
             zoom: 1,
             panX: 0.5,
             panY: 0.5,
+            rotation: 0,
+            flipH: false,
+            flipV: false,
             ...(this.pageElement.contentTransform || {})
         };
 

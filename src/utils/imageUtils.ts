@@ -128,31 +128,43 @@ export function applyCoverTransform(
     frameHeight: number,
     imageWidth: number,
     imageHeight: number,
-    partialTransform: Partial<{ zoom: number; panX: number; panY: number }> = {}
+    partialTransform: Partial<{ zoom: number; panX: number; panY: number; rotation: number; flipH: boolean; flipV: boolean }> = {}
 ) {
     const transform = {
         zoom: 1,
         panX: 0.5,
         panY: 0.5,
+        rotation: 0,
+        flipH: false,
+        flipV: false,
         ...partialTransform
     };
+
+    // Swap image dimensions if rotated 90 or 270 degrees
+    let effectiveImageWidth = imageWidth;
+    let effectiveImageHeight = imageHeight;
+    if (transform.rotation % 180 !== 0) {
+        effectiveImageWidth = imageHeight;
+        effectiveImageHeight = imageWidth;
+    }
+
     const frameRatio = frameWidth / frameHeight;
-    const imageRatio = imageWidth / imageHeight;
+    const imageRatio = effectiveImageWidth / effectiveImageHeight;
 
     let scale: number;
     if (imageRatio > frameRatio) {
         // Image is wider than frame - fit to height
-        scale = frameHeight / imageHeight;
+        scale = frameHeight / effectiveImageHeight;
     } else {
         // Image is taller than frame - fit to width
-        scale = frameWidth / imageWidth;
+        scale = frameWidth / effectiveImageWidth;
     }
 
     // Apply additional zoom relative to the "cover" scale
     scale *= transform.zoom;
 
-    const scaledWidth = imageWidth * scale;
-    const scaledHeight = imageHeight * scale;
+    const scaledWidth = effectiveImageWidth * scale;
+    const scaledHeight = effectiveImageHeight * scale;
 
     // Pan (0.0 to 1.0). 0.5 is centered.
     // We calculate left/top so the image stays within the frame if pan=0.5 and zoom=1.

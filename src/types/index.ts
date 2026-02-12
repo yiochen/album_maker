@@ -73,6 +73,9 @@ export interface PageElement {
     zoom: number;    // Scale relative to 'cover' size
     panX: number;    // 0.0 - 1.0 (relative to frame)
     panY: number;    // 0.0 - 1.0
+    rotation?: number; // 0, 90, 180, 270
+    flipH?: boolean;
+    flipV?: boolean;
   };
 
   lockAspectRatio?: boolean;
