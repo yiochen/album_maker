@@ -10,12 +10,12 @@ import type { PoolImage } from '../types';
 interface CanvasDropTarget {
     /** Ref to the canvas wrapper element for coordinate calculation */
     wrapperRef: React.RefObject<HTMLDivElement | null>;
-    /** Current zoom level (percentage, e.g., 100 = 100%) */
-    zoom: number;
-    /** Current spread ID to receive the dropped image */
-    spreadId: string;
-    /** Handler to call when an image is dropped */
-    onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
+    /** Function to get current drop details (zoom, spreadId, handler) */
+    getDropDetails: () => {
+        zoom: number;
+        spreadId: string;
+        onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
+    };
 }
 
 interface DndContextValue {

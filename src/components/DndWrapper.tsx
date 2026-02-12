@@ -89,7 +89,8 @@ export const DndWrapper: React.FC<DndWrapperProps> = ({
 
         // Only call handler if dropped over the canvas
         if (image && event.over?.id === 'canvas' && canvasDropTarget) {
-            const { wrapperRef, zoom, spreadId, onImageDrop } = canvasDropTarget;
+            const { wrapperRef, getDropDetails } = canvasDropTarget;
+            const { zoom, spreadId, onImageDrop } = getDropDetails();
             const rect = wrapperRef.current?.getBoundingClientRect();
 
             if (rect) {

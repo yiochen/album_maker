@@ -62,21 +62,28 @@ export const Canvas: React.FC<CanvasProps> = ({
         onCanvasChange,
     });
 
-    // Register this canvas as a drop target for dnd-kit
+    // Ref to hold current state for the stable callback
+    const dropStateRef = useRef({ zoom, spreadId: currentSpread?.id, onImageDrop });
     useEffect(() => {
-        if (!currentSpread) return;
+        dropStateRef.current = { zoom, spreadId: currentSpread?.id, onImageDrop };
+    }, [zoom, currentSpread?.id, onImageDrop]);
 
+    // Register this canvas as a drop target for dnd-kit
+    // We pass a stable object with a getter to avoid re-registering on every zoom change
+    useEffect(() => {
         registerCanvasDropTarget({
             wrapperRef,
-            zoom,
-            spreadId: currentSpread.id,
-            onImageDrop,
+            getDropDetails: () => {
+                const { zoom, spreadId, onImageDrop } = dropStateRef.current;
+                if (!spreadId) throw new Error("Drop on invalid spread");
+                return { zoom, spreadId, onImageDrop };
+            }
         });
 
         return () => {
             registerCanvasDropTarget(null);
         };
-    }, [registerCanvasDropTarget, wrapperRef, zoom, currentSpread?.id, onImageDrop, currentSpread]);
+    }, [registerCanvasDropTarget, wrapperRef]);
 
     // Styles
     const canvasStyle = {
