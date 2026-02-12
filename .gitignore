@@ -31,3 +31,6 @@ cypress/downloads/
 
 # Generated Schemas
 src/schemas/
+
+# Compiled Service Worker (source is src/sw.ts)
+sw.js

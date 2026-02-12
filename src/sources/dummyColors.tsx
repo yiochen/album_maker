@@ -67,26 +67,16 @@ const generateColorImages = (): SourceImage[] => {
     return images;
 };
 
-// Generate SVG data URL with a checkerboard pattern overlay
-const generateColorSvg = (color: string, width: number, height: number): string => {
-    // Determine checkerboard tile size based on dimensions
-    const tileSize = Math.max(20, Math.floor(Math.min(width, height) / 10));
-    const patternSize = tileSize * 2;
-
-    const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-  <defs>
-    <pattern id="checkerboard" width="${patternSize}" height="${patternSize}" patternUnits="userSpaceOnUse">
-      <rect width="${tileSize}" height="${tileSize}" fill="white" fill-opacity="0.2"/>
-      <rect x="${tileSize}" y="${tileSize}" width="${tileSize}" height="${tileSize}" fill="white" fill-opacity="0.2"/>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="${color}"/>
-  <rect width="100%" height="100%" fill="url(#checkerboard)"/>
-  <text x="50%" y="50%" font-family="sans-serif" font-size="${tileSize}" fill="white" fill-opacity="0.5" text-anchor="middle" dominant-baseline="middle" style="pointer-events: none;">${width}x${height}</text>
-</svg>`.trim();
-
-    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+/**
+ * Builds a local URL for a dummy color image.
+ * The service worker intercepts this URL and generates an SVG on the fly.
+ *
+ * Format: /__local__/dummyColors/<hex>/<width>x<height>
+ * Example: /__local__/dummyColors/EF4444/4032x3024
+ */
+const buildDummyColorUrl = (color: string, width: number, height: number): string => {
+    const hex = color.replace('#', '');
+    return `/__local__/dummyColors/${hex}/${width}x${height}`;
 };
 
 class DummyColorsSource implements PhotoSource {
@@ -117,18 +107,22 @@ class DummyColorsSource implements PhotoSource {
         };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     getThumbnailUrl(image: SourceImage, width: number, height: number): string {
         const color = image.metadata?.color as string;
+        const imgWidth = image.width || 400;
+        const imgHeight = image.height || 300;
         if (!color) return '';
-        return generateColorSvg(color, width, height);
+        // SVGs are scalable, so use the full-res URL for thumbnails too
+        return buildDummyColorUrl(color, imgWidth, imgHeight);
     }
 
     getFullUrl(image: SourceImage): string {
         const color = image.metadata?.color as string;
-        const width = image.width || 400;
-        const height = image.height || 300;
+        const imgWidth = image.width || 400;
+        const imgHeight = image.height || 300;
         if (!color) return '';
-        return generateColorSvg(color, width, height);
+        return buildDummyColorUrl(color, imgWidth, imgHeight);
     }
 }
 

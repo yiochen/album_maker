@@ -26,6 +26,7 @@ The application is structured into modular layers. Please refer to the `AGENTS.m
 - **[Sources](src/sources/AGENTS.md)**: Plugin system for image providers (Google Photos, etc.).
 - **[States](src/states/AGENTS.md)**: Global state management stores (Zustand).
 - **[Workers](src/workers/AGENTS.md)**: Web Workers for background tasks.
+- **Service Worker (`src/sw.ts`)**: Intercepts fetch requests for local image generation (dummy colors) and network image caching (Google Photos).
 
 ## Core Concepts
 
@@ -55,8 +56,17 @@ src/
 ├── utils/        # Utility Functions
 ├── workers/      # Web Workers -> See src/workers/AGENTS.md
 ├── App.tsx       # Main Orchestrator
+├── sw.ts         # Service Worker (compiled to sw.js by Vite plugin)
+├── registerSW.ts # SW registration utility
 └── index.css     # Global Styles
 ```
+
+### Service Worker (`src/sw.ts`)
+Compiled separately by a custom Vite plugin (esbuild) into `sw.js`. Handles two routes:
+- **`/__local__/dummyColors/<hex>/<WxH>`**: Generates SVG responses on the fly (no network).
+- **`lh3.googleusercontent.com/*`**: Cache-first strategy for Google Photos images, surviving URL expiration.
+
+Registered via `src/registerSW.ts` from `main.tsx`. Uses `skipWaiting()` + `clients.claim()` for immediate activation.
 
 ## Global Rules of Engagement
 
