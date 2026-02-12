@@ -284,42 +284,62 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     };
 
     const handleRotate = () => {
-        const currentRotation = element.contentTransform?.rotation ?? 0;
-        const newRotation = (currentRotation + 90) % 360;
+        const defaults = {
+            zoom: 1,
+            panX: 0.5,
+            panY: 0.5,
+            rotation: 0,
+            flipH: false,
+            flipV: false,
+        };
+        const transform = { ...defaults, ...(element.contentTransform || {}) };
+        const newRotation = (transform.rotation + 90) % 360;
         onUpdate({
             contentTransform: {
-                ...(element.contentTransform || {}),
+                ...transform,
                 rotation: newRotation,
             }
         });
     };
 
     const handleFlipHorizontal = () => {
-        const transform = element.contentTransform || {};
-        const rotation = transform.rotation ?? 0;
-        const newTransform = { ...transform };
+        const defaults = {
+            zoom: 1,
+            panX: 0.5,
+            panY: 0.5,
+            rotation: 0,
+            flipH: false,
+            flipV: false,
+        };
+        const transform = { ...defaults, ...(element.contentTransform || {}) };
 
-        if (rotation % 180 === 0) {
-            newTransform.flipH = !transform.flipH;
+        if (transform.rotation % 180 === 0) {
+            transform.flipH = !transform.flipH;
         } else {
-            newTransform.flipV = !transform.flipV;
+            transform.flipV = !transform.flipV;
         }
 
-        onUpdate({ contentTransform: newTransform });
+        onUpdate({ contentTransform: transform });
     };
 
     const handleFlipVertical = () => {
-        const transform = element.contentTransform || {};
-        const rotation = transform.rotation ?? 0;
-        const newTransform = { ...transform };
+        const defaults = {
+            zoom: 1,
+            panX: 0.5,
+            panY: 0.5,
+            rotation: 0,
+            flipH: false,
+            flipV: false,
+        };
+        const transform = { ...defaults, ...(element.contentTransform || {}) };
 
-        if (rotation % 180 === 0) {
-            newTransform.flipV = !transform.flipV;
+        if (transform.rotation % 180 === 0) {
+            transform.flipV = !transform.flipV;
         } else {
-            newTransform.flipH = !transform.flipH;
+            transform.flipH = !transform.flipH;
         }
 
-        onUpdate({ contentTransform: newTransform });
+        onUpdate({ contentTransform: transform });
     };
 
     return (
