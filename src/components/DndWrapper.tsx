@@ -6,12 +6,11 @@
  * The DragOverlay renders a preview that follows the cursor while
  * the original item stays in place.
  */
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
     DndContext,
     DragEndEvent,
     DragStartEvent,
-    DragMoveEvent,
     DragOverlay,
     PointerSensor,
     TouchSensor,
@@ -37,8 +36,20 @@ export const DndWrapper: React.FC<DndWrapperProps> = ({
     const [activeImage, setActiveImage] = useState<PoolImage | null>(null);
     const [canvasDropTarget, setCanvasDropTarget] = useState<CanvasDropTarget | null>(null);
 
-    // Track the last known pointer position during drag
+    // Track the last known pointer position globally during drag
     const lastPointerPosition = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+    // Track pointer move globally while dragging
+    useEffect(() => {
+        if (!activeImage) return;
+
+        const handlePointerMove = (e: PointerEvent) => {
+            lastPointerPosition.current = { x: e.clientX, y: e.clientY };
+        };
+
+        window.addEventListener('pointermove', handlePointerMove);
+        return () => window.removeEventListener('pointermove', handlePointerMove);
+    }, [activeImage]);
 
     // Configure sensors for both pointer (mouse) and touch
     const pointerSensor = useSensor(PointerSensor, {
@@ -62,25 +73,14 @@ export const DndWrapper: React.FC<DndWrapperProps> = ({
         const image = event.active.data.current as PoolImage | undefined;
         if (image) {
             setActiveImage(image);
-        }
-    }, []);
 
-    const handleDragMove = useCallback((event: DragMoveEvent) => {
-        // Track pointer position during drag
-        // The activatorEvent contains the original DOM event
-        const activatorEvent = event.activatorEvent as PointerEvent | TouchEvent;
-        if ('clientX' in activatorEvent) {
-            // Add the delta to get current position
-            lastPointerPosition.current = {
-                x: activatorEvent.clientX + (event.delta.x || 0),
-                y: activatorEvent.clientY + (event.delta.y || 0),
-            };
-        } else if ('touches' in activatorEvent && activatorEvent.touches.length > 0) {
-            const touch = activatorEvent.touches[0];
-            lastPointerPosition.current = {
-                x: touch.clientX + (event.delta.x || 0),
-                y: touch.clientY + (event.delta.y || 0),
-            };
+            // Initialize pointer position from activator event
+            const activator = event.activatorEvent as PointerEvent | TouchEvent;
+            if ('clientX' in activator) {
+                lastPointerPosition.current = { x: activator.clientX, y: activator.clientY };
+            } else if ('touches' in activator && activator.touches.length > 0) {
+                lastPointerPosition.current = { x: activator.touches[0].clientX, y: activator.touches[0].clientY };
+            }
         }
     }, []);
 
@@ -93,10 +93,11 @@ export const DndWrapper: React.FC<DndWrapperProps> = ({
             const rect = wrapperRef.current?.getBoundingClientRect();
 
             if (rect) {
-                // Convert viewport coordinates to canvas coordinates
+                // Use the globally tracked pointer position
                 const clientX = lastPointerPosition.current.x;
                 const clientY = lastPointerPosition.current.y;
 
+                // Convert viewport coordinates to canvas coordinates
                 const domX = clientX - rect.left;
                 const domY = clientY - rect.top;
 
@@ -125,7 +126,6 @@ export const DndWrapper: React.FC<DndWrapperProps> = ({
             <DndContext
                 sensors={sensors}
                 onDragStart={handleDragStart}
-                onDragMove={handleDragMove}
                 onDragEnd={handleDragEnd}
             >
                 <main className={className}>
