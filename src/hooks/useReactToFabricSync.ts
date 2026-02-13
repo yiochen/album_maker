@@ -117,6 +117,17 @@ export const useReactToFabricSync = ({
             }
         });
 
+        // After syncing properties, enforce z-order for existing objects.
+        // Elements should be stacked above background objects (seam is at index 0).
+        currentSpread.elements.forEach((element, index) => {
+            const obj = currentObjects.find(o => o.data?.id === element.id);
+            if (obj) {
+                // Fabric 7 API: moveObjectTo(object, index)
+                // We keep seam at 0, so elements start at 1.
+                canvas.moveObjectTo(obj, index + 1);
+            }
+        });
+
         currentObjects.forEach(obj => {
             const customObj = obj as CustomFabricObject;
             if (customObj.data?.id && customObj.data.id !== 'seam' && !validIds.has(customObj.data.id)) {
