@@ -1,12 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import type { PoolImage } from '../types';
-import type { SourceImage } from '../sources';
-import { getAllSources, getSource } from '../sources';
-import { usePageWidth, usePageHeight } from '../states/albumStore';
-import {
-    calculateThumbnailSize,
-    calculateCanvasMaxDimensions,
-} from '../utils/imageUtils';
+import { getAllSources } from '../sources';
+import { useImageImport } from '../hooks/useImageImport';
 import { DraggablePoolImage } from './DraggablePoolImage';
 import { UploadIcon } from './icons/UploadIcon';
 import { AddImageIcon } from './icons/AddImageIcon';
@@ -34,70 +29,13 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
     onClose,
 }) => {
     const [activeSourceId, setActiveSourceId] = useState<string>('dummy-colors');
-    const [isLoading, setIsLoading] = useState(false);
     const sources = getAllSources();
-    const activeSource = getSource(activeSourceId);
-    const pageWidth = usePageWidth();
-    const pageHeight = usePageHeight();
 
-    const handleImportFromSource = useCallback(async () => {
-        if (!activeSource || !pageWidth || !pageHeight) return;
+    const { importImages, isLoading } = useImageImport(onImport);
 
-        // Check if auth required
-        if (activeSource.requiresAuth && !activeSource.isAuthenticated()) {
-            try {
-                await activeSource.connect();
-            } catch (error) {
-                console.error('Failed to connect to source:', error);
-                alert(`Failed to connect to ${activeSource.name}. Please try again.`);
-                return;
-            }
-        }
-
-        setIsLoading(true);
-        try {
-            const result = await activeSource.fetchImages();
-
-            // Calculate canvas max dimensions based on album settings
-            const { maxWidth, maxHeight } = calculateCanvasMaxDimensions(
-                pageWidth,
-                pageHeight
-            );
-
-            // Convert source images to pool images with optimal thumbnail sizes
-            const poolImages: PoolImage[] = result.images.map((img: SourceImage) => {
-                // Calculate optimal thumbnail size for this image
-                const thumbSize = calculateThumbnailSize(
-                    img.width,
-                    img.height,
-                    maxWidth,
-                    maxHeight
-                );
-
-                return {
-                    id: crypto.randomUUID(),
-                    sourceId: activeSource.id,
-                    sourceImageId: img.id,
-                    baseUrl: activeSource.getFullUrl(img),
-                    thumbnailUrl: activeSource.getThumbnailUrl(img, thumbSize.width, thumbSize.height),
-                    filename: img.filename,
-                    mimeType: img.mimeType,
-                    width: img.width,
-                    height: img.height,
-                    thumbnailWidth: thumbSize.width,
-                    thumbnailHeight: thumbSize.height,
-                    createdAt: img.createdAt,
-                };
-            });
-
-            onImport(poolImages);
-        } catch (error) {
-            console.error('Failed to import from source:', error);
-            alert(`Failed to import from ${activeSource.name}. Please try again.`);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [activeSource, pageWidth, pageHeight, onImport]);
+    const handleImportClick = () => {
+        importImages(activeSourceId);
+    };
 
     return (
         <div className="image-pool" data-testid="image-pool">
@@ -133,7 +71,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                 </select>
                 <button
                     className="btn btn-primary btn-sm"
-                    onClick={handleImportFromSource}
+                    onClick={handleImportClick}
                     disabled={isLoading}
                     data-testid="import-button"
                 >
