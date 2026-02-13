@@ -247,3 +247,44 @@ export class MoveElementCommand implements Command<Album> {
         return null;
     }
 }
+
+/**
+ * Command to reorder an element within a spread's elements array (z-order change).
+ * Moves an element from one index to another, shifting other elements accordingly.
+ */
+export class ReorderElementCommand implements Command<Album> {
+    readonly type = 'REORDER_ELEMENT';
+
+    constructor(
+        public readonly spreadId: string,
+        public readonly elementId: string,
+        public readonly fromIndex: number,
+        public readonly toIndex: number,
+    ) { }
+
+    execute(state: Album): Album {
+        return this.applyReorder(state, this.fromIndex, this.toIndex);
+    }
+
+    undo(state: Album): Album {
+        return this.applyReorder(state, this.toIndex, this.fromIndex);
+    }
+
+    merge(): Command<Album> | null {
+        return null;
+    }
+
+    private applyReorder(state: Album, from: number, to: number): Album {
+        return {
+            ...state,
+            spreads: state.spreads.map(s => {
+                if (s.id !== this.spreadId) return s;
+                const elements = [...s.elements];
+                const [moved] = elements.splice(from, 1);
+                elements.splice(to, 0, moved);
+                return { ...s, elements };
+            }),
+            updatedAt: Date.now(),
+        };
+    }
+}

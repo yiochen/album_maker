@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Spread, PageElement, AlbumSettings } from '../types';
-import { useAlbumImagePool } from '../states/albumStore';
+import { useAlbumImagePool, useReorderElement } from '../states/albumStore';
 import { applyCoverTransform } from '../utils/imageUtils';
 import { applyRotate90, applyFlipH, applyFlipV, CONTENT_TRANSFORM_DEFAULTS } from '../utils/orientationMatrix';
 import { NumberInput } from './common/NumberInput';
@@ -48,6 +48,15 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     onElementUpdate,
     onElementDelete,
 }) => {
+    const reorderElement = useReorderElement();
+
+    // Z-order bounds for bring forward / send backward
+    const elementIndex = selectedElement
+        ? spread.elements.findIndex(e => e.id === selectedElement.id)
+        : -1;
+    const canBringForward = elementIndex >= 0 && elementIndex < spread.elements.length - 1;
+    const canSendBackward = elementIndex > 0;
+
     return (
         <aside className="properties-panel">
             <div className="properties-header">
@@ -63,6 +72,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                         settings={settings}
                         onUpdate={onElementUpdate}
                         onDelete={onElementDelete}
+                        canBringForward={canBringForward}
+                        canSendBackward={canSendBackward}
+                        onBringForward={() => {
+                            if (canBringForward) {
+                                reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex + 1);
+                            }
+                        }}
+                        onSendBackward={() => {
+                            if (canSendBackward) {
+                                reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex - 1);
+                            }
+                        }}
                     />
                 ) : (
                     <SpreadProperties
@@ -118,6 +139,10 @@ interface ElementPropertiesProps {
     settings: AlbumSettings;
     onUpdate: (updates: Partial<PageElement>, groupId?: string) => void;
     onDelete: () => void;
+    canBringForward: boolean;
+    canSendBackward: boolean;
+    onBringForward: () => void;
+    onSendBackward: () => void;
 }
 
 const ElementProperties: React.FC<ElementPropertiesProps> = ({
@@ -125,6 +150,10 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     settings,
     onUpdate,
     onDelete,
+    canBringForward,
+    canSendBackward,
+    onBringForward,
+    onSendBackward,
 }) => {
     const currentZoom = element.content.contentTransform?.zoom ?? 1;
 
@@ -412,11 +441,23 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         <RotateCwIcon />
                         <span>Rotate 90°</span>
                     </button>
-                    <button className="image-action-button" type="button" title="Bring forward">
+                    <button
+                        className="image-action-button"
+                        type="button"
+                        title="Bring forward"
+                        disabled={!canBringForward}
+                        onClick={onBringForward}
+                    >
                         <MoveForwardIcon />
                         <span>Bring forward</span>
                     </button>
-                    <button className="image-action-button" type="button" title="Send backward">
+                    <button
+                        className="image-action-button"
+                        type="button"
+                        title="Send backward"
+                        disabled={!canSendBackward}
+                        onClick={onSendBackward}
+                    >
                         <MoveBackwardIcon />
                         <span>Send backward</span>
                     </button>

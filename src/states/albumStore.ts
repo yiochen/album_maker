@@ -4,7 +4,8 @@ import {
     UpdateElementCommand,
     AddElementCommand,
     DeleteElementCommand,
-    MoveElementCommand
+    MoveElementCommand,
+    ReorderElementCommand
 } from '../commands/elementCommands';
 import {
     AddSpreadCommand,
@@ -54,6 +55,7 @@ interface AlbumState {
     removeFromPool: (imageId: string) => void;
     clearPool: () => void;
     moveElement: (fromSpreadId: string, toSpreadId: string, elementId: string, updates?: Partial<PageElement>) => void;
+    reorderElement: (spreadId: string, elementId: string, fromIndex: number, toIndex: number) => void;
 
     // History Actions
     undo: () => void;
@@ -260,6 +262,11 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
             syncState();
         },
 
+        reorderElement: (spreadId: string, elementId: string, fromIndex: number, toIndex: number) => {
+            commandManager.execute(new ReorderElementCommand(spreadId, elementId, fromIndex, toIndex));
+            syncState();
+        },
+
         undo: () => {
             commandManager.undo();
             syncState();
@@ -340,3 +347,6 @@ export const useAddToPool = () => useAlbumStore(state => state.addToPool);
 
 /** Select updateSpread action */
 export const useUpdateSpread = () => useAlbumStore(state => state.updateSpread);
+
+/** Select reorderElement action */
+export const useReorderElement = () => useAlbumStore(state => state.reorderElement);
