@@ -4,11 +4,6 @@ describe('Image Pool', () => {
         cy.waitForAppReady();
     });
 
-    it('should open image pool when clicking toggle button', () => {
-        cy.openImagePool();
-        cy.get('[data-testid="image-pool"]').should('be.visible');
-    });
-
     it('should display image pool title', () => {
         cy.openImagePool();
         cy.get('[data-testid="image-pool-title"]').should('contain', 'Image Pool');

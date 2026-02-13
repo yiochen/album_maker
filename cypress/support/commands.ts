@@ -88,7 +88,7 @@ Cypress.Commands.add('openImagePool', () => {
     // Check if image pool is already open
     cy.get('body').then(($body) => {
         if (!$body.find('[data-testid="image-pool"]').length) {
-            cy.get('[data-testid="toggle-image-pool-button"]').click();
+            cy.get('[data-testid="tab-trigger-images"]').click();
         }
     });
     // Wait for the image pool to appear

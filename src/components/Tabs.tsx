@@ -56,6 +56,7 @@ export const Tabs: React.FC<TabsProps> = ({
                             aria-selected={isActive}
                             className={`tabs-trigger ${isActive ? 'active' : ''}`}
                             onClick={() => handleChange(pane.props.id)}
+                            data-testid={`tab-trigger-${pane.props.id}`}
                         >
                             {pane.props.label}
                         </button>
