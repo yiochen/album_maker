@@ -14,3 +14,4 @@ This directory implements the **Command Pattern** to manage application state ch
 - **Do not** put side effects (like API calls) directly inside `execute` if they cannot be undone synchronously or if they break the purity of the state transition.
 - **Do not** modify the state object in place; always return a new state object (immutability).
 - **Deep merge `content`**: `PageElement.content` is a nested object (e.g., `ImageContent`). When applying `Partial<PageElement>` updates that include `content`, use `{ ...e.content, ...updates.content }` to avoid wiping sibling fields. This pattern is already implemented in `UpdateElementCommand` and `MoveElementCommand`.
+- **Z-Order Management**: Elements are rendered in array order (`spread.elements`). Moving an element's index in this array effectively changes its z-order. `ReorderElementCommand` handles both single-step (Forward/Backward) and jump (Front/Back) reordering while maintaining clean undo history.

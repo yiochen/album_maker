@@ -53,7 +53,7 @@ src/
 ├── states/       # Zustand Stores -> See src/states/AGENTS.md
 ├── templates/    # Layout Templates
 ├── types/        # TypeScript Definitions
-├── utils/        # Utility Functions
+├── utils/        # Utility Functions -> See src/utils/AGENTS.md
 ├── workers/      # Web Workers -> See src/workers/AGENTS.md
 ├── App.tsx       # Main Orchestrator
 ├── sw.ts         # Service Worker (compiled to sw.js by Vite plugin)

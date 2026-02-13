@@ -84,6 +84,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                 reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex - 1);
                             }
                         }}
+                        onBringToFront={() => {
+                            if (canBringForward) {
+                                reorderElement(spread.id, selectedElement.id, elementIndex, spread.elements.length - 1);
+                            }
+                        }}
+                        onSendToBack={() => {
+                            if (canSendBackward) {
+                                reorderElement(spread.id, selectedElement.id, elementIndex, 0);
+                            }
+                        }}
                     />
                 ) : (
                     <SpreadProperties
@@ -143,6 +153,8 @@ interface ElementPropertiesProps {
     canSendBackward: boolean;
     onBringForward: () => void;
     onSendBackward: () => void;
+    onBringToFront: () => void;
+    onSendToBack: () => void;
 }
 
 const ElementProperties: React.FC<ElementPropertiesProps> = ({
@@ -154,6 +166,8 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     canSendBackward,
     onBringForward,
     onSendBackward,
+    onBringToFront,
+    onSendToBack,
 }) => {
     const currentZoom = element.content.contentTransform?.zoom ?? 1;
 
@@ -460,6 +474,26 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                     >
                         <MoveBackwardIcon />
                         <span>Send backward</span>
+                    </button>
+                    <button
+                        className="image-action-button"
+                        type="button"
+                        title="Bring to front"
+                        disabled={!canBringForward}
+                        onClick={onBringToFront}
+                    >
+                        <MoveForwardIcon />
+                        <span>Bring to front</span>
+                    </button>
+                    <button
+                        className="image-action-button"
+                        type="button"
+                        title="Send to back"
+                        disabled={!canSendBackward}
+                        onClick={onSendToBack}
+                    >
+                        <MoveBackwardIcon />
+                        <span>Send to back</span>
                     </button>
                     <button
                         className="image-action-button image-action-delete"
