@@ -2,6 +2,7 @@ import React from 'react';
 import type { Spread, PageElement, AlbumSettings } from '../types';
 import { useAlbumImagePool } from '../states/albumStore';
 import { applyCoverTransform } from '../utils/imageUtils';
+import { applyRotate90, applyFlipH, applyFlipV, CONTENT_TRANSFORM_DEFAULTS } from '../utils/orientationMatrix';
 import { NumberInput } from './common/NumberInput';
 import { LockIcon } from './icons/LockIcon';
 import { UnlockIcon } from './icons/UnlockIcon';
@@ -11,9 +12,9 @@ import { CenterContentIcon } from './icons/CenterContentIcon';
 import { FlipHorizontalIcon } from './icons/FlipHorizontalIcon';
 import { FlipVerticalIcon } from './icons/FlipVerticalIcon';
 import { RotateCwIcon } from './icons/RotateCwIcon';
-import { RotateCcwIcon } from './icons/RotateCcwIcon';
 import { MoveForwardIcon } from './icons/MoveForwardIcon';
 import { MoveBackwardIcon } from './icons/MoveBackwardIcon';
+import { TrashIcon } from './icons/TrashIcon';
 
 /**
  * Props for the PropertiesPanel component.
@@ -125,7 +126,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     onUpdate,
     onDelete,
 }) => {
-    const currentZoom = element.contentTransform?.zoom ?? 1;
+    const currentZoom = element.content.contentTransform?.zoom ?? 1;
 
     const ppi = 300;
     const spreadWidth = settings.pageWidth * 2 * ppi;
@@ -188,7 +189,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
             const oldHeight = (newBox.y2 - newBox.y1) * spreadHeight;
             newBox.x2 = newBox.x1 + (newPx / spreadWidth);
 
-            if (element.lockAspectRatio) {
+            if (element.content.lockAspectRatio) {
                 const ratio = oldWidth / oldHeight;
                 const newHeightPx = newPx / ratio;
                 newBox.y2 = newBox.y1 + (newHeightPx / spreadHeight);
@@ -198,7 +199,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
             const oldHeight = (newBox.y2 - newBox.y1) * spreadHeight;
             newBox.y2 = newBox.y1 + (newPx / spreadHeight);
 
-            if (element.lockAspectRatio) {
+            if (element.content.lockAspectRatio) {
                 const ratio = oldWidth / oldHeight;
                 const newWidthPx = newPx * ratio;
                 newBox.x2 = newBox.x1 + (newWidthPx / spreadWidth);
@@ -209,13 +210,13 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
     };
 
     const handleAspectRatioToggle = () => {
-        onUpdate({ lockAspectRatio: !element.lockAspectRatio });
+        onUpdate({ content: { ...element.content, lockAspectRatio: !element.content.lockAspectRatio } });
     };
 
     const pool = useAlbumImagePool();
     const sourceImage = pool.find(img =>
-        img.sourceId === element.sourceId &&
-        img.sourceImageId === element.sourceImageId
+        img.sourceId === element.content.sourceId &&
+        img.sourceImageId === element.content.sourceImageId
     );
 
     /**
@@ -231,8 +232,8 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
         };
 
         const nextZoom = Math.min(3, Math.max(1, Math.round(value * 10) / 10));
-        let nextPanX = element.contentTransform?.panX ?? defaults.panX;
-        let nextPanY = element.contentTransform?.panY ?? defaults.panY;
+        let nextPanX = element.content.contentTransform?.panX ?? defaults.panX;
+        let nextPanY = element.content.contentTransform?.panY ?? defaults.panY;
 
         if (nextZoom === 1) {
             if (!sourceImage?.width || !sourceImage?.height) {
@@ -256,14 +257,14 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
         }
         const newTransform = {
             ...defaults,
-            ...(element.contentTransform || {}),
+            ...(element.content.contentTransform || {}),
             zoom: nextZoom,
             panX: nextPanX,
             panY: nextPanY,
         };
 
         onUpdate({
-            contentTransform: newTransform,
+            content: { ...element.content, contentTransform: newTransform },
         });
     };
 
@@ -275,13 +276,34 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
         };
 
         onUpdate({
-            contentTransform: {
-                ...defaults,
-                ...(element.contentTransform || {}),
-                panX: 0.5,
-                panY: 0.5,
+            content: {
+                ...element.content,
+                contentTransform: {
+                    ...defaults,
+                    ...(element.content.contentTransform || {}),
+                    panX: 0.5,
+                    panY: 0.5,
+                },
             },
         });
+    };
+
+    const handleRotate90 = () => {
+        const ct = element.content.contentTransform ?? CONTENT_TRANSFORM_DEFAULTS;
+        const newCt = applyRotate90(ct);
+        onUpdate({ content: { ...element.content, contentTransform: newCt } });
+    };
+
+    const handleFlipH = () => {
+        const ct = element.content.contentTransform ?? CONTENT_TRANSFORM_DEFAULTS;
+        const newCt = applyFlipH(ct);
+        onUpdate({ content: { ...element.content, contentTransform: newCt } });
+    };
+
+    const handleFlipV = () => {
+        const ct = element.content.contentTransform ?? CONTENT_TRANSFORM_DEFAULTS;
+        const newCt = applyFlipV(ct);
+        onUpdate({ content: { ...element.content, contentTransform: newCt } });
     };
 
     return (
@@ -297,11 +319,11 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                             type="button"
                             className="aspect-lock-button"
                             onClick={handleAspectRatioToggle}
-                            aria-label={element.lockAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
-                            aria-pressed={element.lockAspectRatio || false}
-                            title={element.lockAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                            aria-label={element.content.lockAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                            aria-pressed={element.content.lockAspectRatio || false}
+                            title={element.content.lockAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
                         >
-                            {element.lockAspectRatio ? <LockIcon /> : <UnlockIcon />}
+                            {element.content.lockAspectRatio ? <LockIcon /> : <UnlockIcon />}
                         </button>
                     </div>
                     <NumberInput
@@ -378,21 +400,17 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         <CenterContentIcon />
                         <span>Center content</span>
                     </button>
-                    <button className="image-action-button" type="button" title="Flip horizontal">
+                    <button className="image-action-button" type="button" title="Flip horizontal" onClick={handleFlipH}>
                         <FlipHorizontalIcon />
                         <span>Flip horizontal</span>
                     </button>
-                    <button className="image-action-button" type="button" title="Rotate 90°">
-                        <RotateCwIcon />
-                        <span>Rotate 90°</span>
-                    </button>
-                    <button className="image-action-button" type="button" title="Rotate -90°">
-                        <RotateCcwIcon />
-                        <span>Rotate -90°</span>
-                    </button>
-                    <button className="image-action-button" type="button" title="Flip vertical">
+                    <button className="image-action-button" type="button" title="Flip vertical" onClick={handleFlipV}>
                         <FlipVerticalIcon />
                         <span>Flip vertical</span>
+                    </button>
+                    <button className="image-action-button" type="button" title="Rotate 90°" onClick={handleRotate90}>
+                        <RotateCwIcon />
+                        <span>Rotate 90°</span>
                     </button>
                     <button className="image-action-button" type="button" title="Bring forward">
                         <MoveForwardIcon />
@@ -402,18 +420,16 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         <MoveBackwardIcon />
                         <span>Send backward</span>
                     </button>
+                    <button
+                        className="image-action-button image-action-delete"
+                        type="button"
+                        title="Delete"
+                        onClick={onDelete}
+                    >
+                        <TrashIcon style={{ color: 'var(--color-error, #e53935)' }} />
+                        <span>Delete</span>
+                    </button>
                 </div>
-            </div>
-
-            <div className="property-section">
-                <h3 className="property-section-title">Delete</h3>
-                <button
-                    className="btn btn-secondary"
-                    onClick={onDelete}
-                    style={{ color: 'var(--color-error)' }}
-                >
-                    Delete Image
-                </button>
             </div>
         </>
     );

@@ -21,7 +21,13 @@ export class UpdateElementCommand implements Command<Album> {
                         ...s,
                         elements: s.elements.map(e =>
                             e.id === this.elementId
-                                ? { ...e, ...this.updates }
+                                ? {
+                                    ...e,
+                                    ...this.updates,
+                                    content: this.updates.content
+                                        ? { ...e.content, ...this.updates.content }
+                                        : e.content,
+                                }
                                 : e
                         ),
                     }
@@ -40,7 +46,13 @@ export class UpdateElementCommand implements Command<Album> {
                         ...s,
                         elements: s.elements.map(e =>
                             e.id === this.elementId
-                                ? { ...e, ...this.oldValues }
+                                ? {
+                                    ...e,
+                                    ...this.oldValues,
+                                    content: this.oldValues.content
+                                        ? { ...e.content, ...this.oldValues.content }
+                                        : e.content,
+                                }
                                 : e
                         ),
                     }
@@ -172,7 +184,15 @@ export class MoveElementCommand implements Command<Album> {
                     };
                 }
                 if (s.id === this.toSpreadId) {
-                    const movedElement = this.updates ? { ...elementToMove, ...this.updates } : elementToMove;
+                    const movedElement = this.updates
+                        ? {
+                            ...elementToMove,
+                            ...this.updates,
+                            content: this.updates.content
+                                ? { ...elementToMove.content, ...this.updates.content }
+                                : elementToMove.content,
+                        }
+                        : elementToMove;
                     return {
                         ...s,
                         elements: [...s.elements, movedElement]
@@ -203,7 +223,15 @@ export class MoveElementCommand implements Command<Album> {
                     };
                 }
                 if (s.id === this.fromSpreadId) {
-                    const restoredElement = this.oldValues ? { ...elementToMove, ...this.oldValues } : elementToMove;
+                    const restoredElement = this.oldValues
+                        ? {
+                            ...elementToMove,
+                            ...this.oldValues,
+                            content: this.oldValues.content
+                                ? { ...elementToMove.content, ...this.oldValues.content }
+                                : elementToMove.content,
+                        }
+                        : elementToMove;
                     return {
                         ...s,
                         elements: [...s.elements, restoredElement]

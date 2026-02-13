@@ -1,12 +1,16 @@
 import * as fabric from 'fabric';
-import type { PageElement } from '../types';
+import type { PageElement, ImageContent } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from '../utils/imageUtils';
+import {
+    type OrientationMatrix, IDENTITY,
+    getOrientedDimensions, decomposeForRendering,
+} from '../utils/orientationMatrix';
 
 export class CanvasPageElement extends fabric.Group {
     public pageElement: PageElement;
     private innerImage: fabric.Image;
     private clipRect: fabric.Rect;
-    private onContentTransformChange?: (elementId: string, contentTransform: PageElement['contentTransform']) => void;
+    private onContentTransformChange?: (elementId: string, contentTransform: ImageContent['contentTransform']) => void;
     private panControlSize: number;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,7 +62,7 @@ export class CanvasPageElement extends fabric.Group {
      */
     async loadImage() {
         return new Promise<void>((resolve, reject) => {
-            fabric.util.loadImage(this.pageElement.imageUrl, { crossOrigin: 'anonymous' })
+            fabric.util.loadImage(this.pageElement.content.imageUrl, { crossOrigin: 'anonymous' })
                 .then((imgElement) => {
                     this.innerImage.setElement(imgElement);
                     this.applyLayout();
@@ -109,26 +113,37 @@ export class CanvasPageElement extends fabric.Group {
             zoom: 1,
             panX: 0.5,
             panY: 0.5,
-            ...(this.pageElement.contentTransform || {})
+            ...(this.pageElement.content.contentTransform || {})
         };
+
+        const orientation: OrientationMatrix = transform.orientation ?? IDENTITY;
+        const oriented = getOrientedDimensions(imgWidth, imgHeight, orientation);
 
         const result = applyCoverTransform(
             this.width,
             this.height,
-            imgWidth,
-            imgHeight,
+            oriented.width,
+            oriented.height,
             transform
         );
 
-        // Position relative to group top-left (0,0)
-        // Fabric groups with origin top-left usually position children relative to their center
-        // unless they are initialized with absolute coordinates.
-        // However, we want strict top-left alignment for the frame.
+        // Decompose orientation for Fabric.js (which applies flip-then-rotate in local space)
+        const { angleDeg, flipX } = decomposeForRendering(orientation);
+        const baseScale = result.scale;
+
+        // Position relative to group center
+        // The inner image center should be at (cover.left + cover.width/2, cover.top + cover.height/2)
+        // relative to the group's top-left, offset by -width/2, -height/2 for fabric group centering.
         this.innerImage.set({
-            left: result.left - this.width / 2,
-            top: result.top - this.height / 2,
-            scaleX: result.scale,
-            scaleY: result.scale,
+            left: result.left + result.width / 2 - this.width / 2,
+            top: result.top + result.height / 2 - this.height / 2,
+            originX: 'center',
+            originY: 'center',
+            scaleX: baseScale,
+            scaleY: baseScale,
+            flipX,
+            flipY: false,
+            angle: angleDeg,
         });
     }
 
@@ -141,14 +156,17 @@ export class CanvasPageElement extends fabric.Group {
             zoom: 1,
             panX: 0.5,
             panY: 0.5,
-            ...(this.pageElement.contentTransform || {})
+            ...(this.pageElement.content.contentTransform || {})
         };
+
+        const orientation: OrientationMatrix = transform.orientation ?? IDENTITY;
+        const oriented = getOrientedDimensions(imgWidth, imgHeight, orientation);
 
         const coverage = applyCoverTransform(
             this.width,
             this.height,
-            imgWidth,
-            imgHeight,
+            oriented.width,
+            oriented.height,
             transform
         );
 
@@ -167,7 +185,7 @@ export class CanvasPageElement extends fabric.Group {
             return false;
         }
 
-        this.pageElement.contentTransform = {
+        this.pageElement.content.contentTransform = {
             ...transform,
             panX: nextPanX,
             panY: nextPanY,
@@ -175,7 +193,7 @@ export class CanvasPageElement extends fabric.Group {
 
         this.applyCover();
         this.setCoords();
-        this.onContentTransformChange?.(this.pageElement.id, this.pageElement.contentTransform);
+        this.onContentTransformChange?.(this.pageElement.id, this.pageElement.content.contentTransform);
         return true;
     }
 

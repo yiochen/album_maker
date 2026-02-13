@@ -45,15 +45,68 @@ export interface Spread {
   background?: string;
 }
 
-export interface PageElement {
-  id: string;
-  type: 'image';
+/**
+ * Content data specific to image elements.
+ * Contains all image-related fields: URLs, source identification,
+ * inner positioning (SmartFrame), and aspect ratio settings.
+ */
+export interface ImageContent {
   imageUrl: string;
   thumbnailUrl: string;
   /** Identifies which photo source/provider this image came from (e.g., "google-photos", "dummy-colors") */
   sourceId: string;
   /** The unique ID of this image within its source (e.g., Google Photos media item ID) */
   sourceImageId: string;
+  /**
+   * Inner image positioning and orientation within the frame (SmartFrame).
+   *
+   * ## Rendering Pipeline (applied in this order):
+   *   1. Source image pixels
+   *   2. Apply `orientation` matrix (rotate/flip the source)
+   *   3. Compute effective dimensions (width/height swap if 90°/270°)
+   *   4. Compute "cover" fit to frame (background-size: cover)
+   *   5. Apply `zoom` (scale multiplier on top of cover)
+   *   6. Apply `panX`/`panY` (position offset within frame)
+   *   7. Clip to frame box
+   */
+  contentTransform?: {
+    /** Scale multiplier on top of the "cover" fit. 1.0 = exactly cover, >1 = zoom in. */
+    zoom: number;
+    /** Horizontal pan position (0.0 = left edge, 0.5 = centered, 1.0 = right edge). View-relative. */
+    panX: number;
+    /** Vertical pan position (0.0 = top edge, 0.5 = centered, 1.0 = bottom edge). View-relative. */
+    panY: number;
+    /**
+     * 2×2 orientation matrix [a, b, c, d] representing rotation and/or flip:
+     *   | a  b |
+     *   | c  d |
+     *
+     * The 8 possible states (D4 symmetry group):
+     *   [1,0,0,1]   = 0° (identity)      [-1,0,0,1]  = flip horizontal
+     *   [0,1,-1,0]  = 90° CW             [0,1,1,0]   = flip H + 90°
+     *   [-1,0,0,-1] = 180°               [1,0,0,-1]  = flip vertical
+     *   [0,-1,1,0]  = 270° CW            [0,-1,-1,0] = flip V + 90°
+     *
+     * Defaults to [1,0,0,1] (identity) when omitted.
+     */
+    orientation?: [number, number, number, number];
+  };
+  lockAspectRatio?: boolean;
+  originalAspectRatio?: number;
+}
+
+// Future element content types:
+// export interface TextContent { text: string; fontSize: number; fontFamily: string; color: string; }
+
+/**
+ * A visual element placed on a spread.
+ * Uses a discriminated union pattern via `type` + `content` to support
+ * different element kinds (image, text, shape, etc.) in the future.
+ */
+export interface PageElement {
+  id: string;
+  type: 'image'; // future: 'image' | 'text' | 'shape'
+  content: ImageContent; // future: ImageContent | TextContent | ShapeContent
   /**
    * Normalized relative coordinates (0.0 to 1.0) representing the edges.
    * x1: Left, y1: Top, x2: Right, y2: Bottom.
@@ -64,20 +117,6 @@ export interface PageElement {
     x2: number;
     y2: number;
   };
-
-  /**
-   * For inner image positioning within the frame (SmartFrame).
-   * Replacing the old 'crop' property.
-   */
-  contentTransform?: {
-    zoom: number;    // Scale relative to 'cover' size
-    panX: number;    // 0.0 - 1.0 (relative to frame)
-    panY: number;    // 0.0 - 1.0
-  };
-
-  lockAspectRatio?: boolean;
-
-  originalAspectRatio?: number;
 }
 
 // Position and Size kept for legacy use or general purposes if needed, 

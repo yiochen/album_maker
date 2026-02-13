@@ -1,5 +1,9 @@
 import type { Album, Spread, PageElement, ExportOptions, ExportProgress, AlbumSettings } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from '../utils/imageUtils';
+import {
+    type OrientationMatrix, IDENTITY,
+    getOrientedDimensions, decomposeForRendering,
+} from '../utils/orientationMatrix';
 
 const DEFAULT_OPTIONS: ExportOptions = {
     format: 'png',
@@ -95,18 +99,21 @@ const drawElement = async (
     if (element.type !== 'image') return;
 
     try {
-        const img = await loadImage(element.imageUrl);
+        const img = await loadImage(element.content.imageUrl);
 
         // Calculate discrete pixel boundaries
         const rect = calculateGaplessRect(element.box, canvasWidth, canvasHeight);
 
-        // SmartFrame Logic (Cover + Zoom/Pan)
-        const transform = element.contentTransform || { zoom: 1, panX: 0.5, panY: 0.5 };
+        // SmartFrame Logic (Cover + Zoom/Pan + Orientation)
+        const transform = element.content.contentTransform || { zoom: 1, panX: 0.5, panY: 0.5 };
+        const orientation: OrientationMatrix = transform.orientation ?? IDENTITY;
+        const oriented = getOrientedDimensions(img.width, img.height, orientation);
+
         const cover = applyCoverTransform(
             rect.width,
             rect.height,
-            img.width,
-            img.height,
+            oriented.width,
+            oriented.height,
             transform
         );
 
@@ -116,14 +123,28 @@ const drawElement = async (
         ctx.rect(rect.left, rect.top, rect.width, rect.height);
         ctx.clip();
 
-        // 2. Draw the image
-        // cover.left/top are relative to the frame origin
+        // 2. Position at image center, apply orientation, then draw
+        const imgCenterX = rect.left + cover.left + cover.width / 2;
+        const imgCenterY = rect.top + cover.top + cover.height / 2;
+
+        ctx.translate(imgCenterX, imgCenterY);
+        // Decompose orientation for canvas 2D (apply rotation first, then flip)
+        const { angleDeg, flipX } = decomposeForRendering(orientation);
+        const rotRad = angleDeg * Math.PI / 180;
+        if (rotRad !== 0) {
+            ctx.rotate(rotRad);
+        }
+        if (flipX) {
+            ctx.scale(-1, 1);
+        }
+        // Draw image centered at origin
+        const drawScale = cover.scale;
         ctx.drawImage(
             img,
-            rect.left + cover.left,
-            rect.top + cover.top,
-            cover.width,
-            cover.height
+            -img.width * drawScale / 2,
+            -img.height * drawScale / 2,
+            img.width * drawScale,
+            img.height * drawScale
         );
         ctx.restore();
     } catch (error) {

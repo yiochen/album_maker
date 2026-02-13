@@ -191,8 +191,16 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
 
             const oldValues: Partial<PageElement> = {};
             for (const key of Object.keys(updates) as Array<keyof PageElement>) {
-
-                setVal(oldValues, key, element[key]);
+                if (key === 'content' && updates.content) {
+                    // Deep capture: only store the sub-fields of content that are being updated
+                    const oldContent: Partial<typeof element.content> = {};
+                    for (const ck of Object.keys(updates.content) as Array<keyof typeof element.content>) {
+                        (oldContent as Record<string, unknown>)[ck] = element.content[ck];
+                    }
+                    (oldValues as Record<string, unknown>).content = oldContent;
+                } else {
+                    setVal(oldValues, key, element[key]);
+                }
             }
 
             commandManager.execute(new UpdateElementCommand(spreadId, elementId, updates, oldValues, groupId));
@@ -236,7 +244,15 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
                 if (el) {
                     oldValues = {};
                     for (const key of Object.keys(updates) as Array<keyof PageElement>) {
-                        setVal(oldValues, key, el[key]);
+                        if (key === 'content' && updates.content) {
+                            const oldContent: Partial<typeof el.content> = {};
+                            for (const ck of Object.keys(updates.content) as Array<keyof typeof el.content>) {
+                                (oldContent as Record<string, unknown>)[ck] = el.content[ck];
+                            }
+                            (oldValues as Record<string, unknown>).content = oldContent;
+                        } else {
+                            setVal(oldValues, key, el[key]);
+                        }
                     }
                 }
             }

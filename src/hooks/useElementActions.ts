@@ -71,18 +71,20 @@ export const useElementActions = () => {
             const newElement: PageElement = {
                 id: crypto.randomUUID(),
                 type: 'image',
-                imageUrl: image.baseUrl,
-                thumbnailUrl: image.thumbnailUrl || image.baseUrl,
-                sourceId: image.sourceId,
-                sourceImageId: image.sourceImageId,
-                box,
-                contentTransform: {
-                    zoom: 1,
-                    panX: 0.5,
-                    panY: 0.5,
+                content: {
+                    imageUrl: image.baseUrl,
+                    thumbnailUrl: image.thumbnailUrl || image.baseUrl,
+                    sourceId: image.sourceId,
+                    sourceImageId: image.sourceImageId,
+                    contentTransform: {
+                        zoom: 1,
+                        panX: 0.5,
+                        panY: 0.5,
+                    },
+                    originalAspectRatio: (image.width || 1) / (image.height || 1),
+                    lockAspectRatio: true,
                 },
-                originalAspectRatio: (image.width || 1) / (image.height || 1),
-                lockAspectRatio: true,
+                box,
             };
 
             addElement(spreadId, newElement);

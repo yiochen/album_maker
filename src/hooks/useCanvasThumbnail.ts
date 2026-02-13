@@ -1,6 +1,10 @@
 import { useCallback, useRef } from 'react';
 import { Spread, AlbumSettings } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from '../utils/imageUtils';
+import {
+    type OrientationMatrix, IDENTITY,
+    getOrientedDimensions, decomposeForRendering,
+} from '../utils/orientationMatrix';
 
 interface ThumbnailOptions {
     width: number;
@@ -88,27 +92,44 @@ export function useCanvasThumbnail() {
             const h = rect.height * scale;
 
             try {
-                const img = await loadImage(element.imageUrl);
+                const img = await loadImage(element.content.imageUrl);
 
-                // SmartFrame Cover Logic
-                const transform = element.contentTransform || { zoom: 1, panX: 0.5, panY: 0.5 };
-                const cover = applyCoverTransform(w, h, img.width, img.height, transform);
+                // SmartFrame Cover Logic with orientation
+                const transform = element.content.contentTransform || { zoom: 1, panX: 0.5, panY: 0.5 };
+                const orientation: OrientationMatrix = transform.orientation ?? IDENTITY;
+                const oriented = getOrientedDimensions(img.width, img.height, orientation);
+
+                const cover = applyCoverTransform(w, h, oriented.width, oriented.height, transform);
 
                 ctx.save();
                 ctx.beginPath();
                 ctx.rect(x, y, w, h);
                 ctx.clip();
 
+                // Position at image center, apply orientation, then draw
+                const imgCenterX = x + cover.left + cover.width / 2;
+                const imgCenterY = y + cover.top + cover.height / 2;
+
+                ctx.translate(imgCenterX, imgCenterY);
+                const { angleDeg, flipX } = decomposeForRendering(orientation);
+                const rotRad = angleDeg * Math.PI / 180;
+                if (rotRad !== 0) {
+                    ctx.rotate(rotRad);
+                }
+                if (flipX) {
+                    ctx.scale(-1, 1);
+                }
+                const drawScale = cover.scale;
                 ctx.drawImage(
                     img,
-                    x + cover.left,
-                    y + cover.top,
-                    cover.width,
-                    cover.height
+                    -img.width * drawScale / 2,
+                    -img.height * drawScale / 2,
+                    img.width * drawScale,
+                    img.height * drawScale
                 );
                 ctx.restore();
             } catch (err) {
-                console.error("Failed to load image for thumbnail", element.imageUrl, err);
+                console.error("Failed to load image for thumbnail", element.content.imageUrl, err);
                 ctx.fillStyle = '#f0f0f0';
                 ctx.fillRect(x, y, w, h);
                 ctx.strokeStyle = '#cccccc';

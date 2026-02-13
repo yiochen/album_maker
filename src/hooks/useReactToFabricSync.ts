@@ -91,7 +91,7 @@ export const useReactToFabricSync = ({
             if (existingObj) {
                 if (existingObj instanceof CanvasPageElement) {
                     const canvasEl = existingObj;
-                    const isLocked = element.lockAspectRatio;
+                    const isLocked = element.content.lockAspectRatio;
                     if (canvasEl.get('uniformScaling') !== !!isLocked) {
                         canvasEl.set({
                             uniformScaling: !!isLocked,
@@ -147,12 +147,14 @@ export const useReactToFabricSync = ({
                     borderScaleFactor: uiSizes.borderScaleFactor,
                     objectCaching: true,
                     noScaleCache: true,
-                    uniformScaling: !!element.lockAspectRatio,
-                    lockUniScaling: !!element.lockAspectRatio,
+                    uniformScaling: !!element.content.lockAspectRatio,
+                    lockUniScaling: !!element.content.lockAspectRatio,
                     panControlSize: uiSizes.cornerSize * 1.7,
                     onContentTransformChange: (elementId: string, contentTransform: { zoom: number; panX: number; panY: number }) => {
+                        const currentElement = spreadRef.current.elements.find(e => e.id === elementId);
+                        if (!currentElement) return;
                         onElementUpdateRef.current(spreadRef.current.id, elementId, {
-                            contentTransform,
+                            content: { ...currentElement.content, contentTransform },
                         });
                     },
                 });
@@ -167,7 +169,7 @@ export const useReactToFabricSync = ({
                 }
                 canvas.requestRenderAll();
             } catch (err) {
-                console.error("Failed to load", element.imageUrl, err);
+                console.error("Failed to load", element.content.imageUrl, err);
             } finally {
                 loadingIds.current.delete(element.id);
             }
