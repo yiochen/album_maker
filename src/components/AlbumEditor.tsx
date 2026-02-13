@@ -130,8 +130,6 @@ export const AlbumEditor: React.FC = () => {
         onRedo={redo}
         canUndo={canUndo}
         canRedo={canRedo}
-        isImagePoolOpen={isImagePoolOpen}
-        onImagePoolToggle={() => setImagePoolOpen(!isImagePoolOpen)}
       />
 
       <DndWrapper className="main-content">

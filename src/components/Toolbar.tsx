@@ -2,7 +2,6 @@ import React from 'react';
 import { UndoIcon } from './icons/UndoIcon';
 import { RedoIcon } from './icons/RedoIcon';
 import { SnappingIcon } from './icons/SnappingIcon';
-import { ImageIcon } from './icons/ImageIcon';
 
 /**
  * Props for the Toolbar component.
@@ -20,10 +19,6 @@ interface ToolbarProps {
     canUndo: boolean;
     /** Whether redo is currently available. */
     canRedo: boolean;
-    /** Whether the image pool is currently open. */
-    isImagePoolOpen: boolean;
-    /** Callback fired when the image pool toggle is clicked. */
-    onImagePoolToggle: () => void;
 }
 
 /**
@@ -36,8 +31,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     onRedo,
     canUndo,
     canRedo,
-    isImagePoolOpen,
-    onImagePoolToggle,
 }) => {
     return (
         <div className="toolbar-secondary" data-testid="toolbar-secondary">
@@ -71,16 +64,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 </button>
             </div>
 
-            <div className="toolbar-right">
-                <button
-                    className={`btn btn-ghost btn-icon ${isImagePoolOpen ? 'active' : ''}`}
-                    onClick={onImagePoolToggle}
-                    title="Toggle Image Pool"
-                    data-testid="toggle-image-pool-button"
-                >
-                    <ImageIcon width="20" height="20" />
-                </button>
-            </div>
         </div>
     );
 };
