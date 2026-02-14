@@ -8,6 +8,9 @@ import {
     calculateNewBoxSize,
     calculateNewZoomTransform
 } from '../../utils/propertyUtils';
+import { PropertySection } from '../common/PropertySection';
+import { PanelPropertyRow } from '../common/PanelPropertyRow';
+import { PanelActionButton } from '../common/PanelActionButton';
 import { NumberInput } from '../common/NumberInput';
 import { LockIcon } from '../icons/LockIcon';
 import { UnlockIcon } from '../icons/UnlockIcon';
@@ -20,6 +23,7 @@ import { RotateCwIcon } from '../icons/RotateCwIcon';
 import { MoveForwardIcon } from '../icons/MoveForwardIcon';
 import { MoveBackwardIcon } from '../icons/MoveBackwardIcon';
 import { TrashIcon } from '../icons/TrashIcon';
+import { APP_CONFIG } from '../../config';
 
 interface ElementPropertiesProps {
     element: PageElement;
@@ -44,7 +48,7 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
 }) => {
     const currentZoom = element.content.contentTransform?.zoom ?? 1;
 
-    const ppi = 300; // Ideally use APP_CONFIG.PPI or pass it, but utils use default.
+    const ppi = APP_CONFIG.PPI;
     const spreadWidth = settings.pageWidth * 2 * ppi;
     const spreadHeight = settings.pageHeight * ppi;
 
@@ -151,10 +155,7 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
 
     return (
         <>
-            <div className="property-section">
-                <h3 className="property-section-title">
-                    Size ({settings.unit})
-                </h3>
+            <PropertySection title={`Size (${settings.unit})`}>
                 <div className="property-size-grid">
                     <span className="property-label">Width</span>
                     <div className="aspect-lock-cell">
@@ -185,12 +186,10 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         immediate={true}
                     />
                 </div>
-            </div>
+            </PropertySection>
 
-            <div className="property-section">
-                <h3 className="property-section-title">Position ({settings.unit})</h3>
-                <div className="property-row">
-                    <span className="property-label">X</span>
+            <PropertySection title={`Position (${settings.unit})`}>
+                <PanelPropertyRow label="X">
                     <NumberInput
                         className="property-input"
                         value={xInUnits}
@@ -198,9 +197,8 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         step={0.1}
                         immediate={true}
                     />
-                </div>
-                <div className="property-row">
-                    <span className="property-label">Y</span>
+                </PanelPropertyRow>
+                <PanelPropertyRow label="Y">
                     <NumberInput
                         className="property-input"
                         value={yInUnits}
@@ -208,84 +206,72 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         step={0.1}
                         immediate={true}
                     />
-                </div>
-            </div>
+                </PanelPropertyRow>
+            </PropertySection>
 
-            <div className="property-section">
-                <h3 className="property-section-title">Actions</h3>
+            <PropertySection title="Actions">
                 <div className="image-action-grid">
-                    <button
-                        className="image-action-button"
-                        type="button"
+                    <PanelActionButton
                         title="Zoom in"
                         onClick={() => handleZoomChange(currentZoom + 0.1)}
                         disabled={currentZoom >= 3}
-                    >
-                        <ZoomInIcon />
-                        <span>Zoom in</span>
-                    </button>
-                    <button
-                        className="image-action-button"
-                        type="button"
+                        icon={<ZoomInIcon />}
+                        label="Zoom in"
+                    />
+                    <PanelActionButton
                         title="Zoom out"
                         onClick={() => handleZoomChange(currentZoom - 0.1)}
                         disabled={currentZoom <= 1}
-                    >
-                        <ZoomOutIcon />
-                        <span>Zoom out</span>
-                    </button>
-                    <button
-                        className="image-action-button"
-                        type="button"
+                        icon={<ZoomOutIcon />}
+                        label="Zoom out"
+                    />
+                    <PanelActionButton
                         title="Center content"
                         onClick={handleCenterContent}
-                    >
-                        <CenterContentIcon />
-                        <span>Center content</span>
-                    </button>
-                    <button className="image-action-button" type="button" title="Flip horizontal" onClick={handleFlipH}>
-                        <FlipHorizontalIcon />
-                        <span>Flip horizontal</span>
-                    </button>
-                    <button className="image-action-button" type="button" title="Flip vertical" onClick={handleFlipV}>
-                        <FlipVerticalIcon />
-                        <span>Flip vertical</span>
-                    </button>
-                    <button className="image-action-button" type="button" title="Rotate 90°" onClick={handleRotate90}>
-                        <RotateCwIcon />
-                        <span>Rotate 90°</span>
-                    </button>
-                    <button
-                        className="image-action-button"
-                        type="button"
+                        icon={<CenterContentIcon />}
+                        label="Center content"
+                    />
+                    <PanelActionButton
+                        title="Flip horizontal"
+                        onClick={handleFlipH}
+                        icon={<FlipHorizontalIcon />}
+                        label="Flip horizontal"
+                    />
+                    <PanelActionButton
+                        title="Flip vertical"
+                        onClick={handleFlipV}
+                        icon={<FlipVerticalIcon />}
+                        label="Flip vertical"
+                    />
+                    <PanelActionButton
+                        title="Rotate 90°"
+                        onClick={handleRotate90}
+                        icon={<RotateCwIcon />}
+                        label="Rotate 90°"
+                    />
+                    <PanelActionButton
                         title="Bring forward"
-                        disabled={!canBringForward}
                         onClick={onBringForward}
-                    >
-                        <MoveForwardIcon />
-                        <span>Bring forward</span>
-                    </button>
-                    <button
-                        className="image-action-button"
-                        type="button"
+                        disabled={!canBringForward}
+                        icon={<MoveForwardIcon />}
+                        label="Bring forward"
+                    />
+                    <PanelActionButton
                         title="Send backward"
-                        disabled={!canSendBackward}
                         onClick={onSendBackward}
-                    >
-                        <MoveBackwardIcon />
-                        <span>Send backward</span>
-                    </button>
-                    <button
-                        className="image-action-button image-action-delete"
-                        type="button"
+                        disabled={!canSendBackward}
+                        icon={<MoveBackwardIcon />}
+                        label="Send backward"
+                    />
+                    <PanelActionButton
                         title="Delete"
                         onClick={onDelete}
-                    >
-                        <TrashIcon style={{ color: 'var(--color-error, #e53935)' }} />
-                        <span>Delete</span>
-                    </button>
+                        icon={<TrashIcon style={{ color: 'var(--color-error, #e53935)' }} />}
+                        label="Delete"
+                        className="image-action-delete"
+                    />
                 </div>
-            </div>
+            </PropertySection>
         </>
     );
 };
