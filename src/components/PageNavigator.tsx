@@ -37,7 +37,10 @@ export const PageNavigator: React.FC = () => {
     }, [setCurrentSpreadIndex]);
 
     const handleAddSpread = () => {
-        addSpreads(1);
+        const insertIndex = currentSpreadIndex + 1;
+        addSpreads(1, undefined, insertIndex);
+        // Select the newly added spread
+        setCurrentSpreadIndex(insertIndex);
     };
 
     const handleDeleteSpread = (spreadId: string) => {

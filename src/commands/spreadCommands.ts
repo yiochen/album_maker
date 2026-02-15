@@ -5,17 +5,28 @@ import { createNewSpread } from '../services/storage';
 export class AddSpreadCommand implements Command<Album> {
     readonly type = 'ADD_SPREAD';
     private newSpread: Spread | null = null;
+    private actualIndex: number = -1;
 
-    constructor(public readonly templateId?: TemplateId) { }
+    constructor(
+        public readonly templateId?: TemplateId,
+        public readonly insertAt?: number
+    ) { }
 
     execute(state: Album): Album {
         if (!this.newSpread) {
             this.newSpread = createNewSpread(this.templateId);
         }
 
+        const newSpreads = [...state.spreads];
+        this.actualIndex = this.insertAt !== undefined && this.insertAt >= 0 && this.insertAt <= newSpreads.length
+            ? this.insertAt
+            : newSpreads.length;
+
+        newSpreads.splice(this.actualIndex, 0, this.newSpread);
+
         return {
             ...state,
-            spreads: [...state.spreads, this.newSpread],
+            spreads: newSpreads,
             updatedAt: Date.now(),
         };
     }
@@ -33,10 +44,12 @@ export class AddSpreadCommand implements Command<Album> {
 export class AddSpreadsCommand implements Command<Album> {
     readonly type = 'ADD_SPREADS';
     private newSpreads: Spread[] = [];
+    private actualIndex: number = -1;
 
     constructor(
         public readonly count: number = 2,
-        public readonly templateId?: TemplateId
+        public readonly templateId?: TemplateId,
+        public readonly insertAt?: number
     ) { }
 
     execute(state: Album): Album {
@@ -58,9 +71,16 @@ export class AddSpreadsCommand implements Command<Album> {
 
         if (this.newSpreads.length === 0) return state;
 
+        const newSpreads = [...state.spreads];
+        this.actualIndex = this.insertAt !== undefined && this.insertAt >= 0 && this.insertAt <= newSpreads.length
+            ? this.insertAt
+            : newSpreads.length;
+
+        newSpreads.splice(this.actualIndex, 0, ...this.newSpreads);
+
         return {
             ...state,
-            spreads: [...state.spreads, ...this.newSpreads],
+            spreads: newSpreads,
             updatedAt: Date.now(),
         };
     }
@@ -201,7 +221,7 @@ export class DeleteSpreadsCommand implements Command<Album> {
         const sortedSpreads = [...this.originalSpreads].sort((a, b) => a.index - b.index);
 
         for (const item of sortedSpreads) {
-             newSpreads.splice(item.index, 0, item.spread);
+            newSpreads.splice(item.index, 0, item.spread);
         }
 
         return {

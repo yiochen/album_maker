@@ -37,8 +37,8 @@ interface AlbumState {
     // Command wrappers
     setName: (name: string) => void;
     setSettings: (settings: Partial<AlbumSettings>) => void;
-    addSpread: (templateId?: TemplateId) => void;
-    addSpreads: (count?: number, templateId?: TemplateId) => void;
+    addSpread: (templateId?: TemplateId, index?: number) => void;
+    addSpreads: (count?: number, templateId?: TemplateId, index?: number) => void;
     deleteSpread: (spreadId: string) => void;
     deleteSpreads: (spreadIds: string[]) => void;
     reorderSpreads: (fromIndex: number, toIndex: number) => void;
@@ -96,13 +96,13 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
             syncState();
         },
 
-        addSpread: (templateId?: TemplateId) => {
-            commandManager.execute(new AddSpreadCommand(templateId));
+        addSpread: (templateId?: TemplateId, index?: number) => {
+            commandManager.execute(new AddSpreadCommand(templateId, index));
             syncState();
         },
 
-        addSpreads: (count: number = 1, templateId?: TemplateId) => {
-            commandManager.execute(new AddSpreadsCommand(count, templateId));
+        addSpreads: (count: number = 1, templateId?: TemplateId, index?: number) => {
+            commandManager.execute(new AddSpreadsCommand(count, templateId, index));
             syncState();
         },
 
