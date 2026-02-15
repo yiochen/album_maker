@@ -40,6 +40,12 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(handleGooglePhotos(event.request));
         return;
     }
+
+    // Route 3: Uploaded images from IndexedDB
+    if (url.pathname.startsWith('/__local__/uploaded/')) {
+        event.respondWith(handleUploadedImage(url));
+        return;
+    }
 });
 
 // ─── Dummy Colors Route ──────────────────────────────────────────────
@@ -129,6 +135,84 @@ async function handleGooglePhotos(request: Request): Promise<Response> {
     } catch {
         return new Response('Network error', { status: 503 });
     }
+}
+
+// ─── Uploaded Images Route ───────────────────────────────────────────
+
+/**
+ * Serves uploaded images from IndexedDB.
+ * URL format:
+ *   - /__local__/uploaded/full/<id>
+ *   - /__local__/uploaded/thumb/<id>
+ */
+async function handleUploadedImage(url: URL): Promise<Response> {
+    const segments = url.pathname.split('/');
+    // segments: ['', '__local__', 'uploaded', 'full|thumb', '<id>']
+    const type = segments[3];
+    const id = segments[4];
+
+    if (!id || (type !== 'full' && type !== 'thumb')) {
+        return new Response('Invalid uploaded image URL', { status: 400 });
+    }
+
+    try {
+        const record = await getRecordFromDB(id);
+        if (!record) {
+            return new Response('Image not found', { status: 404 });
+        }
+
+        const blob = type === 'full' ? record.blob : record.thumbnailBlob;
+        return new Response(blob, {
+            headers: {
+                'Content-Type': record.mimeType,
+                'Cache-Control': 'public, max-age=31536000, immutable',
+            },
+        });
+    } catch (error) {
+        console.error('Failed to fetch from IndexedDB:', error);
+        return new Response('Database error', { status: 500 });
+    }
+}
+
+interface UploadedImageRecord {
+    id: string;
+    blob: Blob;
+    thumbnailBlob: Blob;
+    filename: string;
+    mimeType: string;
+    width: number;
+    height: number;
+    createdAt: number;
+}
+
+/**
+ * Raw IndexedDB lookup logic for Service Worker.
+ * Bypasses Dexie to keep SW footprint small and avoid complex imports.
+ */
+function getRecordFromDB(id: string): Promise<UploadedImageRecord | null> {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('AlbumEditorDB'); // Must match db/index.ts
+
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            const db = request.result;
+            try {
+                // Check if the store exists to avoid crashes during initial/failed migrations
+                if (!db.objectStoreNames.contains('uploadedImages')) {
+                    resolve(null);
+                    return;
+                }
+                const transaction = db.transaction('uploadedImages', 'readonly');
+                const store = transaction.objectStore('uploadedImages');
+                const getRequest = store.get(id);
+
+                getRequest.onsuccess = () => resolve(getRequest.result || null);
+                getRequest.onerror = () => reject(getRequest.error);
+            } catch (e) {
+                reject(e);
+            }
+        };
+    });
 }
 
 export { };

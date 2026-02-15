@@ -6,6 +6,8 @@ import { DraggablePoolImage } from './DraggablePoolImage';
 import { UploadIcon } from './icons/UploadIcon';
 import { AddImageIcon } from './icons/AddImageIcon';
 import { CloseIcon } from './icons/CloseIcon';
+import { usePageWidth, usePageHeight } from '../states/albumStore';
+import { processAndSaveUpload } from '../services/imageUploadService';
 
 /**
  * Props for the ImagePool component.
@@ -29,13 +31,42 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
     onClose,
 }) => {
     const [activeSourceId, setActiveSourceId] = useState<string>('dummy-colors');
-    const sources = getAllSources();
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const pageWidth = usePageWidth();
+    const pageHeight = usePageHeight();
 
-    const { importImages, isLoading } = useImageImport(onImport);
+    const sources = getAllSources();
+    const { importImages, isLoading: isImporting } = useImageImport(onImport);
+    const [isUploading, setIsUploading] = useState(false);
 
     const handleImportClick = () => {
-        importImages(activeSourceId);
+        if (activeSourceId === 'uploaded') {
+            fileInputRef.current?.click();
+        } else {
+            importImages(activeSourceId);
+        }
     };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0 || !pageWidth || !pageHeight) return;
+
+        setIsUploading(true);
+        try {
+            const newImages = await Promise.all(
+                files.map(file => processAndSaveUpload(file, pageWidth, pageHeight))
+            );
+            onImport(newImages);
+        } catch (error) {
+            console.error('Failed to upload images:', error);
+            alert('Failed to upload images. Please try again.');
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const isLoading = isImporting || isUploading;
 
     return (
         <div className="image-pool" data-testid="image-pool">
@@ -78,15 +109,24 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                     {isLoading ? (
                         <>
                             <span className="loading-spinner" style={{ width: 14, height: 14 }} />
-                            Importing...
+                            {isUploading ? 'Uploading...' : 'Importing...'}
                         </>
                     ) : (
                         <>
                             <UploadIcon width="14" height="14" />
-                            Import
+                            {activeSourceId === 'uploaded' ? 'Upload Files' : 'Import'}
                         </>
                     )}
                 </button>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    multiple
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    data-testid="file-upload-input"
+                />
             </div>
 
             <div className="image-pool-content">

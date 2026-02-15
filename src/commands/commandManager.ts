@@ -17,6 +17,14 @@ export class CommandManager<T> {
         this.future = [];
     }
 
+    /**
+     * Updates the current state without adding to history.
+     * Useful for auxiliary state changes that shouldn't clutter the undo stack.
+     */
+    updatePresent(state: T) {
+        this.present = state;
+    }
+
     getState(): T | null {
         return this.present;
     }

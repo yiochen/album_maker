@@ -29,12 +29,25 @@ export interface SettingsRecord {
     value: string;
 }
 
+export interface UploadedImageRecord {
+    id: string; // Internal DB Primary Key (UUID)
+    sourceImageId: string; // Stable ID (<CreationDate>/<Filename>)
+    blob: Blob;
+    thumbnailBlob: Blob;
+    filename: string;
+    mimeType: string;
+    width: number;
+    height: number;
+    createdAt: number;
+}
+
 // Database class
 class AlbumDatabase extends Dexie {
     albums!: Table<AlbumRecord, string>;
     thumbnailCache!: Table<ThumbnailCacheRecord, string>;
     spreadThumbnails!: Table<SpreadThumbnailRecord, string>;
     settings!: Table<SettingsRecord, string>;
+    uploadedImages!: Table<UploadedImageRecord, string>;
 
     constructor() {
         super('AlbumEditorDB');
@@ -60,6 +73,11 @@ class AlbumDatabase extends Dexie {
         }).upgrade(tx => {
             // Optional: migrate or clear old thumbnails. Clearing is safer/easier.
             return tx.table('spreadThumbnails').clear();
+        });
+
+        // Version 4: Add uploaded images table
+        this.version(4).stores({
+            uploadedImages: 'id, createdAt',
         });
     }
 }
@@ -219,3 +237,26 @@ export function generateSpreadContentHash(spread: { elements: Array<{ id: string
     }
     return hash.toString(36);
 }
+
+// Helper functions for uploaded images
+export const uploadedImageDB = {
+    async get(id: string): Promise<UploadedImageRecord | undefined> {
+        return db.uploadedImages.get(id);
+    },
+
+    async getAll(): Promise<UploadedImageRecord[]> {
+        return db.uploadedImages.orderBy('createdAt').reverse().toArray();
+    },
+
+    async save(record: UploadedImageRecord): Promise<void> {
+        await db.uploadedImages.put(record);
+    },
+
+    async delete(id: string): Promise<void> {
+        await db.uploadedImages.delete(id);
+    },
+
+    async clear(): Promise<void> {
+        await db.uploadedImages.clear();
+    },
+};

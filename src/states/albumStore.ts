@@ -19,11 +19,6 @@ import {
     SetAlbumNameCommand,
     SetSettingsCommand
 } from '../commands/albumCommands';
-import {
-    AddToPoolCommand,
-    RemoveFromPoolCommand,
-    ClearPoolCommand
-} from '../commands/poolCommands';
 import { CommandManager } from '../commands/commandManager';
 import { setVal } from '../utils/typeUtil';
 
@@ -222,17 +217,59 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
         },
 
         addToPool: (images: PoolImage[]) => {
-            commandManager.execute(new AddToPoolCommand(images));
+            const album = get().album;
+            if (!album) return;
+
+            // Deduplicate and reorder:
+            // 1. Identify which images are already in the pool based on (sourceId, sourceImageId)
+            const newImageMap = new Map<string, PoolImage>();
+            images.forEach(img => {
+                const key = `${img.sourceId}/${img.sourceImageId}`;
+                newImageMap.set(key, img);
+            });
+
+            // 2. Remove any existing versions of these images from the current pool
+            const filteredPool = album.imagePool.filter(img => {
+                const key = `${img.sourceId}/${img.sourceImageId}`;
+                return !newImageMap.has(key);
+            });
+
+            // 3. Prepend the new images (which includes updated versions of re-added ones)
+            const newAlbum = {
+                ...album,
+                imagePool: [...images, ...filteredPool],
+                updatedAt: Date.now(),
+            };
+
+            commandManager.updatePresent(newAlbum);
             syncState();
         },
 
         removeFromPool: (imageId: string) => {
-            commandManager.execute(new RemoveFromPoolCommand(imageId));
+            const album = get().album;
+            if (!album) return;
+
+            const newAlbum = {
+                ...album,
+                imagePool: album.imagePool.filter(img => img.id !== imageId),
+                updatedAt: Date.now(),
+            };
+
+            commandManager.updatePresent(newAlbum);
             syncState();
         },
 
         clearPool: () => {
-            commandManager.execute(new ClearPoolCommand());
+            const album = get().album;
+            if (!album) return;
+
+            const newAlbum = {
+                ...album,
+                imagePool: [],
+                updatedAt: Date.now(),
+            };
+
+            commandManager.updatePresent(newAlbum);
             syncState();
         },
 

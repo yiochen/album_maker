@@ -1,6 +1,7 @@
 import { PhotoSource, isInitializableSource } from './types';
 import { googlePhotosSource } from './googlePhotos';
 import { dummyColorsSource } from './dummyColors';
+import { uploadPhotoSource } from './UploadPhotoSource';
 
 // Re-export types
 export * from './types';
@@ -11,6 +12,7 @@ const sources: Map<string, PhotoSource> = new Map();
 // Register built-in sources
 sources.set(googlePhotosSource.id, googlePhotosSource);
 sources.set(dummyColorsSource.id, dummyColorsSource);
+sources.set(uploadPhotoSource.id, uploadPhotoSource);
 
 // Get a source by ID
 export const getSource = (id: string): PhotoSource | undefined => {
@@ -49,3 +51,4 @@ export const initializeSources = async (): Promise<void> => {
 // Export source instances for direct access
 export { googlePhotosSource } from './googlePhotos';
 export { dummyColorsSource } from './dummyColors';
+export { uploadPhotoSource } from './UploadPhotoSource';
