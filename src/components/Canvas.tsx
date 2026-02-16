@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useState, useLayoutEffect } from 'react';
 import type { PoolImage } from '../types';
 import { useCanvasRender } from '../hooks/useCanvasRender';
 import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
@@ -82,7 +82,27 @@ export const Canvas: React.FC<CanvasProps> = ({
     const zoomedWidth = canvasWidth * (zoom / 100);
     const zoomedHeight = canvasHeight * (zoom / 100);
 
-    const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+    const [viewportSize, setViewportSize] = useState({
+        innerWidth: 0,
+        innerHeight: 0,
+        paddingLeft: 0,
+        paddingTop: 0,
+    });
+
+    const getViewportMetrics = (viewport: HTMLDivElement) => {
+        const styles = window.getComputedStyle(viewport);
+        const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
+        const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
+        const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+        const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+
+        return {
+            innerWidth: Math.max(0, viewport.clientWidth - paddingLeft - paddingRight),
+            innerHeight: Math.max(0, viewport.clientHeight - paddingTop - paddingBottom),
+            paddingLeft,
+            paddingTop,
+        };
+    };
 
     // Track viewport size to calculate safe margins
     useEffect(() => {
@@ -90,10 +110,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const viewport = containerRef.current;
 
         const updateSize = () => {
-            setViewportSize({
-                width: viewport.clientWidth,
-                height: viewport.clientHeight
-            });
+            setViewportSize(getViewportMetrics(viewport));
         };
 
         const resizeObserver = new ResizeObserver(updateSize);
@@ -105,24 +122,56 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     // Margins ensure the content is centered when smaller than viewport,
     // but starts at (0,0) when larger to avoid clipping overflow.
-    const marginL = Math.max(0, (viewportSize.width - zoomedWidth) / 2);
-    const marginT = Math.max(0, (viewportSize.height - zoomedHeight) / 2);
+    const marginL = Math.max(0, (viewportSize.innerWidth - zoomedWidth) / 2);
+    const marginT = Math.max(0, (viewportSize.innerHeight - zoomedHeight) / 2);
 
-    // Auto-center the canvas when zoom level changes
-    useEffect(() => {
-        if (!containerRef.current) return;
+    // Keep current viewport position stable across zoom changes.
+    // This prevents "jump to center" and preserves where the user is looking.
+    const previousZoomRef = useRef(zoom);
+    useLayoutEffect(() => {
         const viewport = containerRef.current;
+        if (!viewport) return;
 
-        // Calculate target scroll positions to keep the content centered
-        const targetScrollLeft = Math.max(0, (zoomedWidth - viewport.clientWidth) / 2);
-        const targetScrollTop = Math.max(0, (zoomedHeight - viewport.clientHeight) / 2);
+        const previousZoom = previousZoomRef.current;
+        if (previousZoom === zoom) return;
 
-        // We use scrollLeft/Top directly to jump to the center
-        viewport.scrollLeft = targetScrollLeft;
-        viewport.scrollTop = targetScrollTop;
-    }, [zoom, zoomedWidth, zoomedHeight]);
+        const viewportWidth = viewport.clientWidth;
+        const viewportHeight = viewport.clientHeight;
+        const {
+            innerWidth,
+            innerHeight,
+            paddingLeft,
+            paddingTop,
+        } = getViewportMetrics(viewport);
+
+        const previousZoomedWidth = canvasWidth * (previousZoom / 100);
+        const previousZoomedHeight = canvasHeight * (previousZoom / 100);
+        const previousMarginL = Math.max(0, (innerWidth - previousZoomedWidth) / 2);
+        const previousMarginT = Math.max(0, (innerHeight - previousZoomedHeight) / 2);
+
+        // Preserve the viewport's top-left point in canvas space.
+        const prevContentX = Math.max(0, viewport.scrollLeft - (paddingLeft + previousMarginL));
+        const prevContentY = Math.max(0, viewport.scrollTop - (paddingTop + previousMarginT));
+        const ratio = zoom / previousZoom;
+        const nextContentX = prevContentX * ratio;
+        const nextContentY = prevContentY * ratio;
+
+        const nextScrollLeft = nextContentX + paddingLeft + marginL;
+        const nextScrollTop = nextContentY + paddingTop + marginT;
+
+        const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewportWidth);
+        const maxScrollTop = Math.max(0, viewport.scrollHeight - viewportHeight);
+
+        viewport.scrollLeft = Math.min(maxScrollLeft, Math.max(0, nextScrollLeft));
+        viewport.scrollTop = Math.min(maxScrollTop, Math.max(0, nextScrollTop));
+
+        previousZoomRef.current = zoom;
+    }, [zoom, canvasWidth, canvasHeight, marginL, marginT, zoomedWidth, zoomedHeight]);
 
     const canvasStyle = {
+        width: `${canvasWidth}px`,
+        height: `${canvasHeight}px`,
+        position: 'relative' as const,
         transform: `scale(${zoom / 100})`,
         transformOrigin: '0 0', // Top-left origin for standard expansion
     };
@@ -144,6 +193,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                     outline: 'none',
                     overflow: 'auto',
                     display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'flex-start',
                 }}
             >
                 {/* Scroller content wrapper ensures the viewport has content to scroll */}
@@ -162,7 +213,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                         style={canvasStyle}
                         data-testid="interaction-layer"
                     >
-                        <div ref={wrapperRef}>
+                        <div ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
                             <canvas ref={canvasElRef} data-testid="canvas-layer" />
                             {currentSpread.elements.length === 0 && (
                                 <div className="canvas-placeholder" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', textAlign: 'center', width: '100%' }}>

@@ -29,9 +29,16 @@ export const useCanvasZoom = ({
     const fitToViewport = useCallback(() => {
         if (!containerRef.current) return;
         const viewport = containerRef.current;
-        const padding = 64;
-        const availableWidth = viewport.clientWidth - padding;
-        const availableHeight = viewport.clientHeight - padding;
+        const styles = window.getComputedStyle(viewport);
+        const paddingX =
+            (Number.parseFloat(styles.paddingLeft) || 0) +
+            (Number.parseFloat(styles.paddingRight) || 0);
+        const paddingY =
+            (Number.parseFloat(styles.paddingTop) || 0) +
+            (Number.parseFloat(styles.paddingBottom) || 0);
+
+        const availableWidth = Math.max(1, viewport.clientWidth - paddingX);
+        const availableHeight = Math.max(1, viewport.clientHeight - paddingY);
 
         const scaleX = availableWidth / canvasWidth;
         const scaleY = availableHeight / canvasHeight;
