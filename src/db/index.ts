@@ -9,12 +9,6 @@ export interface AlbumRecord {
     data: string; // JSON stringified Album
 }
 
-export interface ThumbnailCacheRecord {
-    url: string;
-    blob: Blob;
-    timestamp: number;
-    size: number; // thumbnail size
-}
 
 
 export interface SettingsRecord {
@@ -37,7 +31,6 @@ export interface UploadedImageRecord {
 // Database class
 class AlbumDatabase extends Dexie {
     albums!: Table<AlbumRecord, string>;
-    thumbnailCache!: Table<ThumbnailCacheRecord, string>;
     spreadThumbnails!: Table<SpreadThumbnailRecord, string>;
     settings!: Table<SettingsRecord, string>;
     uploadedImages!: Table<UploadedImageRecord, string>;
@@ -47,7 +40,6 @@ class AlbumDatabase extends Dexie {
 
         this.version(1).stores({
             albums: 'id, name, lastModified',
-            thumbnailCache: 'url, timestamp',
             settings: 'key',
         });
 
@@ -56,7 +48,6 @@ class AlbumDatabase extends Dexie {
         // If users have existing v2 data with spreadIndex, this might cause issues or just be ignored/overwritten.
         this.version(2).stores({
             albums: 'id, name, lastModified',
-            thumbnailCache: 'url, timestamp',
             spreadThumbnails: 'id, albumId, spreadIndex, timestamp', // Legacy
             settings: 'key',
         });
@@ -77,9 +68,6 @@ class AlbumDatabase extends Dexie {
 
 // Singleton instance
 export const db = new AlbumDatabase();
-
-// Thumbnail cache TTL (7 days)
-const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 
 // Helper functions for album operations
 export const albumDB = {
@@ -105,53 +93,6 @@ export const albumDB = {
     async exists(id: string): Promise<boolean> {
         const count = await db.albums.where('id').equals(id).count();
         return count > 0;
-    },
-};
-
-// Helper functions for thumbnail cache
-export const thumbnailDB = {
-    async get(url: string): Promise<Blob | null> {
-        const record = await db.thumbnailCache.get(url);
-        if (!record) return null;
-
-        // Check if cache is expired
-        if (Date.now() - record.timestamp > CACHE_TTL) {
-            await db.thumbnailCache.delete(url);
-            return null;
-        }
-
-        return record.blob;
-    },
-
-    async set(url: string, blob: Blob, size: number): Promise<void> {
-        await db.thumbnailCache.put({
-            url,
-            blob,
-            timestamp: Date.now(),
-            size,
-        });
-    },
-
-    async delete(url: string): Promise<void> {
-        await db.thumbnailCache.delete(url);
-    },
-
-    async clear(): Promise<void> {
-        await db.thumbnailCache.clear();
-    },
-
-    async cleanup(): Promise<number> {
-        const expired = Date.now() - CACHE_TTL;
-        const count = await db.thumbnailCache
-            .where('timestamp')
-            .below(expired)
-            .delete();
-        return count;
-    },
-
-    async getSize(): Promise<number> {
-        const all = await db.thumbnailCache.toArray();
-        return all.reduce((sum, record) => sum + record.blob.size, 0);
     },
 };
 

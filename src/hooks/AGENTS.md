@@ -56,13 +56,11 @@ The application uses a **normalized box model** for storage and a two-tier pixel
 - **`useElementActions`**: Creates/updates elements. All inputs and outputs are in MODEL PIXELS.
 
 ### State Management
-- **`useHistory`**: Manages the application state stack (past/present/future) and integrates with the Command Pattern.
-- **`useAlbum`**: High-level hook exposing album actions (add spread, update element, etc.) wrapping `useHistory`.
+- **`useAlbum`**: High-level hook exposing album actions (add spread, update element, etc.) via `useAlbumStore`.
 - **`useAutoSave`**: Handles auto-saving album data to IndexedDB.
 
 ## Rules of Engagement
 - **Do** separate complex logic from components into custom hooks.
-- **Do** use `useHistory` for any state that requires Undo/Redo support.
 - **Do** use `APP_CONFIG` for constants used within hooks.
 - **Do** document which pixel coordinate system each function expects/returns.
 - **Do not** use `useEffect` to sync state with props if it can be derived during render.

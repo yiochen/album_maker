@@ -6,7 +6,7 @@ This directory implements the **Command Pattern** to manage application state ch
 ## Key Logic
 - **Command Interface**: Defined in `Command.ts`. All commands must implement `execute`, `undo`, and optionally `merge`.
 - **Batching**: User interactions (like dragging) generate many small updates. These are batched into a single history entry using a unique `groupId` (generated on `MouseDown`) and the `merge` method.
-- **State Management**: Commands are dispatched via the `useHistory` hook (in `src/hooks/`), which maintains the `past`, `present`, and `future` stacks.
+- **State Management**: Commands are dispatched via the `CommandManager` singleton used within `src/states/albumStore.ts`.
 
 ## Rules of Engagement
 - **Do** implement `undo` to exactly reverse the `execute` operation.
