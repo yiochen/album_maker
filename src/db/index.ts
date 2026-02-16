@@ -9,12 +9,6 @@ export interface AlbumRecord {
     data: string; // JSON stringified Album
 }
 
-export interface ThumbnailCacheRecord {
-    url: string;
-    blob: Blob;
-    timestamp: number;
-    size: number; // thumbnail size
-}
 
 
 export interface SettingsRecord {
@@ -37,7 +31,6 @@ export interface UploadedImageRecord {
 // Database class
 class AlbumDatabase extends Dexie {
     albums!: Table<AlbumRecord, string>;
-    thumbnailCache!: Table<ThumbnailCacheRecord, string>; // Deprecated/Unused
     spreadThumbnails!: Table<SpreadThumbnailRecord, string>;
     settings!: Table<SettingsRecord, string>;
     uploadedImages!: Table<UploadedImageRecord, string>;
@@ -47,7 +40,6 @@ class AlbumDatabase extends Dexie {
 
         this.version(1).stores({
             albums: 'id, name, lastModified',
-            thumbnailCache: 'url, timestamp',
             settings: 'key',
         });
 
@@ -56,7 +48,6 @@ class AlbumDatabase extends Dexie {
         // If users have existing v2 data with spreadIndex, this might cause issues or just be ignored/overwritten.
         this.version(2).stores({
             albums: 'id, name, lastModified',
-            thumbnailCache: 'url, timestamp',
             spreadThumbnails: 'id, albumId, spreadIndex, timestamp', // Legacy
             settings: 'key',
         });

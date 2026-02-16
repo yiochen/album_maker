@@ -73,8 +73,7 @@ Registered via `src/registerSW.ts` from `main.tsx`. Uses `skipWaiting()` + `clie
 1.  **Read Before You Write**: Always consult the local `AGENTS.md` in the directory you are working in.
 2.  **Visual Regression**: We use `cypress-visual-regression`. Run `npm run cypress:ci` to verify changes, especially for Canvas rendering.
 3.  **State Management**:
-    *   Use **Zustand** stores (`src/states/`) for global state.
-    *   Use `useHistory` (wrapped in `albumStore`) for undoable state.
+    *   Use **Zustand** stores (`src/states/`) for global state and history (Undo/Redo via `CommandManager`).
     *   Use `useReducer` or "State from Props" for complex local state.
     *   Avoid deep prop drilling; use composition or context where appropriate.
 4.  **Testing**:
