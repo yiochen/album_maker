@@ -54,7 +54,7 @@ export const DndWrapper: React.FC<DndWrapperProps> = ({
     // Configure sensors for both pointer (mouse) and touch
     const pointerSensor = useSensor(PointerSensor, {
         activationConstraint: {
-            distance: 5, // 5px movement required to start drag
+            distance: 1, // Reduced to 1px to be more sensitive for tests and mouse
         },
     });
     const touchSensor = useSensor(TouchSensor, {
