@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import type { PoolImage } from '../types';
 import { useCanvasRender } from '../hooks/useCanvasRender';
 import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
@@ -78,10 +78,53 @@ export const Canvas: React.FC<CanvasProps> = ({
         };
     }, [registerCanvasDropTarget, wrapperRef, zoom, currentSpread?.id, onImageDrop, currentSpread]);
 
-    // Styles
+    // Styles for scrollable content
+    const zoomedWidth = canvasWidth * (zoom / 100);
+    const zoomedHeight = canvasHeight * (zoom / 100);
+
+    const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+
+    // Track viewport size to calculate safe margins
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const viewport = containerRef.current;
+
+        const updateSize = () => {
+            setViewportSize({
+                width: viewport.clientWidth,
+                height: viewport.clientHeight
+            });
+        };
+
+        const resizeObserver = new ResizeObserver(updateSize);
+        resizeObserver.observe(viewport);
+        updateSize();
+
+        return () => resizeObserver.disconnect();
+    }, []);
+
+    // Margins ensure the content is centered when smaller than viewport,
+    // but starts at (0,0) when larger to avoid clipping overflow.
+    const marginL = Math.max(0, (viewportSize.width - zoomedWidth) / 2);
+    const marginT = Math.max(0, (viewportSize.height - zoomedHeight) / 2);
+
+    // Auto-center the canvas when zoom level changes
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const viewport = containerRef.current;
+
+        // Calculate target scroll positions to keep the content centered
+        const targetScrollLeft = Math.max(0, (zoomedWidth - viewport.clientWidth) / 2);
+        const targetScrollTop = Math.max(0, (zoomedHeight - viewport.clientHeight) / 2);
+
+        // We use scrollLeft/Top directly to jump to the center
+        viewport.scrollLeft = targetScrollLeft;
+        viewport.scrollTop = targetScrollTop;
+    }, [zoom, zoomedWidth, zoomedHeight]);
+
     const canvasStyle = {
         transform: `scale(${zoom / 100})`,
-        transformOrigin: 'center center',
+        transformOrigin: '0 0', // Top-left origin for standard expansion
     };
 
     if (!currentSpread) return null;
@@ -97,24 +140,40 @@ export const Canvas: React.FC<CanvasProps> = ({
                 className="canvas-viewport"
                 data-testid="canvas-viewport"
                 tabIndex={0}
-                style={{ outline: 'none', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+                style={{
+                    outline: 'none',
+                    overflow: 'auto',
+                    display: 'flex',
+                }}
             >
-                <DroppableCanvas
-                    id="canvas"
-                    style={canvasStyle}
-                    data-testid="interaction-layer"
+                {/* Scroller content wrapper ensures the viewport has content to scroll */}
+                <div
+                    style={{
+                        width: zoomedWidth,
+                        height: zoomedHeight,
+                        marginLeft: marginL,
+                        marginTop: marginT,
+                        position: 'relative',
+                        flexShrink: 0,
+                    }}
                 >
-                    <div ref={wrapperRef}>
-                        <canvas ref={canvasElRef} data-testid="canvas-layer" />
-                        {currentSpread.elements.length === 0 && (
-                            <div className="canvas-placeholder" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', textAlign: 'center', width: '100%' }}>
-                                <span className="text-muted" style={{ opacity: 0.5 }}>
-                                    Drag images here
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </DroppableCanvas>
+                    <DroppableCanvas
+                        id="canvas"
+                        style={canvasStyle}
+                        data-testid="interaction-layer"
+                    >
+                        <div ref={wrapperRef}>
+                            <canvas ref={canvasElRef} data-testid="canvas-layer" />
+                            {currentSpread.elements.length === 0 && (
+                                <div className="canvas-placeholder" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', textAlign: 'center', width: '100%' }}>
+                                    <span className="text-muted" style={{ opacity: 0.5 }}>
+                                        Drag images here
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </DroppableCanvas>
+                </div>
             </div>
 
             <div className="canvas-controls">

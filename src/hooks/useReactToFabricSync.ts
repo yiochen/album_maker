@@ -1,27 +1,10 @@
 import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
 import { APP_CONFIG } from '../config';
-import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
-import { toCanvasPx } from '../utils/imageUtils';
-import { CanvasPageElement } from './CanvasPageElement';
-import { ImageContent } from '../types';
+import { renderSpread } from '../utils/fabricRenderer';
+import { CustomFabricObject } from './fabricTypes';
 import { useAlbumSettings, useAlbumSpreads, useUpdateElement } from '../states/albumStore';
 import { useSelectedElementId, useCurrentSpreadIndex } from '../states/uiStore';
-
-export const getZoomCompensatedSizes = (zoomPercent: number) => {
-    const scale = zoomPercent / 100;
-    const inverseScale = 1 / scale;
-    const base = APP_CONFIG.BASE_UI_SIZES;
-
-    return {
-        cornerSize: base.cornerSize * inverseScale,
-        borderScaleFactor: base.borderWidth * inverseScale,
-        seamStrokeWidth: base.seamStrokeWidth * inverseScale,
-        seamDash: base.seamDash * inverseScale,
-        snapLineStrokeWidth: base.snapLineStrokeWidth * inverseScale,
-        snapLineDash: base.snapLineDash * inverseScale,
-    };
-};
 
 /**
  * Props for useReactToFabricSync.
@@ -35,10 +18,6 @@ interface UseReactToFabricSyncProps {
 
 /**
  * Hook to synchronize the React state (album spread data) to the Fabric.js canvas.
- *
- * It monitors the spread elements and updates the canvas objects accordingly.
- * It also handles creating new Fabric objects for new elements and removing deleted ones.
- * It ensures UI elements (controls, borders) scale inversely with zoom to maintain constant visual size.
  */
 export const useReactToFabricSync = ({
     fabricCanvas,
@@ -52,174 +31,58 @@ export const useReactToFabricSync = ({
     const onElementUpdate = useUpdateElement();
 
     const ppi = APP_CONFIG.PPI;
-    const loadingIds = useRef<Set<string>>(new Set());
 
-    // Refs for props/state
+    // We use refs for the callbacks and the spread to avoid stale closures in the 
+    // event handlers while minimizing useEffect re-subscriptions.
     const spreadRef = useRef(spread);
-    spreadRef.current = spread;
-    const selectedElementIdRef = useRef(selectedElementId);
-    selectedElementIdRef.current = selectedElementId;
     const onElementUpdateRef = useRef(onElementUpdate);
-    onElementUpdateRef.current = onElementUpdate;
 
-    // Track the last spread ID
-    const lastSyncedSpreadId = useRef<string | null>(null);
+    useEffect(() => {
+        spreadRef.current = spread;
+        onElementUpdateRef.current = onElementUpdate;
+    }, [spread, onElementUpdate]);
 
     const modelWidth = settings ? settings.pageWidth * 2 * ppi : 0;
     const modelHeight = settings ? settings.pageHeight * ppi : 0;
 
-    const shouldSkipLayoutSync = (obj: fabric.Object) => {
-        return (obj as ExtendedFabricObject).preventLayoutSync;
-    };
-
     // Sync State to Fabric
     useEffect(() => {
-        const canvas = fabricCanvas;
-        if (!canvas || !spread || !settings) return;
+        const sync = async () => {
+            const canvas = fabricCanvas;
+            if (!canvas || !spread || !settings) return;
 
-        const currentSpread = spreadRef.current;
+            await renderSpread(spread, settings, canvas, {
+                ppi: APP_CONFIG.PPI,
+                interactivityOptions: {
+                    zoom,
+                    showPageSeam: true,
+                    onContentTransformChange: (elementId, contentTransform) => {
+                        const currentSpread = spreadRef.current;
+                        if (!currentSpread) return;
 
-        lastSyncedSpreadId.current = currentSpread.id;
+                        const element = currentSpread.elements.find(e => e.id === elementId);
+                        if (!element) return;
 
-        const currentObjects = canvas.getObjects() as CustomFabricObject[];
-        const validIds = new Set<string>();
-        const elementsToLoad: typeof currentSpread.elements = [];
-
-        currentSpread.elements.forEach(element => {
-            validIds.add(element.id);
-            const existingObj = currentObjects.find(o => o.data?.id === element.id) as CustomFabricObject;
-
-            if (existingObj) {
-                if (existingObj instanceof CanvasPageElement) {
-                    const canvasEl = existingObj;
-                    const isLocked = element.content.lockAspectRatio;
-                    if (canvasEl.get('uniformScaling') !== !!isLocked) {
-                        canvasEl.set({
-                            uniformScaling: !!isLocked,
-                            lockUniScaling: !!isLocked,
+                        onElementUpdateRef.current(currentSpread.id, elementId, {
+                            content: { ...element.content, contentTransform },
                         });
-                        if (canvas.getActiveObject() === canvasEl) {
-                            canvas.uniformScaling = !!isLocked;
-                        }
-                        canvasEl.updateControlVisibility(!!isLocked);
-                        canvasEl.setCoords();
-                    }
-
-                    // Update layout/properties if not moving/scaling
-                    if (!shouldSkipLayoutSync(existingObj)) {
-                        canvasEl.pageElement = element;
-                        canvasEl.applyLayout(toCanvasPx(modelWidth), toCanvasPx(modelHeight));
                     }
                 }
-            } else {
-                if (!loadingIds.current.has(element.id)) {
-                    elementsToLoad.push(element);
-                }
-            }
-        });
-
-        // After syncing properties, enforce z-order for existing objects.
-        // Elements should be stacked above background objects (seam is at index 0).
-        currentSpread.elements.forEach((element, index) => {
-            const obj = currentObjects.find(o => o.data?.id === element.id);
-            if (obj) {
-                // Fabric 7 API: moveObjectTo(object, index)
-                // We keep seam at 0, so elements start at 1.
-                canvas.moveObjectTo(obj, index + 1);
-            }
-        });
-
-        currentObjects.forEach(obj => {
-            const customObj = obj as CustomFabricObject;
-            if (customObj.data?.id && customObj.data.id !== 'seam' && !validIds.has(customObj.data.id)) {
-                canvas.remove(obj);
-            }
-        });
-
-        const zoomValue = zoom;
-        // Capture the selected ID at the start of the sync (e.g. when drop occurred)
-        // This ensures that even if selection is temporarily cleared (e.g. by dnd-kit pointer events),
-        // we still select the element once it finishes loading if it was intended to be selected.
-        const pendingSelectedId = selectedElementIdRef.current;
-
-        elementsToLoad.forEach(async (element) => {
-            if (loadingIds.current.has(element.id)) return;
-            loadingIds.current.add(element.id);
-
-            try {
-                const uiSizes = getZoomCompensatedSizes(zoomValue);
-
-                const canvasEl = new CanvasPageElement(element, {
-                    cornerStyle: 'circle',
-                    cornerColor: 'white',
-                    cornerStrokeColor: '#333',
-                    borderColor: '#333',
-                    transparentCorners: false,
-                    cornerSize: uiSizes.cornerSize,
-                    borderScaleFactor: uiSizes.borderScaleFactor,
-                    objectCaching: true,
-                    noScaleCache: true,
-                    uniformScaling: !!element.content.lockAspectRatio,
-                    panControlSize: uiSizes.cornerSize * 1.7,
-                    onContentTransformChange: (elementId: string, contentTransform: ImageContent['contentTransform']) => {
-                        const currentElement = spreadRef.current.elements.find(e => e.id === elementId);
-                        if (!currentElement) return;
-                        onElementUpdateRef.current(spreadRef.current.id, elementId, {
-                            content: { ...currentElement.content, contentTransform },
-                        });
-                    },
-                });
-
-                await canvasEl.loadImage();
-                canvasEl.applyLayout(toCanvasPx(modelWidth), toCanvasPx(modelHeight));
-
-                canvas.add(canvasEl);
-                // Select if it matches the current selection OR the selection at the start of the load
-                if (selectedElementIdRef.current === element.id || pendingSelectedId === element.id) {
-                    canvas.setActiveObject(canvasEl);
-                }
-                canvas.requestRenderAll();
-            } catch (err) {
-                console.error("Failed to load", element.content.imageUrl, err);
-            } finally {
-                loadingIds.current.delete(element.id);
-            }
-        });
-
-        canvas.requestRenderAll();
-    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, ppi, settings]);
-
-    // Update UI sizes when zoom changes
-    useEffect(() => {
-        const canvas = fabricCanvas;
-        if (!canvas) return;
-
-        const uiSizes = getZoomCompensatedSizes(zoom);
-        canvas.getObjects().forEach((obj: fabric.Object) => {
-            const customObj = obj as CustomFabricObject;
-            if (customObj.data?.id === 'seam') {
-                (obj as fabric.Line).set({
-                    strokeWidth: uiSizes.seamStrokeWidth,
-                    strokeDashArray: [uiSizes.seamDash, uiSizes.seamDash],
-                });
-                return;
-            }
-            if (obj.type === 'line' && (obj as fabric.Line).stroke === '#ff00ff') {
-                (obj as fabric.Line).set({
-                    strokeWidth: uiSizes.snapLineStrokeWidth,
-                    strokeDashArray: [uiSizes.snapLineDash, uiSizes.snapLineDash],
-                });
-                return;
-            }
-
-            obj.set({
-                cornerSize: uiSizes.cornerSize,
-                borderScaleFactor: uiSizes.borderScaleFactor,
             });
-            if (obj instanceof CanvasPageElement) {
-                obj.setPanControlSize(uiSizes.cornerSize * 1.7);
+
+            // Handle selection after sync
+            if (selectedElementId && canvas instanceof fabric.Canvas) {
+                const obj = canvas.getObjects().find(o => (o as CustomFabricObject).data?.id === selectedElementId);
+                if (obj && canvas.getActiveObject() !== obj) {
+                    canvas.setActiveObject(obj);
+                    canvas.requestRenderAll();
+                }
+            } else if (!selectedElementId && canvas instanceof fabric.Canvas) {
+                canvas.discardActiveObject();
+                canvas.requestRenderAll();
             }
-        });
-        canvas.requestRenderAll();
-    }, [zoom, fabricCanvas]);
+        };
+
+        sync();
+    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, settings, selectedElementId]);
 };

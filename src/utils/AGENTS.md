@@ -1,27 +1,30 @@
-# Utilities Directory (`src/utils`)
+# Utils Directory
 
-## Purpose
-This directory contains pure utility functions and stateless logic used across the application.
+This directory contains pure utility functions and stateless components used across the application.
 
-## Key Modules
+## Core Services
 
-### Orientation Matrix (`orientationMatrix.ts`)
-Handles the **D4 symmetry group** operations (8 possible combinations of 90° rotations and flips) using 2x2 integer matrices `[a, b, c, d]`.
+### Image Utilities (`imageUtils.ts`)
+Handles unit conversions and coordinate transforms.
+- **`toModelPx`**: Converts browser pixels (96 DPI) to album pixels (300 DPI).
+- **`toCanvasPx`**: Converts album pixels (300 DPI) to browser pixels (96 DPI).
+- **Coordinate Wrappers**: Functions like `getCenterInPixels` ensure layout math is consistent across the editor and export worker.
 
-- **Internal Model**: View-space transforms (flip what you see).
-- **Rendering**: Decomposed for Fabric.js/Canvas 2D which apply `Flip_local → Rotate`.
-- **Composition**: Left-multiplication `compose(A, B)` means A is applied AFTER B.
-- **Button Actions**:
+### Transformation Logic (`transforms.ts`)
+Manages non-destructive image manipulation (pan, zoom, flip, rotate).
+- **Matrix-based math**: Uses linear algebra to maintain precision during complex multi-step transforms.
+- **Atomic Operations**: 
+    - `applyZoom`: Updates scale and compensates pan to keep center point stable.
     - `applyRotate90`: Left-multiplies `ROTATE_90_CW`. Resets zoom/pan.
     - `applyFlipH`/`applyFlipV`: Left-multiplies flip matrix. Keeps zoom, mirrors pan.
 
-### Fabric Renderer (`fabricRenderer.ts`)
-Central utility to render a spread onto a Fabric canvas.
-- **`renderSpread`**: Used by the **Main Thread** (Editor) to populate canvas from state.
-- **Z-Order Management**: Ensures consistent stacking of elements and center seam.
-- **Note**: The export worker (`exportProcessor.ts`) uses a direct 2D context path instead of Fabric.js to ensure worker compatibility.
+### Rendering Engine
+The application uses two specialized renderers that share a common visual logic:
+- **`rendererTypes.ts`**: Defines the shared `BaseRenderOptions`, `FabricRenderOptions`, and `OffscreenRenderOptions`.
+- **Fabric Renderer (`fabricRenderer.ts`)**: Central utility for the **Main Thread (Editor)**. It handles incremental synchronization, layout, z-ordering, and zoom-compensated handles.
+- **Offscreen Renderer (`offscreenCanvasRenderer.ts`)**: Pure headless renderer for **Web Workers (Export)**. Uses native 2D Canvas API for maximum speed and compatibility without DOM dependencies. It supports full image orientation (rotation/flip) to match the editor's quality.
 
 ## Rules of Engagement
 - **Keep it Pure**: Utility functions should be stateless and deterministic.
-- **Orientation Pipeline**: Always use `decomposeForRendering` when mapping the orientation matrix to rendering engine properties (like Fabric's `angle` and `flipX`) to ensure the correct transform order.
-- **Dimension Awareness**: Use `getOrientedDimensions` when calculating cover/fit logic to account for width/height swaps during 90°/270° rotations.
+- **Unit Awareness**: Always verify whether a function expects Model Pixels (PPI-indexed) or Canvas Pixels (Screen-indexed).
+- **No Side Effects**: Do not access `localStorage` or `window` directly; pass necessary dependencies as arguments.

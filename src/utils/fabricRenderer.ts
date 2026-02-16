@@ -1,94 +1,147 @@
 import * as fabric from 'fabric';
 import { Spread, AlbumSettings } from '../types';
 import { CanvasPageElement } from '../hooks/CanvasPageElement';
-
-export interface RenderOptions {
-    ppi: number;
-    showSeam: boolean;
-    interactive: boolean;
-    useThumbnail: boolean;
-}
+import { CustomFabricObject } from '../hooks/fabricTypes';
+import { APP_CONFIG } from '../config';
+import { FabricRenderOptions } from './rendererTypes';
 
 /**
- * Renders a spread to a Fabric.js canvas.
+ * Calculates UI sizes (corners, borders, seam) compensated for zoom.
+ */
+export const getZoomCompensatedSizes = (zoomPercent: number) => {
+    const scale = zoomPercent / 100;
+    const inverseScale = 1 / scale;
+    const base = APP_CONFIG.BASE_UI_SIZES;
+
+    return {
+        cornerSize: base.cornerSize * inverseScale,
+        borderScaleFactor: base.borderWidth * inverseScale,
+        seamStrokeWidth: base.seamStrokeWidth * inverseScale,
+        seamDash: base.seamDash * inverseScale,
+        snapLineStrokeWidth: base.snapLineStrokeWidth * inverseScale,
+        snapLineDash: base.snapLineDash * inverseScale,
+    };
+};
+
+/**
+ * Renders or updates a spread onto a Fabric.js canvas using an incremental sync strategy.
  */
 export async function renderSpread(
     spread: Spread,
     settings: AlbumSettings,
-    canvasOrOptions?: fabric.Canvas | fabric.StaticCanvas | RenderOptions,
-    maybeOptions?: RenderOptions
-): Promise<fabric.StaticCanvas | fabric.Canvas> {
-    // 1. Determine if we are provided a canvas or just options
-    let canvas: fabric.StaticCanvas | fabric.Canvas | undefined;
-    let options: RenderOptions;
+    canvas: fabric.Canvas | fabric.StaticCanvas,
+    options: FabricRenderOptions
+): Promise<void> {
+    // Use actual canvas visual dimensions for overlay positioning (seam, etc.)
+    const canvasWidth = canvas.width ?? 0;
+    const canvasHeight = canvas.height ?? 0;
 
-    if (canvasOrOptions instanceof fabric.Canvas || canvasOrOptions instanceof fabric.StaticCanvas) {
-        canvas = canvasOrOptions;
-        options = {
-            ppi: maybeOptions?.ppi ?? 72,
-            showSeam: maybeOptions?.showSeam ?? true,
-            interactive: maybeOptions?.interactive ?? true,
-            useThumbnail: maybeOptions?.useThumbnail ?? false,
-        };
-    } else {
-        options = {
-            ppi: (canvasOrOptions as RenderOptions)?.ppi ?? 72,
-            showSeam: (canvasOrOptions as RenderOptions)?.showSeam ?? true,
-            interactive: (canvasOrOptions as RenderOptions)?.interactive ?? true,
-            useThumbnail: (canvasOrOptions as RenderOptions)?.useThumbnail ?? false,
-        };
+    const interactiveOpts = options.interactivityOptions;
+    const isInteractive = !!interactiveOpts;
+    const zoom = interactiveOpts?.zoom ?? 100;
+    const showPageSeam = interactiveOpts?.showPageSeam ?? false;
+
+    // 1. Calculate zoom-compensated UI sizes (corner handles, etc.)
+    const uiSizes = getZoomCompensatedSizes(zoom);
+
+    const currentObjects = canvas.getObjects() as CustomFabricObject[];
+    const validIds = new Set<string>();
+    const elementsToLoad: typeof spread.elements = [];
+
+    // 2. Sync existing objects or identify new ones
+    spread.elements.forEach(element => {
+        validIds.add(element.id);
+        const existingObj = currentObjects.find(o => (o as CustomFabricObject).data?.id === element.id) as CanvasPageElement;
+
+        if (existingObj && existingObj instanceof CanvasPageElement) {
+            existingObj.set({
+                selectable: isInteractive,
+                hasControls: isInteractive,
+                evented: isInteractive,
+                cornerSize: uiSizes.cornerSize,
+                borderScaleFactor: uiSizes.borderScaleFactor,
+            });
+            existingObj.applyLayout(canvas.width, canvas.height);
+            existingObj.onContentTransformChange = interactiveOpts?.onContentTransformChange;
+        } else {
+            elementsToLoad.push(element);
+        }
+    });
+
+    // 3. Remove orphaned objects
+    currentObjects.forEach(obj => {
+        const id = (obj as CustomFabricObject).data?.id;
+        if (id && id !== 'seam' && !validIds.has(id)) {
+            canvas.remove(obj);
+        }
+    });
+
+    // 4. Handle Seam Layer (Index 0)
+    let seam = currentObjects.find(o => (o as CustomFabricObject).data?.id === 'seam') as fabric.Line;
+    if (showPageSeam) {
+        if (!seam) {
+            seam = new fabric.Line([canvasWidth / 2, 0, canvasWidth / 2, canvasHeight], {
+                stroke: '#ddd',
+                strokeWidth: uiSizes.seamStrokeWidth,
+                selectable: false,
+                evented: false,
+                strokeDashArray: [uiSizes.seamDash, uiSizes.seamDash],
+            });
+            (seam as CustomFabricObject).data = { id: 'seam' };
+            canvas.add(seam);
+        } else {
+            seam.set({
+                x1: canvasWidth / 2,
+                x2: canvasWidth / 2,
+                y1: 0,
+                y2: canvasHeight,
+                strokeWidth: uiSizes.seamStrokeWidth,
+                strokeDashArray: [uiSizes.seamDash, uiSizes.seamDash],
+            });
+        }
+    } else if (seam) {
+        canvas.remove(seam);
     }
 
-    const width = settings.pageWidth * 2 * options.ppi;
-    const height = settings.pageHeight * options.ppi;
-
-    if (!canvas) {
-        const el = document.createElement('canvas');
-        el.width = width;
-        el.height = height;
-        canvas = new fabric.StaticCanvas(el, {
-            enableRetinaScaling: false,
-        });
-    }
-
-    // 2. Load and add elements
-    const loadPromises = spread.elements.map(async (element) => {
+    // 5. Load and add new elements
+    const loadPromises = elementsToLoad.map(async (element) => {
         const canvasEl = new CanvasPageElement(element, {
-            interactive: options.interactive === true,
-            objectCaching: true,
-            uniformScaling: !!element.content.lockAspectRatio,
+            cornerStyle: 'circle',
+            cornerColor: 'white',
+            cornerStrokeColor: '#333',
+            borderColor: '#333',
+            transparentCorners: false,
+            cornerSize: uiSizes.cornerSize,
+            borderScaleFactor: uiSizes.borderScaleFactor,
+            selectable: isInteractive,
+            hasControls: isInteractive,
+            evented: isInteractive,
+            onContentTransformChange: interactiveOpts?.onContentTransformChange,
         });
 
         const url = options.useThumbnail ? element.content.thumbnailUrl : element.content.imageUrl;
         await canvasEl.loadImage(url);
-        canvasEl.applyLayout(width, height);
-        return canvasEl;
+        canvasEl.applyLayout(canvas.width, canvas.height);
+
+        canvas.add(canvasEl);
     });
 
-    const objects = await Promise.all(loadPromises);
+    await Promise.all(loadPromises);
 
-    // Clear and start fresh to ensure correct Z-order
-    canvas.clear();
+    // 6. Finalize Z-Order
+    // Elements start at index 0. We order them according to the elements array.
+    spread.elements.forEach((element, index) => {
+        const obj = (canvas.getObjects() as CustomFabricObject[]).find(o => o.data?.id === element.id);
+        if (obj) {
+            canvas.moveObjectTo(obj, index);
+        }
+    });
 
-    // 3. Add Center Seam if required (Always at the bottom)
-    if (options.showSeam) {
-        const seam = new fabric.Line([width / 2, 0, width / 2, height], {
-            stroke: '#ddd',
-            strokeWidth: 2,
-            selectable: false,
-            evented: false,
-            strokeDashArray: [5, 5],
-        });
-        // @ts-expect-error - custom property for identification
-        seam.id = 'seam';
-        canvas.add(seam);
+    // Seam is placed on top of elements as a guide layer.
+    const finalSeam = (canvas.getObjects() as CustomFabricObject[]).find(o => o.data?.id === 'seam');
+    if (finalSeam) {
+        canvas.moveObjectTo(finalSeam, canvas.getObjects().length - 1);
     }
 
-    // 4. Add elements in order
-    objects.forEach(obj => {
-        canvas!.add(obj);
-    });
-
-    canvas.renderAll();
-    return canvas;
+    canvas.requestRenderAll();
 }

@@ -10,7 +10,7 @@ export class CanvasPageElement extends fabric.Group {
     public pageElement: PageElement;
     private innerImage: fabric.Image;
     private clipRect: fabric.Rect;
-    private onContentTransformChange?: (elementId: string, contentTransform: ImageContent['contentTransform']) => void;
+    public onContentTransformChange?: (elementId: string, contentTransform: ImageContent['contentTransform']) => void;
     private panControlSize: number;
 
     constructor(
