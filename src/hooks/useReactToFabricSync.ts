@@ -4,6 +4,7 @@ import { APP_CONFIG } from '../config';
 import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
 import { toCanvasPx } from '../utils/imageUtils';
 import { CanvasPageElement } from './CanvasPageElement';
+import { ImageContent } from '../types';
 import { useAlbumSettings, useAlbumSpreads, useUpdateElement } from '../states/albumStore';
 import { useSelectedElementId, useCurrentSpreadIndex } from '../states/uiStore';
 
@@ -159,9 +160,8 @@ export const useReactToFabricSync = ({
                     objectCaching: true,
                     noScaleCache: true,
                     uniformScaling: !!element.content.lockAspectRatio,
-                    lockUniScaling: !!element.content.lockAspectRatio,
                     panControlSize: uiSizes.cornerSize * 1.7,
-                    onContentTransformChange: (elementId: string, contentTransform: { zoom: number; panX: number; panY: number }) => {
+                    onContentTransformChange: (elementId: string, contentTransform: ImageContent['contentTransform']) => {
                         const currentElement = spreadRef.current.elements.find(e => e.id === elementId);
                         if (!currentElement) return;
                         onElementUpdateRef.current(spreadRef.current.id, elementId, {

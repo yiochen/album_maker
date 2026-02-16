@@ -13,10 +13,18 @@ export class CanvasPageElement extends fabric.Group {
     private onContentTransformChange?: (elementId: string, contentTransform: ImageContent['contentTransform']) => void;
     private panControlSize: number;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    constructor(element: PageElement, options: any = {}) {
+    constructor(
+        element: PageElement,
+        options: Partial<fabric.FabricObjectProps> & {
+            interactive?: boolean;
+            uniformScaling?: boolean;
+            onContentTransformChange?: (elementId: string, contentTransform: ImageContent['contentTransform']) => void;
+            panControlSize?: number;
+        } = {}
+    ) {
         // Create inner image (placeholder initially)
-        const innerImage = new fabric.Image(new Image(), {
+        // fabric.Image handles null source in v7
+        const innerImage = new fabric.Image(null as unknown as HTMLImageElement, {
             originX: 'left',
             originY: 'top',
             left: 0,
@@ -30,10 +38,13 @@ export class CanvasPageElement extends fabric.Group {
             originY: 'top',
             subTargetCheck: false, // Don't allow selecting the inner image directly
             interactive: true,
+            // @ts-expect-error - data is available on FabricObject but missing in GroupProps interface
             data: { id: element.id },
             lockRotation: true,
             uniformScaling: options.uniformScaling !== undefined ? options.uniformScaling : true,
             lockUniScaling: options.uniformScaling !== undefined ? options.uniformScaling : true,
+            selectable: options.interactive !== false,
+            evented: options.interactive !== false,
         });
 
         this.pageElement = element;
@@ -41,8 +52,10 @@ export class CanvasPageElement extends fabric.Group {
         this.onContentTransformChange = options.onContentTransformChange;
         this.panControlSize = options.panControlSize ?? 22;
 
-        this.updateControlVisibility(options.uniformScaling !== undefined ? options.uniformScaling : true);
-        this.addPanControl();
+        if (options.interactive !== false) {
+            this.updateControlVisibility(options.uniformScaling !== undefined ? options.uniformScaling : true);
+            this.addPanControl();
+        }
 
         // Create clip path for the frame
         this.clipRect = new fabric.Rect({
@@ -60,15 +73,32 @@ export class CanvasPageElement extends fabric.Group {
     /**
      * Load image and update layout
      */
-    async loadImage() {
+    async loadImage(url?: string) {
+        const imageUrl = url || this.pageElement.content.imageUrl;
         return new Promise<void>((resolve, reject) => {
-            fabric.util.loadImage(this.pageElement.content.imageUrl, { crossOrigin: 'anonymous' })
-                .then((imgElement) => {
-                    this.innerImage.setElement(imgElement);
-                    this.applyLayout();
-                    resolve();
-                })
-                .catch(reject);
+            // Check if we are in a worker or browser main thread
+            if (typeof window === 'undefined' || typeof HTMLImageElement === 'undefined') {
+                // Worker context
+                fetch(imageUrl)
+                    .then(response => response.blob())
+                    .then(blob => createImageBitmap(blob))
+                    .then(imageBitmap => {
+                        // Fabric v7 Image.setElement handles ImageBitmap
+                        this.innerImage.setElement(imageBitmap as unknown as HTMLImageElement);
+                        this.applyLayout();
+                        resolve();
+                    })
+                    .catch(reject);
+            } else {
+                // Main thread
+                fabric.util.loadImage(imageUrl, { crossOrigin: 'anonymous' })
+                    .then((imgElement) => {
+                        this.innerImage.setElement(imgElement);
+                        this.applyLayout();
+                        resolve();
+                    })
+                    .catch(reject);
+            }
         });
     }
 
