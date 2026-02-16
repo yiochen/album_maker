@@ -185,7 +185,7 @@ export const AlbumEditor: React.FC = () => {
           <AlbumSettingsPanel
             settings={album.settings}
             onSettingsChange={setSettings}
-            currentPageCount={album.spreads.length}
+            currentPageCount={album.spreads.length * 2}
           />
         </Modal>
       )}
