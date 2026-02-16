@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import { SpreadThumbnailRecord } from '../types';
 
 // Types for database
 export interface AlbumRecord {
@@ -15,14 +16,6 @@ export interface ThumbnailCacheRecord {
     size: number; // thumbnail size
 }
 
-export interface SpreadThumbnailRecord {
-    id: string;           // albumId-spreadId
-    albumId: string;
-    spreadId: string;
-    dataUrl: string;      // Base64 data URL
-    contentHash: string;  // Hash of spread content for cache invalidation
-    timestamp: number;
-}
 
 export interface SettingsRecord {
     key: string;

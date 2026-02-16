@@ -240,3 +240,12 @@ export interface ExportProgress {
   status: 'idle' | 'exporting' | 'complete' | 'error';
   error?: string;
 }
+
+export interface SpreadThumbnailRecord {
+  id: string;           // albumId-spreadId
+  albumId: string;
+  spreadId: string;
+  dataUrl: string;      // Base64 data URL
+  contentHash: string;  // Hash of spread content for cache invalidation
+  timestamp: number;
+}

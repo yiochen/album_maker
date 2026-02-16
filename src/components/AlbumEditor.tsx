@@ -11,6 +11,7 @@ import {
   useCanRedo,
   useUpdateSpread
 } from '../states/albumStore';
+import { useNavigate } from 'react-router-dom';
 import {
   useCurrentSpreadIndex,
   useSelectedElementId,
@@ -47,6 +48,7 @@ export const AlbumEditor: React.FC = () => {
   const setName = useSetName();
   const setSettings = useSetSettings();
   const addToPool = useAddToPool();
+  const navigate = useNavigate();
   const undo = useUndo();
   const redo = useRedo();
   const canUndo = useCanUndo();
@@ -80,7 +82,6 @@ export const AlbumEditor: React.FC = () => {
     handleCreateAlbum,
     handleDeleteAlbum,
     handleImportAlbum,
-    handleExportAlbum,
   } = useAlbumLifecycle();
 
   // Thumbnail sync
@@ -119,7 +120,7 @@ export const AlbumEditor: React.FC = () => {
           />
         }
         onImport={handleImportAlbum}
-        onExport={handleExportAlbum}
+        onExport={() => navigate('/export')}
         onSettingsClick={() => setSettingsOpen(!isSettingsOpen)}
       />
 
