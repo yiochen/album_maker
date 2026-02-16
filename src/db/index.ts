@@ -37,7 +37,7 @@ export interface UploadedImageRecord {
 // Database class
 class AlbumDatabase extends Dexie {
     albums!: Table<AlbumRecord, string>;
-    thumbnailCache!: Table<ThumbnailCacheRecord, string>;
+    thumbnailCache!: Table<ThumbnailCacheRecord, string>; // Deprecated/Unused
     spreadThumbnails!: Table<SpreadThumbnailRecord, string>;
     settings!: Table<SettingsRecord, string>;
     uploadedImages!: Table<UploadedImageRecord, string>;
@@ -78,9 +78,6 @@ class AlbumDatabase extends Dexie {
 // Singleton instance
 export const db = new AlbumDatabase();
 
-// Thumbnail cache TTL (7 days)
-const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
-
 // Helper functions for album operations
 export const albumDB = {
     async getAll(): Promise<AlbumRecord[]> {
@@ -105,53 +102,6 @@ export const albumDB = {
     async exists(id: string): Promise<boolean> {
         const count = await db.albums.where('id').equals(id).count();
         return count > 0;
-    },
-};
-
-// Helper functions for thumbnail cache
-export const thumbnailDB = {
-    async get(url: string): Promise<Blob | null> {
-        const record = await db.thumbnailCache.get(url);
-        if (!record) return null;
-
-        // Check if cache is expired
-        if (Date.now() - record.timestamp > CACHE_TTL) {
-            await db.thumbnailCache.delete(url);
-            return null;
-        }
-
-        return record.blob;
-    },
-
-    async set(url: string, blob: Blob, size: number): Promise<void> {
-        await db.thumbnailCache.put({
-            url,
-            blob,
-            timestamp: Date.now(),
-            size,
-        });
-    },
-
-    async delete(url: string): Promise<void> {
-        await db.thumbnailCache.delete(url);
-    },
-
-    async clear(): Promise<void> {
-        await db.thumbnailCache.clear();
-    },
-
-    async cleanup(): Promise<number> {
-        const expired = Date.now() - CACHE_TTL;
-        const count = await db.thumbnailCache
-            .where('timestamp')
-            .below(expired)
-            .delete();
-        return count;
-    },
-
-    async getSize(): Promise<number> {
-        const all = await db.thumbnailCache.toArray();
-        return all.reduce((sum, record) => sum + record.blob.size, 0);
     },
 };
 
