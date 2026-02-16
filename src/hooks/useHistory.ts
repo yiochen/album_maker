@@ -1,3 +1,6 @@
+/**
+ * @deprecated This hook is no longer used. State history is managed by CommandManager in albumStore.
+ */
 import { useState, useCallback } from 'react';
 import type { Command } from '../commands/Command';
 

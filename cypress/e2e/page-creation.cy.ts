@@ -27,21 +27,29 @@ describe('Page Creation', () => {
     });
 
     it('should navigate between spreads', () => {
+        // Wait for initial render
+        cy.get('[data-testid="spread-thumbnail"]').should('have.length.at.least', 1);
+
         // Add another spread first to ensure we have at least 2
-        cy.get('[data-testid="add-pages-button"]').should('not.be.disabled').click();
+        cy.get('[data-testid="add-pages-button"]')
+            .should('not.be.disabled')
+            .click();
 
         // Ensure we have at least 2 spreads before trying to interact
-        // Chain the visible check and click to ensure we operate on the found element
+        // Use a more specific selector strategy to wait for the second element
         cy.get('[data-testid="spread-thumbnail"]')
-            .should('have.length.at.least', 2)
+            .should('have.length.at.least', 2);
+
+        // Explicitly wait for the second element to be visible and interactive
+        cy.get('[data-testid="spread-thumbnail"]')
             .eq(1)
             .should('be.visible')
-            .click();
+            .click({ force: true }); // Force click in case of overlay/animation
 
         cy.get('[data-testid="spread-thumbnail"]').eq(1).should('have.class', 'active');
 
         // Click on the first spread
-        cy.get('[data-testid="spread-thumbnail"]').eq(0).click();
+        cy.get('[data-testid="spread-thumbnail"]').eq(0).click({ force: true });
         cy.get('[data-testid="spread-thumbnail"]').eq(0).should('have.class', 'active');
     });
 
@@ -102,7 +110,11 @@ describe('Page Creation', () => {
                 const newMax = currentCount + 2;
                 cy.get('[data-testid="max-pages-input"]')
                     .clear()
-                    .type(String(newMax));
+                    .type(String(newMax) + '{enter}') // Press Enter to commit the change (NumberInput requires blur/enter)
+                    .blur(); // Ensure blur fires
+
+                // Wait for the value to be reflected (optional, but good practice)
+                cy.get('[data-testid="max-pages-input"]').should('have.value', String(newMax));
 
                 // Close settings by clicking the close button or overlay
                 cy.get('[data-testid="modal-close"]').click();

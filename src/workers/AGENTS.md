@@ -4,7 +4,6 @@
 Contains Web Workers to handle heavy or I/O-bound tasks off the main thread, ensuring the UI remains responsive.
 
 ## Key Logic
-- **`imageFetcher.worker.ts`**: Handles parallel image fetching. It accepts request messages, performs `fetch` operations, and posts results (blobs or errors) back to the main thread.
 - **`exportProcessor.ts`**: Handles parallel image rendering for export. Uses a direct 2D context on an `OffscreenCanvas` to bypass DOM dependencies required by heavy canvas libraries like Fabric.js.
 
 ## Rules of Engagement
