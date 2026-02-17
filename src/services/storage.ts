@@ -1,16 +1,16 @@
 import type { Album, Spread } from '../types';
 import { APP_CONFIG } from '../config';
 import { albumDB, settingsDB } from '../db';
-import Ajv from 'ajv';
+import Ajv, { ValidateFunction } from 'ajv';
 import albumSchema from '../schemas/albumSchema.json';
 
-let validateAlbum: any; // Type as any to avoid complex TS types for fallback
+let validateAlbum: ValidateFunction<unknown>;
 try {
     const ajv = new Ajv();
     validateAlbum = ajv.compile(albumSchema);
 } catch (error) {
     console.error('Failed to compile JSON schema:', error);
-    validateAlbum = () => true; // Fallback to allow loading if schema fails
+    validateAlbum = (() => true) as unknown as ValidateFunction<unknown>; // Fallback to allow loading if schema fails
 }
 
 // Create a new empty album
