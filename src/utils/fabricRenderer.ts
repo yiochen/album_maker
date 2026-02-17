@@ -52,7 +52,16 @@ export async function renderSpread(
     spread.elements.forEach(element => {
         validIds.add(element.id);
         const existingObj = currentObjects.find(o => (o as CustomFabricObject).data?.id === element.id) as CanvasPageElement;
-        const targetUrl = options.useThumbnail ? element.content.thumbnailUrl : element.content.imageUrl;
+
+        // Dynamic URL Selection based on PPI
+        let targetUrl: string;
+        if (options.ppi < 50) {
+            targetUrl = element.content.thumbnailUrl;
+        } else if (options.ppi < 200) {
+            targetUrl = element.content.previewUrl;
+        } else {
+            targetUrl = element.content.fullUrl;
+        }
 
         if (existingObj && existingObj instanceof CanvasPageElement) {
             // Update reference to latest data from React state
@@ -73,7 +82,7 @@ export async function renderSpread(
             existingObj.onContentTransformChange = interactiveOpts?.onContentTransformChange;
 
             // Detect image change
-            const currentUrl = options.useThumbnail ? existingObj.pageElement.content.thumbnailUrl : existingObj.pageElement.content.imageUrl;
+            const currentUrl = existingObj.currentUrl; // We should probably store/check currentUrl in existingObj
             if (targetUrl !== currentUrl) {
                 // Update element reference for future comparisons
                 existingObj.pageElement = element;

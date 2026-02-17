@@ -12,6 +12,7 @@ export class CanvasPageElement extends fabric.Group {
     private clipRect: fabric.Rect;
     public onContentTransformChange?: (elementId: string, contentTransform: ImageContent['contentTransform']) => void;
     private panControlSize: number;
+    public currentUrl: string = '';
 
     constructor(
         element: PageElement,
@@ -73,13 +74,13 @@ export class CanvasPageElement extends fabric.Group {
     /**
      * Load image and update layout
      */
-    async loadImage(url?: string) {
-        const imageUrl = url || this.pageElement.content.imageUrl;
+    async loadImage(url: string) {
+        this.currentUrl = url;
         return new Promise<void>((resolve, reject) => {
             // Check if we are in a worker or browser main thread
             if (typeof window === 'undefined' || typeof HTMLImageElement === 'undefined') {
                 // Worker context
-                fetch(imageUrl)
+                fetch(url)
                     .then(response => response.blob())
                     .then(blob => createImageBitmap(blob))
                     .then(imageBitmap => {
@@ -91,7 +92,7 @@ export class CanvasPageElement extends fabric.Group {
                     .catch(reject);
             } else {
                 // Main thread
-                fabric.util.loadImage(imageUrl, { crossOrigin: 'anonymous' })
+                fabric.util.loadImage(url, { crossOrigin: 'anonymous' })
                     .then((imgElement) => {
                         this.innerImage.setElement(imgElement);
                         this.applyLayout();

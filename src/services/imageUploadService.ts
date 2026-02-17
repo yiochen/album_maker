@@ -44,7 +44,24 @@ export async function processAndSaveUpload(
         const originalWidth = img.width;
         const originalHeight = img.height;
 
-        // 2. Calculate optimal thumbnail size
+        // 2. Generate preview blob via Canvas (at most 1024px)
+        const previewSize = calculateThumbnailSize(
+            originalWidth,
+            originalHeight,
+            1024,
+            1024
+        );
+        const previewCanvas = document.createElement('canvas');
+        previewCanvas.width = previewSize.width;
+        previewCanvas.height = previewSize.height;
+        const previewCtx = previewCanvas.getContext('2d')!;
+        previewCtx.drawImage(img, 0, 0, previewSize.width, previewSize.height);
+
+        const previewBlob = await new Promise<Blob>((res) => {
+            previewCanvas.toBlob((b) => res(b!), file.type, 0.85);
+        });
+
+        // 3. Calculate optimal thumbnail size
         const { maxWidth, maxHeight } = calculateCanvasMaxDimensions(pageWidth, pageHeight);
         const thumbSize = calculateThumbnailSize(
             originalWidth,
@@ -53,22 +70,23 @@ export async function processAndSaveUpload(
             maxHeight
         );
 
-        // 3. Generate thumbnail blob via Canvas
-        const canvas = document.createElement('canvas');
-        canvas.width = thumbSize.width;
-        canvas.height = thumbSize.height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0, thumbSize.width, thumbSize.height);
+        // 4. Generate thumbnail blob via Canvas
+        const thumbCanvas = document.createElement('canvas');
+        thumbCanvas.width = thumbSize.width;
+        thumbCanvas.height = thumbSize.height;
+        const thumbCtx = thumbCanvas.getContext('2d')!;
+        thumbCtx.drawImage(img, 0, 0, thumbSize.width, thumbSize.height);
 
         const thumbnailBlob = await new Promise<Blob>((res) => {
-            canvas.toBlob((b) => res(b!), file.type, 0.8);
+            thumbCanvas.toBlob((b) => res(b!), file.type, 0.8);
         });
 
-        // 4. Save to IndexedDB
+        // 5. Save to IndexedDB
         const record: UploadedImageRecord = {
             id,
             sourceImageId: sourceImageId,
             blob,
+            previewBlob,
             thumbnailBlob,
             filename: file.name,
             mimeType: file.type,
@@ -79,12 +97,13 @@ export async function processAndSaveUpload(
 
         await uploadedImageDB.save(record);
 
-        // 5. Return PoolImage
+        // 6. Return PoolImage
         return {
             id: crypto.randomUUID(), // Unique ID for the pool instance
             sourceId: 'uploaded',
             sourceImageId: sourceImageId,
-            baseUrl: `/__local__/uploaded/full/${id}`,
+            fullUrl: `/__local__/uploaded/full/${id}`,
+            previewUrl: `/__local__/uploaded/preview/${id}`,
             thumbnailUrl: `/__local__/uploaded/thumb/${id}`,
             filename: file.name,
             mimeType: file.type,

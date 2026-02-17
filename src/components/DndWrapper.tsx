@@ -138,7 +138,7 @@ export const DndWrapper: React.FC<DndWrapperProps> = ({
                             style={{
                                 width: APP_CONFIG.DRAG_PREVIEW_SIZE,
                                 height: APP_CONFIG.DRAG_PREVIEW_SIZE,
-                                backgroundImage: `url(${activeImage.thumbnailUrl || activeImage.baseUrl})`,
+                                backgroundImage: `url(${activeImage.thumbnailUrl})`,
                                 backgroundSize: 'cover',
                                 backgroundPosition: 'center',
                                 borderRadius: 8,

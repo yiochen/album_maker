@@ -60,6 +60,9 @@ const generateColorImages = (): SourceImage[] => {
                     color,
                     sizeName: size.name,
                 },
+                thumbnailUrl: buildDummyColorUrl('thumb', color, 400, 300),
+                previewUrl: buildDummyColorUrl('preview', color, 1024, 768),
+                fullUrl: buildDummyColorUrl('full', color, size.width, size.height),
             });
         });
     });
@@ -74,7 +77,7 @@ const generateColorImages = (): SourceImage[] => {
  * Format: /__local__/dummyColors/<type>/<hex>/<width>x<height>
  * Example: /__local__/dummyColors/full/EF4444/4032x3024
  */
-const buildDummyColorUrl = (type: 'full' | 'thumb', color: string, width: number, height: number): string => {
+const buildDummyColorUrl = (type: 'full' | 'thumb' | 'preview', color: string, width: number, height: number): string => {
     const hex = color.replace('#', '');
     return `/__local__/dummyColors/${type}/${hex}/${width}x${height}`;
 };
@@ -107,8 +110,13 @@ class DummyColorsSource implements PhotoSource {
         };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getThumbnailUrl(image: SourceImage, width: number, height: number): string {
+    getPreviewUrl(image: SourceImage): string {
+        const color = image.metadata?.color as string;
+        if (!color) return '';
+        return buildDummyColorUrl('preview', color, 1024, 768);
+    }
+
+    getThumbnailUrl(image: SourceImage): string {
         const color = image.metadata?.color as string;
         if (!color) return '';
         // Use thumb type and smaller dimensions for thumbnails

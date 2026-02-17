@@ -8,7 +8,6 @@ export interface InteractivityOptions {
 
 export interface BaseRenderOptions {
     ppi: number;
-    useThumbnail?: boolean;
 }
 
 export interface FabricRenderOptions extends BaseRenderOptions {

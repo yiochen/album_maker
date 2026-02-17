@@ -72,8 +72,9 @@ export const useElementActions = () => {
                 id: crypto.randomUUID(),
                 type: 'image',
                 content: {
-                    imageUrl: image.baseUrl,
-                    thumbnailUrl: image.thumbnailUrl || image.baseUrl,
+                    fullUrl: image.fullUrl,
+                    previewUrl: image.previewUrl,
+                    thumbnailUrl: image.thumbnailUrl,
                     sourceId: image.sourceId,
                     sourceImageId: image.sourceImageId,
                     contentTransform: {

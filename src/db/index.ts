@@ -19,6 +19,7 @@ export interface UploadedImageRecord {
     id: string; // Internal DB Primary Key (UUID)
     sourceImageId: string; // Stable ID (<CreationDate>/<Filename>)
     blob: Blob;
+    previewBlob?: Blob;
     thumbnailBlob: Blob;
     filename: string;
     mimeType: string;
@@ -57,6 +58,12 @@ class AlbumDatabase extends Dexie {
 
         // Version 4: Add uploaded images table
         this.version(4).stores({
+            uploadedImages: 'id, createdAt',
+        });
+
+        // Version 5: Add previewBlob to uploadedImages (Dexie handles schema update automatically if stores don't change, 
+        // but we increment version to be explicit and allow for potential future migrations)
+        this.version(5).stores({
             uploadedImages: 'id, createdAt',
         });
     }

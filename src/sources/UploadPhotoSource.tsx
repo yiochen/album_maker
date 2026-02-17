@@ -35,6 +35,9 @@ class UploadPhotoSource implements PhotoSource {
             width: record.width,
             height: record.height,
             createdAt: record.createdAt,
+            thumbnailUrl: `/__local__/uploaded/thumb/${record.id}`,
+            previewUrl: `/__local__/uploaded/preview/${record.id}`,
+            fullUrl: `/__local__/uploaded/full/${record.id}`,
             metadata: { dbId: record.id }, // Keep DB ID in metadata for URL resolution
         }));
 
@@ -45,8 +48,12 @@ class UploadPhotoSource implements PhotoSource {
         };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getThumbnailUrl(image: SourceImage, width: number, height: number): string {
+    getPreviewUrl(image: SourceImage): string {
+        const dbId = (image.metadata?.dbId as string) || image.id;
+        return `/__local__/uploaded/preview/${dbId}`;
+    }
+
+    getThumbnailUrl(image: SourceImage): string {
         const dbId = (image.metadata?.dbId as string) || image.id;
         return `/__local__/uploaded/thumb/${dbId}`;
     }

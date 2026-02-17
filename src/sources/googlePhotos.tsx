@@ -189,6 +189,9 @@ class GooglePhotosSource implements PhotoSource, InitializableSource {
                     width: i.mediaMetadata?.width ? parseInt(i.mediaMetadata.width) : undefined,
                     height: i.mediaMetadata?.height ? parseInt(i.mediaMetadata.height) : undefined,
                     createdAt: i.mediaMetadata?.creationTime ? new Date(i.mediaMetadata.creationTime).getTime() : undefined,
+                    thumbnailUrl: `${i.baseUrl}=w256`,
+                    previewUrl: `${i.baseUrl}=w1024`,
+                    fullUrl: `${i.baseUrl}=d`,
                     metadata: { baseUrl: i.baseUrl },
                 };
             });
@@ -226,10 +229,16 @@ class GooglePhotosSource implements PhotoSource, InitializableSource {
         }));
     }
 
-    getThumbnailUrl(image: SourceImage, width: number, height: number): string {
+    getPreviewUrl(image: SourceImage): string {
         const baseUrl = image.metadata?.baseUrl as string;
         if (!baseUrl) return '';
-        return `${baseUrl}=w${width}-h${height}`;
+        return `${baseUrl}=w1024`;
+    }
+
+    getThumbnailUrl(image: SourceImage): string {
+        const baseUrl = image.metadata?.baseUrl as string;
+        if (!baseUrl) return '';
+        return `${baseUrl}=w256`;
     }
 
     getFullUrl(image: SourceImage, maxWidth?: number, maxHeight?: number): string {

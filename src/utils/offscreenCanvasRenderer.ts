@@ -64,7 +64,16 @@ export async function renderSpread(
     // spread.elements are assumed to be ordered correctly in the store
     for (const element of spread.elements) {
         try {
-            const url = options.useThumbnail ? element.content.thumbnailUrl : element.content.imageUrl;
+            // Dynamic URL Selection based on PPI
+            let url: string;
+            if (ppi < 50) {
+                url = element.content.thumbnailUrl;
+            } else if (ppi < 200) {
+                url = element.content.previewUrl;
+            } else {
+                url = element.content.fullUrl;
+            }
+
             const bitmap = await loadImage(url, options.customFetch as typeof fetch);
 
             // Determine orientation

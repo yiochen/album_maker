@@ -9,6 +9,9 @@ export interface SourceImage {
     width?: number;
     height?: number;
     createdAt?: number;
+    fullUrl?: string;
+    previewUrl?: string;
+    thumbnailUrl?: string;
     metadata?: Record<string, unknown>;
 }
 
@@ -60,11 +63,11 @@ export interface PhotoSource {
     // Fetch images from the source
     fetchImages(options?: FetchImagesOptions): Promise<FetchImagesResult>;
 
-    // Get albums/folders if the source supports them
-    fetchAlbums?(): Promise<SourceAlbum[]>;
+    // Get preview URL (medium resolution) for an image
+    getPreviewUrl(image: SourceImage): string;
 
-    // Get thumbnail URL for an image at specific dimensions
-    getThumbnailUrl(image: SourceImage, width: number, height: number): string;
+    // Get thumbnail URL for an image
+    getThumbnailUrl(image: SourceImage): string;
 
     // Get full-resolution URL for an image
     getFullUrl(image: SourceImage, maxWidth?: number, maxHeight?: number): string;

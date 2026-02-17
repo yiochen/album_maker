@@ -36,7 +36,7 @@ export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({ image })
             }}
         >
             <img
-                src={image.thumbnailUrl || image.baseUrl}
+                src={image.thumbnailUrl}
                 alt={image.filename}
                 title={image.filename}
                 loading="lazy"

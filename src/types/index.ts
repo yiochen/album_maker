@@ -51,7 +51,8 @@ export interface Spread {
  * inner positioning (SmartFrame), and aspect ratio settings.
  */
 export interface ImageContent {
-  imageUrl: string;
+  fullUrl: string;
+  previewUrl: string;
   thumbnailUrl: string;
   /** Identifies which photo source/provider this image came from (e.g., "google-photos", "dummy-colors") */
   sourceId: string;
@@ -141,8 +142,9 @@ export interface PoolImage {
   sourceId: string;
   /** The unique ID of this image within its source (e.g., Google Photos media item ID) */
   sourceImageId: string;
-  baseUrl: string;
-  thumbnailUrl?: string;
+  fullUrl: string;
+  previewUrl: string;
+  thumbnailUrl: string;
   filename: string;
   mimeType: string;
   /** Original width of the image in pixels (full resolution) */

@@ -84,7 +84,7 @@ async function handleDummyColor(url: URL): Promise<Response> {
     let colorHex: string;
     let dimensions: string;
 
-    if (segments[3] === 'full' || segments[3] === 'thumb') {
+    if (segments[3] === 'full' || segments[3] === 'thumb' || segments[3] === 'preview') {
         colorHex = segments[4];
         dimensions = segments[5];
     } else {
@@ -252,7 +252,6 @@ async function handleSpreadThumbnail(url: URL): Promise<Response> {
             ppi: THUMBNAIL_PPI,
             format: 'jpeg',
             quality: 0.8,
-            useThumbnail: true, // SW uses thumbnails for speed
             // CRITICAL: We pass our internal resolver because self.fetch() 
             // from within the SW bypasses the 'fetch' event listener.
             customFetch: (input: string | Request | URL) => {
@@ -355,7 +354,7 @@ async function handleUploadedImage(url: URL): Promise<Response> {
     const type = segments[3];
     const id = segments[4];
 
-    if (!id || (type !== 'full' && type !== 'thumb')) {
+    if (!id || (type !== 'full' && type !== 'thumb' && type !== 'preview')) {
         return new Response('Invalid uploaded image URL', { status: 400 });
     }
 
@@ -365,7 +364,15 @@ async function handleUploadedImage(url: URL): Promise<Response> {
             return new Response('Image not found', { status: 404 });
         }
 
-        const blob = type === 'full' ? record.blob : record.thumbnailBlob;
+        let blob: Blob;
+        if (type === 'full') {
+            blob = record.blob;
+        } else if (type === 'preview') {
+            blob = record.previewBlob || record.blob; // Fallback to full if preview missing
+        } else {
+            blob = record.thumbnailBlob;
+        }
+
         return new Response(blob, {
             headers: {
                 'Content-Type': record.mimeType,
@@ -381,6 +388,7 @@ async function handleUploadedImage(url: URL): Promise<Response> {
 interface UploadedImageRecord {
     id: string;
     blob: Blob;
+    previewBlob?: Blob;
     thumbnailBlob: Blob;
     filename: string;
     mimeType: string;
