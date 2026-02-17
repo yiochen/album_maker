@@ -133,7 +133,6 @@ export function calculateResizeSnap(
     resizeHandle: string,
     threshold: number = SNAP_THRESHOLD
 ): { position: Position; size: Size; snappedEdges: SnapEdge[] } {
-    const targets = SNAP_TARGETS;
     const snappedEdges: SnapEdge[] = [];
 
     let newX = position.x;
@@ -146,7 +145,7 @@ export function calculateResizeSnap(
     const bottom = position.y + size.height;
 
     // Check vertical snaps based on which edge is being resized
-    for (const target of targets.filter(t => t.orientation === 'vertical')) {
+    for (const target of VERTICAL_TARGETS) {
         if (resizeHandle.includes('e')) {
             // Resizing right edge
             if (Math.abs(right - target.position) < threshold) {
@@ -168,7 +167,7 @@ export function calculateResizeSnap(
     }
 
     // Check horizontal snaps
-    for (const target of targets.filter(t => t.orientation === 'horizontal')) {
+    for (const target of HORIZONTAL_TARGETS) {
         if (resizeHandle.includes('s')) {
             // Resizing bottom edge
             if (Math.abs(bottom - target.position) < threshold) {
