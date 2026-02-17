@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Album } from '../types';
-import { spreadThumbnailDB } from '../db';
 
 interface ExportSelectionGridProps {
     album: Album;
@@ -19,33 +18,12 @@ export const ExportSelectionGrid: React.FC<ExportSelectionGridProps> = ({
     onSelectAll,
     onSelectNone,
 }) => {
-    const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
-    const [isLoading, setIsLoading] = useState(true);
+    // Thumbnails are now generated on-the-fly via virtual URLs.
 
-    useEffect(() => {
-        const loadThumbnails = async () => {
-            setIsLoading(true);
-            try {
-                const results = await spreadThumbnailDB.getAllForAlbum(album.id);
-                const thumbMap: Record<string, string> = {};
-                results.forEach(rec => {
-                    thumbMap[rec.spreadId] = rec.dataUrl;
-                });
-                setThumbnails(thumbMap);
-            } catch (error) {
-                console.error('Failed to load thumbnails for selection grid:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        loadThumbnails();
-    }, [album.id]);
-
-    const renderSelectionItem = (spreadId: string, index: number, subId?: 'left' | 'right') => {
+    const renderSelectionItem = (spreadId: string, versionId: string, index: number, subId?: 'left' | 'right') => {
         const fullId = subId ? `${spreadId}:${subId}` : spreadId;
         const isSelected = selectedIds.has(fullId);
-        const thumbnailUrl = thumbnails[spreadId];
+        const thumbnailUrl = `/__local__/spreadThumbnails/${album.id}/${spreadId}/${versionId}`;
 
         // Page numbers
         let label = '';
@@ -96,19 +74,15 @@ export const ExportSelectionGrid: React.FC<ExportSelectionGridProps> = ({
             </div>
 
             <div className="selection-grid">
-                {isLoading ? (
-                    <div className="loading-spinner" style={{ gridColumn: '1 / -1', margin: '2rem auto' }} />
-                ) : (
-                    album.spreads.flatMap((spread, index) => {
-                        if (exportUnit === 'page') {
-                            return [
-                                renderSelectionItem(spread.id, index, 'left'),
-                                renderSelectionItem(spread.id, index, 'right')
-                            ];
-                        }
-                        return [renderSelectionItem(spread.id, index)];
-                    })
-                )}
+                {album.spreads.flatMap((spread, index) => {
+                    if (exportUnit === 'page') {
+                        return [
+                            renderSelectionItem(spread.id, spread.versionId, index, 'left'),
+                            renderSelectionItem(spread.id, spread.versionId, index, 'right')
+                        ];
+                    }
+                    return [renderSelectionItem(spread.id, spread.versionId, index)];
+                })}
             </div>
 
             <p className="text-muted" style={{ fontSize: 'var(--text-xs)', marginTop: 'var(--space-2)' }}>

@@ -17,8 +17,6 @@ interface UseCanvasInteractionProps {
     zoom: number;
     /** Ref to store active snap lines. */
     snapLinesRef: React.RefObject<fabric.Line[]>;
-    /** Optional callback when canvas content changes. */
-    onCanvasChange?: (dataUrl: string) => void;
 }
 
 /**
@@ -37,7 +35,6 @@ export const useCanvasInteraction = ({
     canvasHeight,
     zoom,
     snapLinesRef,
-    onCanvasChange,
 }: UseCanvasInteractionProps) => {
 
     useCanvasKeyboardEvents({
@@ -54,7 +51,6 @@ export const useCanvasInteraction = ({
         canvasHeight,
         zoom,
         snapLinesRef,
-        onCanvasChange,
     });
 
     return {

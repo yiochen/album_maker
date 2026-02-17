@@ -223,7 +223,7 @@ export class CanvasPageElement extends fabric.Group {
 
         this.applyCover();
         this.setCoords();
-        this.onContentTransformChange?.(this.pageElement.id, this.pageElement.content.contentTransform);
+        // REMOVED: this.onContentTransformChange?.(this.pageElement.id, this.pageElement.content.contentTransform);
         return true;
     }
 

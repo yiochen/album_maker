@@ -5,8 +5,8 @@ Manages persistent client-side storage using **IndexedDB** via the **Dexie.js** 
 
 ## Key Logic
 - **Singleton Instance**: The database is accessed via a singleton instance `db` exported from `index.ts`.
-- **Helpers**: specialized objects (`albumDB`, `spreadThumbnailDB`, `settingsDB`) abstract raw Dexie operations.
-- **Caching**: `spreadThumbnailDB` manages data URL caching for spread previews.
+- **Helpers**: specialized objects (`albumDB`, `settingsDB`, `uploadedImageDB`) abstract raw Dexie operations.
+- **Caching**: Spread thumbnails are now managed by the **Service Worker** via the Browser Cache API, using `versionId` for invalidation. IndexedDB is only used to fetch raw album data for rendering.
 - **Image Storage**: `uploadedImageDB` handles original and thumbnail blobs for user-uploaded images.
 
 ## Rules of Engagement

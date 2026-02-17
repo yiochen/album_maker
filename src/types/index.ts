@@ -40,6 +40,7 @@ export interface AlbumMetadata {
 
 export interface Spread {
   id: string; // ID of the spread (can be same as left page ID)
+  versionId: string; // Unique ID for cache invalidation (UUID)
   templateId: TemplateId;
   elements: PageElement[];
   background?: string;
@@ -241,11 +242,3 @@ export interface ExportProgress {
   error?: string;
 }
 
-export interface SpreadThumbnailRecord {
-  id: string;           // albumId-spreadId
-  albumId: string;
-  spreadId: string;
-  dataUrl: string;      // Base64 data URL
-  contentHash: string;  // Hash of spread content for cache invalidation
-  timestamp: number;
-}

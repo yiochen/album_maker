@@ -28,7 +28,6 @@ import { useAutoSave } from '../hooks/useAutoSave';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useElementActions } from '../hooks/useElementActions';
 import { useAlbumLifecycle } from '../hooks/useAlbumLifecycle';
-import { useThumbnailSync } from '../hooks/useThumbnailSync';
 import { Headerbar } from './Headerbar';
 import { AlbumSettingsPanel } from './AlbumSettingsPanel';
 import { PageNavigator } from './PageNavigator';
@@ -84,8 +83,6 @@ export const AlbumEditor: React.FC = () => {
     handleImportAlbum,
   } = useAlbumLifecycle();
 
-  // Thumbnail sync
-  const { handleCanvasChange } = useThumbnailSync();
 
   // Derived state
   const currentSpread = useMemo(() => {
@@ -138,7 +135,6 @@ export const AlbumEditor: React.FC = () => {
 
         <Canvas
           onImageDrop={handleImageDrop}
-          onCanvasChange={handleCanvasChange}
         />
 
         <Tabs

@@ -22,8 +22,6 @@ interface UseCanvasRenderProps {
     canvasElRef: React.RefObject<HTMLCanvasElement | null>;
     /** Ref to the container div element. */
     containerRef: React.RefObject<HTMLDivElement | null>;
-    /** Optional callback when canvas content changes. */
-    onCanvasChange?: (dataUrl: string) => void;
 }
 
 /**
@@ -37,7 +35,6 @@ interface UseCanvasRenderProps {
 export const useCanvasRender = ({
     canvasElRef,
     containerRef,
-    onCanvasChange,
 }: UseCanvasRenderProps) => {
     const settings = useAlbumSettings();
 
@@ -61,7 +58,6 @@ export const useCanvasRender = ({
         canvasWidth,
         canvasHeight,
         snapLinesRef,
-        onCanvasChange,
     });
 
     useReactToFabricSync({

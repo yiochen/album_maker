@@ -1,7 +1,7 @@
 import * as fabric from 'fabric';
 import { Spread, AlbumSettings } from '../types';
 import { CanvasPageElement } from '../hooks/CanvasPageElement';
-import { CustomFabricObject } from '../hooks/fabricTypes';
+import { CustomFabricObject, ExtendedFabricObject } from '../hooks/fabricTypes';
 import { APP_CONFIG } from '../config';
 import { FabricRenderOptions } from './rendererTypes';
 
@@ -46,14 +46,18 @@ export async function renderSpread(
 
     const currentObjects = canvas.getObjects() as CustomFabricObject[];
     const validIds = new Set<string>();
-    const elementsToLoad: typeof spread.elements = [];
+    const loadPromises: Promise<void>[] = [];
 
-    // 2. Sync existing objects or identify new ones
+    // 2. Sync existing objects, update images if changed, or add new ones
     spread.elements.forEach(element => {
         validIds.add(element.id);
         const existingObj = currentObjects.find(o => (o as CustomFabricObject).data?.id === element.id) as CanvasPageElement;
+        const targetUrl = options.useThumbnail ? element.content.thumbnailUrl : element.content.imageUrl;
 
         if (existingObj && existingObj instanceof CanvasPageElement) {
+            // Update reference to latest data from React state
+            existingObj.pageElement = element;
+
             existingObj.set({
                 selectable: isInteractive,
                 hasControls: isInteractive,
@@ -61,10 +65,40 @@ export async function renderSpread(
                 cornerSize: uiSizes.cornerSize,
                 borderScaleFactor: uiSizes.borderScaleFactor,
             });
-            existingObj.applyLayout(canvas.width, canvas.height);
+
+            // Only apply state layout if not currently being interacted with in Fabric
+            if (!(existingObj as ExtendedFabricObject).preventLayoutSync) {
+                existingObj.applyLayout(canvas.width, canvas.height);
+            }
             existingObj.onContentTransformChange = interactiveOpts?.onContentTransformChange;
+
+            // Detect image change
+            const currentUrl = options.useThumbnail ? existingObj.pageElement.content.thumbnailUrl : existingObj.pageElement.content.imageUrl;
+            if (targetUrl !== currentUrl) {
+                // Update element reference for future comparisons
+                existingObj.pageElement = element;
+                loadPromises.push(existingObj.loadImage(targetUrl));
+            }
         } else {
-            elementsToLoad.push(element);
+            // [SYNC ADDITION] Create and add immediately so next call finds it
+            const canvasEl = new CanvasPageElement(element, {
+                cornerStyle: 'circle',
+                cornerColor: 'white',
+                cornerStrokeColor: '#333',
+                borderColor: '#333',
+                transparentCorners: false,
+                cornerSize: uiSizes.cornerSize,
+                borderScaleFactor: uiSizes.borderScaleFactor,
+                selectable: isInteractive,
+                hasControls: isInteractive,
+                evented: isInteractive,
+                onContentTransformChange: interactiveOpts?.onContentTransformChange,
+            });
+
+            canvas.add(canvasEl);
+            loadPromises.push(canvasEl.loadImage(targetUrl).then(() => {
+                canvasEl.applyLayout(canvas.width, canvas.height);
+            }));
         }
     });
 
@@ -76,8 +110,8 @@ export async function renderSpread(
         }
     });
 
-    // 4. Handle Seam Layer (Index 0)
-    let seam = currentObjects.find(o => (o as CustomFabricObject).data?.id === 'seam') as fabric.Line;
+    // 4. Handle Seam Layer
+    let seam = (canvas.getObjects() as CustomFabricObject[]).find(o => o.data?.id === 'seam') as fabric.Line;
     if (showPageSeam) {
         if (!seam) {
             seam = new fabric.Line([canvasWidth / 2, 0, canvasWidth / 2, canvasHeight], {
@@ -103,29 +137,7 @@ export async function renderSpread(
         canvas.remove(seam);
     }
 
-    // 5. Load and add new elements
-    const loadPromises = elementsToLoad.map(async (element) => {
-        const canvasEl = new CanvasPageElement(element, {
-            cornerStyle: 'circle',
-            cornerColor: 'white',
-            cornerStrokeColor: '#333',
-            borderColor: '#333',
-            transparentCorners: false,
-            cornerSize: uiSizes.cornerSize,
-            borderScaleFactor: uiSizes.borderScaleFactor,
-            selectable: isInteractive,
-            hasControls: isInteractive,
-            evented: isInteractive,
-            onContentTransformChange: interactiveOpts?.onContentTransformChange,
-        });
-
-        const url = options.useThumbnail ? element.content.thumbnailUrl : element.content.imageUrl;
-        await canvasEl.loadImage(url);
-        canvasEl.applyLayout(canvas.width, canvas.height);
-
-        canvas.add(canvasEl);
-    });
-
+    // 5. Wait for all content to be ready
     await Promise.all(loadPromises);
 
     // 6. Finalize Z-Order

@@ -9,3 +9,4 @@ trigger: always_on
 - **Proactive Refactoring:** Prioritize code health. Do not append code to existing large files, functions, or components. Instead, restructure the code and create better abstractions to break it into smaller, manageable pieces.
 - **Generalize Patterns:** When implementing something that follows an existing pattern, seek to generalize it into a helper or reusable utility rather than just duplicating the implementation. 
 - **Goal-Oriented Health:** Treat maintaining and improving code health as a primary goal of every task, not just adding new features.
+- **Approval Protocol**: Never start code implementation or modification until the user has provided a specific "Proceed", "Go" or "Implement" command. Without the command, treat user's request as a discussion.

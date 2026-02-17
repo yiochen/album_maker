@@ -62,6 +62,21 @@ export const useAlbumLifecycle = () => {
      */
     const handleDeleteAlbum = useCallback(async (id: string) => {
         await albumStorage.deleteAlbum(id);
+
+        // Clear thumbnail cache for this album
+        try {
+            const cache = await caches.open('spread-thumbnails-v1');
+            const keys = await cache.keys();
+            const prefix = `/__local__/spreadThumbnails/${id}/`;
+
+            for (const request of keys) {
+                if (new URL(request.url).pathname.startsWith(prefix)) {
+                    await cache.delete(request);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to clean up album cache:', e);
+        }
     }, []);
 
     /**

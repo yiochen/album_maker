@@ -163,6 +163,8 @@ export class ReorderSpreadsCommand implements Command<Album> {
 export class UpdateSpreadCommand implements Command<Album> {
     readonly type = 'UPDATE_SPREAD';
 
+    private newVersionId: string | null = null;
+
     constructor(
         public readonly spreadId: string,
         public readonly updates: Partial<Spread>,
@@ -170,11 +172,15 @@ export class UpdateSpreadCommand implements Command<Album> {
     ) { }
 
     execute(state: Album): Album {
+        if (!this.newVersionId) {
+            this.newVersionId = crypto.randomUUID();
+        }
+
         return {
             ...state,
             spreads: state.spreads.map(s =>
                 s.id === this.spreadId
-                    ? { ...s, ...this.updates }
+                    ? { ...s, ...this.updates, versionId: this.newVersionId! }
                     : s
             ),
             updatedAt: Date.now(),
@@ -186,7 +192,7 @@ export class UpdateSpreadCommand implements Command<Album> {
             ...state,
             spreads: state.spreads.map(s =>
                 s.id === this.spreadId
-                    ? { ...s, ...this.oldValues }
+                    ? { ...s, ...this.oldValues, versionId: this.oldValues.versionId || s.versionId }
                     : s
             ),
             updatedAt: Date.now(),

@@ -19,4 +19,10 @@ export interface OffscreenRenderOptions extends BaseRenderOptions {
     format: 'png' | 'jpeg';
     quality: number;
     splitPage?: 'left' | 'right';
+    /**
+     * Optional custom fetcher.
+     * Use this when rendering from within contexts where regular fetch() 
+     * might bypass interceptors (e.g., inside a Service Worker calling itself).
+     */
+    customFetch?: (input: string | Request | URL, init?: RequestInit) => Promise<Response>;
 }

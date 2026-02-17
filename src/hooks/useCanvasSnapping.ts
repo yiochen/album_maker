@@ -12,7 +12,6 @@ import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
 import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 import { CustomFabricObject } from './fabricTypes';
-import { APP_CONFIG } from '../config';
 import { getZoomCompensatedSizes } from '../utils/fabricRenderer';
 import { CanvasPageElement } from './CanvasPageElement';
 import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
@@ -32,8 +31,6 @@ interface UseCanvasSnappingProps {
     zoom: number;
     /** Ref to store active snap lines. */
     snapLinesRef: React.RefObject<fabric.Line[]>;
-    /** Optional callback when canvas content changes. */
-    onCanvasChange?: (dataUrl: string) => void;
 }
 
 /**
@@ -46,7 +43,6 @@ export const useCanvasSnapping = ({
     canvasHeight,
     zoom,
     snapLinesRef,
-    onCanvasChange,
 }: UseCanvasSnappingProps) => {
     const isSnappingEnabled = useIsSnappingEnabled();
     const spreads = useAlbumSpreads();
@@ -55,7 +51,6 @@ export const useCanvasSnapping = ({
     const onElementUpdate = useUpdateElement();
 
     const onElementUpdateRef = useRef(onElementUpdate);
-    const onCanvasChangeRef = useRef(onCanvasChange);
     const spreadRef = useRef(spread);
     const isSnappingEnabledRef = useRef(isSnappingEnabled);
     // Cache UI sizes to avoid recalculating on every mouse move
@@ -63,11 +58,10 @@ export const useCanvasSnapping = ({
 
     useEffect(() => {
         onElementUpdateRef.current = onElementUpdate;
-        onCanvasChangeRef.current = onCanvasChange;
         spreadRef.current = spread;
         isSnappingEnabledRef.current = isSnappingEnabled;
         uiSizesRef.current = getZoomCompensatedSizes(zoom);
-    }, [onElementUpdate, onCanvasChange, spread, isSnappingEnabled, zoom]);
+    }, [onElementUpdate, spread, isSnappingEnabled, zoom]);
 
     useEffect(() => {
         const canvas = fabricCanvas;
@@ -167,16 +161,11 @@ export const useCanvasSnapping = ({
 
             onElementUpdateRef.current(spreadRef.current.id, obj.pageElement.id, {
                 box: obj.pageElement.box,
+                content: {
+                    ...obj.pageElement.content,
+                    contentTransform: obj.pageElement.content.contentTransform,
+                }
             });
-
-            if (onCanvasChangeRef.current) {
-                const dataUrl = canvas.toDataURL({
-                    format: 'jpeg',
-                    quality: APP_CONFIG.THUMBNAIL_QUALITY,
-                    multiplier: APP_CONFIG.THUMBNAIL_MULTIPLIER
-                });
-                onCanvasChangeRef.current(dataUrl);
-            }
         };
 
         canvas.on('object:moving', handleObjectMoving);

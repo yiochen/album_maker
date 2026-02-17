@@ -13,8 +13,6 @@ import { useDndDropContext } from '../contexts/DndDropContext';
 interface CanvasProps {
     /** Callback fired when an image is dropped onto the canvas. */
     onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
-    /** Optional callback fired when the canvas content changes (e.g., for thumbnail generation). */
-    onCanvasChange?: (dataUrl: string) => void;
 }
 
 /**
@@ -23,7 +21,6 @@ interface CanvasProps {
  */
 export const Canvas: React.FC<CanvasProps> = ({
     onImageDrop,
-    onCanvasChange,
 }) => {
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
@@ -47,7 +44,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     } = useCanvasRender({
         canvasElRef,
         containerRef,
-        onCanvasChange,
     });
 
     // Initialize interaction logic
@@ -59,7 +55,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         canvasHeight,
         zoom,
         snapLinesRef,
-        onCanvasChange,
     });
 
     // Register this canvas as a drop target for dnd-kit

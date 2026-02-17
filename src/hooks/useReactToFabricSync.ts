@@ -36,6 +36,7 @@ export const useReactToFabricSync = ({
     // event handlers while minimizing useEffect re-subscriptions.
     const spreadRef = useRef(spread);
     const onElementUpdateRef = useRef(onElementUpdate);
+    const syncLockRef = useRef<{ promise: Promise<void> | null }>({ promise: null });
 
     useEffect(() => {
         spreadRef.current = spread;
@@ -47,7 +48,7 @@ export const useReactToFabricSync = ({
 
     // Sync State to Fabric
     useEffect(() => {
-        const sync = async () => {
+        const performSync = async () => {
             const canvas = fabricCanvas;
             if (!canvas || !spread || !settings) return;
 
@@ -81,6 +82,17 @@ export const useReactToFabricSync = ({
                 canvas.discardActiveObject();
                 canvas.requestRenderAll();
             }
+        };
+
+        const sync = () => {
+            // Queue the sync to ensure sequential execution
+            const currentPromise = syncLockRef.current.promise || Promise.resolve();
+            const nextPromise = currentPromise.then(async () => {
+                await performSync();
+            }).catch(err => {
+                console.error('Sync error:', err);
+            });
+            syncLockRef.current.promise = nextPromise;
         };
 
         sync();

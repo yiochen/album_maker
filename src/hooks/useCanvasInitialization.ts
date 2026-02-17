@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
-import { APP_CONFIG } from '../config';
 
 /**
  * Props for useCanvasInitialization.
@@ -17,8 +16,6 @@ interface UseCanvasInitializationProps {
     canvasHeight: number;
     /** Ref to store active snap lines. */
     snapLinesRef: React.RefObject<fabric.Line[]>;
-    /** Optional callback when canvas content changes (for thumbnails). */
-    onCanvasChange?: (dataUrl: string) => void;
 }
 
 /**
@@ -33,16 +30,10 @@ export const useCanvasInitialization = ({
     canvasWidth,
     canvasHeight,
     snapLinesRef,
-    onCanvasChange,
 }: UseCanvasInitializationProps) => {
     const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
     const seamRef = useRef<fabric.Line | null>(null);
 
-    // Stable ref for callback
-    const onCanvasChangeRef = useRef(onCanvasChange);
-    useEffect(() => {
-        onCanvasChangeRef.current = onCanvasChange;
-    }, [onCanvasChange]);
 
     useEffect(() => {
         if (!canvasElRef.current) return;
@@ -85,15 +76,6 @@ export const useCanvasInitialization = ({
                 snapLinesRef.current.length = 0;
             }
             canvas.requestRenderAll();
-
-            if (onCanvasChangeRef.current) {
-                const dataUrl = canvas.toDataURL({
-                    format: 'jpeg',
-                    quality: APP_CONFIG.THUMBNAIL_QUALITY,
-                    multiplier: APP_CONFIG.THUMBNAIL_MULTIPLIER
-                });
-                onCanvasChangeRef.current(dataUrl);
-            }
         });
 
         canvas.on('mouse:down', () => {

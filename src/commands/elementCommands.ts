@@ -4,6 +4,8 @@ import { Album, PageElement } from '../types';
 export class UpdateElementCommand implements Command<Album> {
     readonly type = 'UPDATE_ELEMENT';
 
+    private newVersionId: string | null = null;
+
     constructor(
         public readonly spreadId: string,
         public readonly elementId: string,
@@ -13,12 +15,17 @@ export class UpdateElementCommand implements Command<Album> {
     ) { }
 
     execute(state: Album): Album {
+        if (!this.newVersionId) {
+            this.newVersionId = crypto.randomUUID();
+        }
+
         return {
             ...state,
             spreads: state.spreads.map(s =>
                 s.id === this.spreadId
                     ? {
                         ...s,
+                        versionId: this.newVersionId!,
                         elements: s.elements.map(e =>
                             e.id === this.elementId
                                 ? {
@@ -44,6 +51,7 @@ export class UpdateElementCommand implements Command<Album> {
                 s.id === this.spreadId
                     ? {
                         ...s,
+                        versionId: crypto.randomUUID(), // Always bump version on undo to trigger refresh
                         elements: s.elements.map(e =>
                             e.id === this.elementId
                                 ? {
@@ -85,19 +93,32 @@ export class UpdateElementCommand implements Command<Album> {
 export class AddElementCommand implements Command<Album> {
     readonly type = 'ADD_ELEMENT';
 
+    private newVersionId: string | null = null;
+    private oldVersionId: string | null = null;
+
     constructor(
         public readonly spreadId: string,
         public readonly element: PageElement
     ) { }
 
     execute(state: Album): Album {
+        if (!this.newVersionId) {
+            this.newVersionId = crypto.randomUUID();
+        }
+
         return {
             ...state,
-            spreads: state.spreads.map(s =>
-                s.id === this.spreadId
-                    ? { ...s, elements: [...s.elements, this.element] }
-                    : s
-            ),
+            spreads: state.spreads.map(s => {
+                if (s.id === this.spreadId) {
+                    if (!this.oldVersionId) this.oldVersionId = s.versionId;
+                    return {
+                        ...s,
+                        versionId: this.newVersionId!,
+                        elements: [...s.elements, this.element]
+                    };
+                }
+                return s;
+            }),
             updatedAt: Date.now(),
         };
     }
@@ -109,6 +130,7 @@ export class AddElementCommand implements Command<Album> {
                 s.id === this.spreadId
                     ? {
                         ...s,
+                        versionId: this.oldVersionId || s.versionId,
                         elements: s.elements.filter(e => e.id !== this.element.id),
                     }
                     : s
@@ -121,22 +143,32 @@ export class AddElementCommand implements Command<Album> {
 export class DeleteElementCommand implements Command<Album> {
     readonly type = 'DELETE_ELEMENT';
 
+    private newVersionId: string | null = null;
+    private oldVersionId: string | null = null;
+
     constructor(
         public readonly spreadId: string,
         public readonly element: PageElement
     ) { }
 
     execute(state: Album): Album {
+        if (!this.newVersionId) {
+            this.newVersionId = crypto.randomUUID();
+        }
+
         return {
             ...state,
-            spreads: state.spreads.map(s =>
-                s.id === this.spreadId
-                    ? {
+            spreads: state.spreads.map(s => {
+                if (s.id === this.spreadId) {
+                    if (!this.oldVersionId) this.oldVersionId = s.versionId;
+                    return {
                         ...s,
+                        versionId: this.newVersionId!,
                         elements: s.elements.filter(e => e.id !== this.element.id),
-                    }
-                    : s
-            ),
+                    };
+                }
+                return s;
+            }),
             updatedAt: Date.now(),
         };
     }
@@ -146,7 +178,11 @@ export class DeleteElementCommand implements Command<Album> {
             ...state,
             spreads: state.spreads.map(s =>
                 s.id === this.spreadId
-                    ? { ...s, elements: [...s.elements, this.element] }
+                    ? {
+                        ...s,
+                        versionId: this.oldVersionId || s.versionId,
+                        elements: [...s.elements, this.element]
+                    }
                     : s
             ),
             updatedAt: Date.now(),
@@ -156,6 +192,11 @@ export class DeleteElementCommand implements Command<Album> {
 
 export class MoveElementCommand implements Command<Album> {
     readonly type = 'MOVE_ELEMENT';
+
+    private newFromVersionId: string | null = null;
+    private newToVersionId: string | null = null;
+    private oldFromVersionId: string | null = null;
+    private oldToVersionId: string | null = null;
 
     constructor(
         public readonly fromSpreadId: string,
@@ -168,6 +209,9 @@ export class MoveElementCommand implements Command<Album> {
     execute(state: Album): Album {
         if (this.fromSpreadId === this.toSpreadId) return state;
 
+        if (!this.newFromVersionId) this.newFromVersionId = crypto.randomUUID();
+        if (!this.newToVersionId) this.newToVersionId = crypto.randomUUID();
+
         const fromSpread = state.spreads.find(s => s.id === this.fromSpreadId);
         if (!fromSpread) return state;
 
@@ -178,12 +222,15 @@ export class MoveElementCommand implements Command<Album> {
             ...state,
             spreads: state.spreads.map(s => {
                 if (s.id === this.fromSpreadId) {
+                    if (!this.oldFromVersionId) this.oldFromVersionId = s.versionId;
                     return {
                         ...s,
+                        versionId: this.newFromVersionId!,
                         elements: s.elements.filter(e => e.id !== this.elementId)
                     };
                 }
                 if (s.id === this.toSpreadId) {
+                    if (!this.oldToVersionId) this.oldToVersionId = s.versionId;
                     const movedElement = this.updates
                         ? {
                             ...elementToMove,
@@ -195,6 +242,7 @@ export class MoveElementCommand implements Command<Album> {
                         : elementToMove;
                     return {
                         ...s,
+                        versionId: this.newToVersionId!,
                         elements: [...s.elements, movedElement]
                     };
                 }
@@ -219,6 +267,7 @@ export class MoveElementCommand implements Command<Album> {
                 if (s.id === this.toSpreadId) {
                     return {
                         ...s,
+                        versionId: this.oldToVersionId || s.versionId,
                         elements: s.elements.filter(e => e.id !== this.elementId)
                     };
                 }
@@ -234,6 +283,7 @@ export class MoveElementCommand implements Command<Album> {
                         : elementToMove;
                     return {
                         ...s,
+                        versionId: this.oldFromVersionId || s.versionId,
                         elements: [...s.elements, restoredElement]
                     };
                 }
@@ -255,6 +305,9 @@ export class MoveElementCommand implements Command<Album> {
 export class ReorderElementCommand implements Command<Album> {
     readonly type = 'REORDER_ELEMENT';
 
+    private newVersionId: string | null = null;
+    private oldVersionId: string | null = null;
+
     constructor(
         public readonly spreadId: string,
         public readonly elementId: string,
@@ -275,14 +328,24 @@ export class ReorderElementCommand implements Command<Album> {
     }
 
     private applyReorder(state: Album, from: number, to: number): Album {
+        if (!this.newVersionId) this.newVersionId = crypto.randomUUID();
+
         return {
             ...state,
             spreads: state.spreads.map(s => {
                 if (s.id !== this.spreadId) return s;
+                if (!this.oldVersionId) this.oldVersionId = s.versionId;
+
                 const elements = [...s.elements];
                 const [moved] = elements.splice(from, 1);
                 elements.splice(to, 0, moved);
-                return { ...s, elements };
+                const isUndo = from === this.toIndex && to === this.fromIndex;
+
+                return {
+                    ...s,
+                    versionId: isUndo ? (this.oldVersionId || s.versionId) : this.newVersionId!,
+                    elements
+                };
             }),
             updatedAt: Date.now(),
         };

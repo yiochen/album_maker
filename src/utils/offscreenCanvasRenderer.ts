@@ -6,10 +6,29 @@ import { decomposeForRendering, IDENTITY, getOrientedDimensions } from './orient
 /**
  * Helper to load an image as an ImageBitmap in a worker environment.
  */
-async function loadImage(url: string): Promise<ImageBitmap> {
-    const response = await fetch(url);
+/**
+ * Helper to load an image as an ImageBitmap in a worker environment.
+ * 
+ * @param url The image URL to load.
+ * @param fetcher Optional fetch function. Defaults to global fetch.
+ *                Inside a Service Worker, you MUST provide a custom fetcher that 
+ *                manually resolves local routes, because internal SW fetches bypass 
+ *                the SW's own fetch event handlers.
+ */
+async function loadImage(url: string, fetcher: typeof fetch = fetch): Promise<ImageBitmap> {
+    const response = await fetcher(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${url} (${response.status} ${response.statusText})`);
+    }
     const blob = await response.blob();
-    return await createImageBitmap(blob);
+    try {
+        return await createImageBitmap(blob);
+    } catch (e) {
+        // Detailed error for decoding failures
+        const type = blob.type;
+        const size = blob.size;
+        throw new Error(`Failed to decode ${type} image (${size} bytes) from ${url}: ${e}`);
+    }
 }
 
 /**
@@ -46,7 +65,7 @@ export async function renderSpread(
     for (const element of spread.elements) {
         try {
             const url = options.useThumbnail ? element.content.thumbnailUrl : element.content.imageUrl;
-            const bitmap = await loadImage(url);
+            const bitmap = await loadImage(url, options.customFetch as typeof fetch);
 
             // Determine orientation
             const orientation = element.content.contentTransform?.orientation || IDENTITY;

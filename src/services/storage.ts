@@ -27,6 +27,7 @@ export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
 export const createNewSpread = (templateId: TemplateId = 'fullpage'): Spread => {
     return {
         id: crypto.randomUUID(),
+        versionId: crypto.randomUUID(),
         templateId,
         elements: [],
         background: '#ffffff',
@@ -110,29 +111,41 @@ export const albumStorage = {
     },
 };
 
-// Auto-save with debouncing
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+// Auto-save with microtask bundling
+// Using a microtask ensures that multiple synchronous state changes 
+// (e.g., updating multiple elements, or updating box + content)
+// are bundled into a single IndexedDB write at the end of the current tick.
+let isSavePending = false;
+let pendingAlbumToSave: Album | null = null;
 
 export const debouncedSave = (album: Album): void => {
-    if (saveTimeout) {
-        clearTimeout(saveTimeout);
-    }
+    pendingAlbumToSave = album;
 
-    saveTimeout = setTimeout(async () => {
-        try {
-            await albumStorage.saveAlbum(album);
-            console.debug('Album auto-saved');
-        } catch (error) {
-            console.error('Failed to auto-save album:', error);
-        }
-    }, APP_CONFIG.SAVE_DELAY);
+    if (!isSavePending) {
+        isSavePending = true;
+        queueMicrotask(async () => {
+            if (!pendingAlbumToSave) {
+                isSavePending = false;
+                return;
+            }
+
+            const albumToSave = pendingAlbumToSave;
+            pendingAlbumToSave = null;
+            isSavePending = false;
+
+            try {
+                await albumStorage.saveAlbum(albumToSave);
+                console.debug('Album auto-saved (microtask)');
+            } catch (error) {
+                console.error('Failed to auto-save album:', error);
+            }
+        });
+    }
 };
 
 export const immediatelyFlushSave = async (album: Album): Promise<void> => {
-    if (saveTimeout) {
-        clearTimeout(saveTimeout);
-        saveTimeout = null;
-    }
+    pendingAlbumToSave = null;
+    isSavePending = false;
     await albumStorage.saveAlbum(album);
 };
 

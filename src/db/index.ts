@@ -1,5 +1,4 @@
 import Dexie, { Table } from 'dexie';
-import { SpreadThumbnailRecord } from '../types';
 
 // Types for database
 export interface AlbumRecord {
@@ -31,7 +30,6 @@ export interface UploadedImageRecord {
 // Database class
 class AlbumDatabase extends Dexie {
     albums!: Table<AlbumRecord, string>;
-    spreadThumbnails!: Table<SpreadThumbnailRecord, string>;
     settings!: Table<SettingsRecord, string>;
     uploadedImages!: Table<UploadedImageRecord, string>;
 
@@ -52,9 +50,7 @@ class AlbumDatabase extends Dexie {
             settings: 'key',
         });
 
-        this.version(3).stores({
-            spreadThumbnails: 'id, albumId, spreadId, timestamp', // New schema
-        }).upgrade(tx => {
+        this.version(3).upgrade(tx => {
             // Optional: migrate or clear old thumbnails. Clearing is safer/easier.
             return tx.table('spreadThumbnails').clear();
         });
@@ -112,65 +108,6 @@ export const settingsDB = {
     },
 };
 
-// Helper functions for spread thumbnails
-export const spreadThumbnailDB = {
-    async get(albumId: string, spreadId: string): Promise<SpreadThumbnailRecord | null> {
-        const id = `${albumId}-${spreadId}`;
-        const record = await db.spreadThumbnails.get(id);
-        return record ?? null;
-    },
-
-    async set(
-        albumId: string,
-        spreadId: string,
-        dataUrl: string,
-        contentHash: string
-    ): Promise<void> {
-        const id = `${albumId}-${spreadId}`;
-        await db.spreadThumbnails.put({
-            id,
-            albumId,
-            spreadId,
-            dataUrl,
-            contentHash,
-            timestamp: Date.now(),
-        });
-    },
-
-    async delete(albumId: string, spreadId: string): Promise<void> {
-        const id = `${albumId}-${spreadId}`;
-        await db.spreadThumbnails.delete(id);
-    },
-
-    async deleteForAlbum(albumId: string): Promise<number> {
-        return db.spreadThumbnails.where('albumId').equals(albumId).delete();
-    },
-
-    async clear(): Promise<void> {
-        await db.spreadThumbnails.clear();
-    },
-
-    async getAllForAlbum(albumId: string): Promise<SpreadThumbnailRecord[]> {
-        return db.spreadThumbnails.where('albumId').equals(albumId).toArray();
-    },
-};
-
-// Generate a simple hash from spread content for cache invalidation
-// Updated to be clearer about Spread structure assumption
-export function generateSpreadContentHash(spread: { elements: Array<{ id: string; box: { x1: number; y1: number; x2: number; y2: number } }> }): string {
-    const elementsHash = spread.elements.map(e =>
-        `${e.id}:${e.box.x1.toFixed(4)},${e.box.y1.toFixed(4)},${e.box.x2.toFixed(4)},${e.box.y2.toFixed(4)}`
-    ).join('|');
-
-    // Simple hash function
-    let hash = 0;
-    for (let i = 0; i < elementsHash.length; i++) {
-        const char = elementsHash.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return hash.toString(36);
-}
 
 // Helper functions for uploaded images
 export const uploadedImageDB = {

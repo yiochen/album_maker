@@ -69,14 +69,14 @@ const generateColorImages = (): SourceImage[] => {
 
 /**
  * Builds a local URL for a dummy color image.
- * The service worker intercepts this URL and generates an SVG on the fly.
+ * The service worker intercepts this URL and generates a PNG on the fly.
  *
- * Format: /__local__/dummyColors/<hex>/<width>x<height>
- * Example: /__local__/dummyColors/EF4444/4032x3024
+ * Format: /__local__/dummyColors/<type>/<hex>/<width>x<height>
+ * Example: /__local__/dummyColors/full/EF4444/4032x3024
  */
-const buildDummyColorUrl = (color: string, width: number, height: number): string => {
+const buildDummyColorUrl = (type: 'full' | 'thumb', color: string, width: number, height: number): string => {
     const hex = color.replace('#', '');
-    return `/__local__/dummyColors/${hex}/${width}x${height}`;
+    return `/__local__/dummyColors/${type}/${hex}/${width}x${height}`;
 };
 
 class DummyColorsSource implements PhotoSource {
@@ -110,11 +110,9 @@ class DummyColorsSource implements PhotoSource {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     getThumbnailUrl(image: SourceImage, width: number, height: number): string {
         const color = image.metadata?.color as string;
-        const imgWidth = image.width || 400;
-        const imgHeight = image.height || 300;
         if (!color) return '';
-        // SVGs are scalable, so use the full-res URL for thumbnails too
-        return buildDummyColorUrl(color, imgWidth, imgHeight);
+        // Use thumb type and smaller dimensions for thumbnails
+        return buildDummyColorUrl('thumb', color, 400, 300);
     }
 
     getFullUrl(image: SourceImage): string {
@@ -122,7 +120,8 @@ class DummyColorsSource implements PhotoSource {
         const imgWidth = image.width || 400;
         const imgHeight = image.height || 300;
         if (!color) return '';
-        return buildDummyColorUrl(color, imgWidth, imgHeight);
+        // Use full type for original res
+        return buildDummyColorUrl('full', color, imgWidth, imgHeight);
     }
 }
 
