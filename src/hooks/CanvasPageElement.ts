@@ -252,7 +252,9 @@ export class CanvasPageElement extends fabric.Group {
                 sizeY: size,
                 touchSizeX: size * 1.4,
                 touchSizeY: size * 1.4,
-                render: (ctx, left, top) => {
+                render: (ctx, left, top, _styleOverride, fabricObject) => {
+                    const target = fabricObject as CanvasPageElement;
+                    const size = target.panControlSize || 22;
                     ctx.save();
                     ctx.translate(left, top);
                     const radius = size / 2 - 2;

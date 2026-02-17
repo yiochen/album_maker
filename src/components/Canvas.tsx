@@ -211,7 +211,18 @@ export const Canvas: React.FC<CanvasProps> = ({
                         <div ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
                             <canvas ref={canvasElRef} data-testid="canvas-layer" />
                             {currentSpread.elements.length === 0 && (
-                                <div className="canvas-placeholder" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', textAlign: 'center', width: '100%' }}>
+                                <div
+                                    className="canvas-placeholder"
+                                    style={{
+                                        position: 'absolute',
+                                        top: '50%',
+                                        left: '50%',
+                                        transform: `translate(-50%, -50%) scale(${100 / zoom})`,
+                                        pointerEvents: 'none',
+                                        textAlign: 'center',
+                                        width: '100%',
+                                    }}
+                                >
                                     <span className="text-muted" style={{ opacity: 0.5 }}>
                                         Drag images here
                                     </span>

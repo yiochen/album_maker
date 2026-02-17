@@ -83,6 +83,8 @@ Registered via `src/registerSW.ts` from `main.tsx`. Uses `skipWaiting()` + `clie
 5.  **Performance**:
     *   Offload heavy tasks to Web Workers.
     *   Manage object lifecycles (especially Fabric.js objects) to avoid memory leaks.
+6.  **Fabric.js v7 Specifics**:
+    *   **Uniform Scaling**: In Fabric v7, the `uniformScaling` option for controls is a **canvas-level** setting (`canvas.uniformScaling`), not strictly per-object. When synchronizing selections or updating element properties, always ensure `canvas.uniformScaling` is synced with the active object's requirements to ensure consistent behavior.
 
 ## Development
 

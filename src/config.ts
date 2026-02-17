@@ -14,6 +14,7 @@ export const APP_CONFIG = {
     seamDash: 5,
     snapLineStrokeWidth: 1,
     snapLineDash: 4,
+    panControlSize: 22,
   },
 
   // Image Pool

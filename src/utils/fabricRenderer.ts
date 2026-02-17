@@ -20,6 +20,7 @@ export const getZoomCompensatedSizes = (zoomPercent: number) => {
         seamDash: base.seamDash * inverseScale,
         snapLineStrokeWidth: base.snapLineStrokeWidth * inverseScale,
         snapLineDash: base.snapLineDash * inverseScale,
+        panControlSize: base.panControlSize * inverseScale,
     };
 };
 
@@ -73,7 +74,20 @@ export async function renderSpread(
                 evented: isInteractive,
                 cornerSize: uiSizes.cornerSize,
                 borderScaleFactor: uiSizes.borderScaleFactor,
+                uniformScaling: element.content.lockAspectRatio,
             });
+
+            // Update handles and pan control size based on current zoom/locked state
+            if (isInteractive) {
+                existingObj.updateControlVisibility(element.content.lockAspectRatio ?? true);
+                existingObj.setPanControlSize(uiSizes.panControlSize);
+
+                // In Fabric v7, uniformScaling is often respected more reliably when set on the canvas.
+                // Sync it if this object is the active one.
+                if (canvas instanceof fabric.Canvas && canvas.getActiveObject() === existingObj) {
+                    canvas.uniformScaling = element.content.lockAspectRatio ?? true;
+                }
+            }
 
             // Only apply state layout if not currently being interacted with in Fabric
             if (!(existingObj as ExtendedFabricObject).preventLayoutSync) {
@@ -101,6 +115,8 @@ export async function renderSpread(
                 selectable: isInteractive,
                 hasControls: isInteractive,
                 evented: isInteractive,
+                uniformScaling: element.content.lockAspectRatio,
+                panControlSize: uiSizes.panControlSize,
                 onContentTransformChange: interactiveOpts?.onContentTransformChange,
             });
 
