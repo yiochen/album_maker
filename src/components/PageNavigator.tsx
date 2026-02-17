@@ -38,7 +38,7 @@ export const PageNavigator: React.FC = () => {
 
     const handleAddSpread = () => {
         const insertIndex = currentSpreadIndex + 1;
-        addSpreads(1, undefined, insertIndex);
+        addSpreads(1, insertIndex);
         // Select the newly added spread
         setCurrentSpreadIndex(insertIndex);
     };

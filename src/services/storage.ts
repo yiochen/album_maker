@@ -1,4 +1,4 @@
-import type { Album, Spread, TemplateId } from '../types';
+import type { Album, Spread } from '../types';
 import { APP_CONFIG } from '../config';
 import { albumDB, settingsDB } from '../db';
 import Ajv from 'ajv';
@@ -24,11 +24,10 @@ export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
 };
 
 // Create a new empty spread
-export const createNewSpread = (templateId: TemplateId = 'fullpage'): Spread => {
+export const createNewSpread = (): Spread => {
     return {
         id: crypto.randomUUID(),
         versionId: crypto.randomUUID(),
-        templateId,
         elements: [],
         background: '#ffffff',
     };
