@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { PageElement } from '../types';
+import type { PageElement, TemplateId } from '../types';
 import {
   useAlbum,
   useSetName,
@@ -8,7 +8,8 @@ import {
   useUndo,
   useRedo,
   useCanUndo,
-  useCanRedo
+  useCanRedo,
+  useUpdateSpread
 } from '../states/albumStore';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -51,6 +52,7 @@ export const AlbumEditor: React.FC = () => {
   const redo = useRedo();
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
+  const updateSpread = useUpdateSpread();
 
   // UI State
   const currentSpreadIndex = useCurrentSpreadIndex();
@@ -145,6 +147,9 @@ export const AlbumEditor: React.FC = () => {
               settings={album.settings}
               selectedElement={selectedElement}
               selectedPageId={selectedPageId}
+              onTemplateChange={(spreadId, templateId) => {
+                updateSpread(spreadId, { templateId: templateId as TemplateId });
+              }}
               onElementUpdate={(updates, groupId) => {
                 if (selectedElementId && selectedPageId) {
                   handleElementUpdate(selectedPageId, selectedElementId, updates, groupId);

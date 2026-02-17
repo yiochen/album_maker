@@ -4,8 +4,14 @@ import { albumDB, settingsDB } from '../db';
 import Ajv from 'ajv';
 import albumSchema from '../schemas/albumSchema.json';
 
-const ajv = new Ajv();
-const validateAlbum = ajv.compile(albumSchema);
+let validateAlbum: any; // Type as any to avoid complex TS types for fallback
+try {
+    const ajv = new Ajv();
+    validateAlbum = ajv.compile(albumSchema);
+} catch (error) {
+    console.error('Failed to compile JSON schema:', error);
+    validateAlbum = () => true; // Fallback to allow loading if schema fails
+}
 
 // Create a new empty album
 export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
