@@ -1,5 +1,5 @@
 import { Command } from './Command';
-import { Album, Spread, TemplateId } from '../types';
+import { Album, Spread } from '../types';
 import { createNewSpread } from '../services/storage';
 
 export class AddSpreadCommand implements Command<Album> {
@@ -8,13 +8,12 @@ export class AddSpreadCommand implements Command<Album> {
     private actualIndex: number = -1;
 
     constructor(
-        public readonly templateId?: TemplateId,
         public readonly insertAt?: number
     ) { }
 
     execute(state: Album): Album {
         if (!this.newSpread) {
-            this.newSpread = createNewSpread(this.templateId);
+            this.newSpread = createNewSpread();
         }
 
         const newSpreads = [...state.spreads];
@@ -48,7 +47,6 @@ export class AddSpreadsCommand implements Command<Album> {
 
     constructor(
         public readonly count: number = 2,
-        public readonly templateId?: TemplateId,
         public readonly insertAt?: number
     ) { }
 
@@ -64,7 +62,7 @@ export class AddSpreadsCommand implements Command<Album> {
 
             if (spreadsToAdd > 0) {
                 this.newSpreads = Array.from({ length: spreadsToAdd }, () =>
-                    createNewSpread(this.templateId)
+                    createNewSpread()
                 );
             }
         }

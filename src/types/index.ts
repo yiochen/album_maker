@@ -41,7 +41,6 @@ export interface AlbumMetadata {
 export interface Spread {
   id: string; // ID of the spread (can be same as left page ID)
   versionId: string; // Unique ID for cache invalidation (UUID)
-  templateId: TemplateId;
   elements: PageElement[];
   background?: string;
 }
@@ -157,42 +156,6 @@ export interface PoolImage {
   createdAt?: number;
 }
 
-// Template types
-export type TemplateId =
-  | 'fullpage'
-  | 'square-center'
-  | 'portrait'
-  | 'landscape'
-  | 'polaroid'
-  | 'grid-2x2'
-  | 'grid-1-2';
-
-export interface PageTemplate {
-  id: TemplateId;
-  name: string;
-  description: string;
-  exportWidth: number;
-  exportHeight: number;
-  padding: Padding;
-  slots: TemplateSlot[];
-}
-
-export interface Padding {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-}
-
-export interface TemplateSlot {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  aspectRatio?: number;
-}
-
 // App state types
 export interface AppState {
   album: Album;
@@ -214,8 +177,8 @@ export type AlbumAction =
   | { type: 'SET_ALBUM'; payload: Album }
   | { type: 'SET_NAME'; payload: string }
   | { type: 'SET_SETTINGS'; payload: Partial<AlbumSettings> }
-  | { type: 'ADD_SPREAD'; payload?: { templateId?: TemplateId } }
-  | { type: 'ADD_SPREADS'; payload?: { count?: number; templateId?: TemplateId } }
+  | { type: 'ADD_SPREAD'; payload?: Record<string, never> }
+  | { type: 'ADD_SPREADS'; payload?: { count?: number } }
   | { type: 'DELETE_SPREAD'; payload: string }
   | { type: 'REORDER_SPREADS'; payload: { fromIndex: number; toIndex: number } }
   | { type: 'UPDATE_SPREAD'; payload: { spreadId: string; updates: Partial<Spread> } }

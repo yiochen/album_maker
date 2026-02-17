@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Album, Spread, PageElement, PoolImage, TemplateId, AlbumSettings } from '../types';
+import type { Album, Spread, PageElement, PoolImage, AlbumSettings } from '../types';
 import {
     UpdateElementCommand,
     AddElementCommand,
@@ -37,8 +37,8 @@ interface AlbumState {
     // Command wrappers
     setName: (name: string) => void;
     setSettings: (settings: Partial<AlbumSettings>) => void;
-    addSpread: (templateId?: TemplateId, index?: number) => void;
-    addSpreads: (count?: number, templateId?: TemplateId, index?: number) => void;
+    addSpread: (index?: number) => void;
+    addSpreads: (count?: number, index?: number) => void;
     deleteSpread: (spreadId: string) => void;
     deleteSpreads: (spreadIds: string[]) => void;
     reorderSpreads: (fromIndex: number, toIndex: number) => void;
@@ -96,13 +96,13 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
             syncState();
         },
 
-        addSpread: (templateId?: TemplateId, index?: number) => {
-            commandManager.execute(new AddSpreadCommand(templateId, index));
+        addSpread: (index?: number) => {
+            commandManager.execute(new AddSpreadCommand(index));
             syncState();
         },
 
-        addSpreads: (count: number = 1, templateId?: TemplateId, index?: number) => {
-            commandManager.execute(new AddSpreadsCommand(count, templateId, index));
+        addSpreads: (count: number = 1, index?: number) => {
+            commandManager.execute(new AddSpreadsCommand(count, index));
             syncState();
         },
 

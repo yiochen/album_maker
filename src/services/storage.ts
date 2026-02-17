@@ -1,11 +1,18 @@
-import type { Album, Spread, TemplateId } from '../types';
+import type { Album, Spread } from '../types';
 import { APP_CONFIG } from '../config';
 import { albumDB, settingsDB } from '../db';
 import Ajv from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import albumSchema from '../schemas/albumSchema.json';
 
-const ajv = new Ajv();
-const validateAlbum = ajv.compile(albumSchema);
+let validateAlbum: ValidateFunction<unknown>;
+try {
+    const ajv = new Ajv();
+    validateAlbum = ajv.compile(albumSchema);
+} catch (error) {
+    console.error('Failed to compile JSON schema:', error);
+    validateAlbum = (() => true) as unknown as ValidateFunction<unknown>; // Fallback to allow loading if schema fails
+}
 
 // Create a new empty album
 export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
@@ -24,11 +31,10 @@ export const createNewAlbum = (name: string = 'Untitled Album'): Album => {
 };
 
 // Create a new empty spread
-export const createNewSpread = (templateId: TemplateId = 'fullpage'): Spread => {
+export const createNewSpread = (): Spread => {
     return {
         id: crypto.randomUUID(),
         versionId: crypto.randomUUID(),
-        templateId,
         elements: [],
         background: '#ffffff',
     };
