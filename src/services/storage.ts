@@ -1,7 +1,8 @@
 import type { Album, Spread } from '../types';
 import { APP_CONFIG } from '../config';
 import { albumDB, settingsDB } from '../db';
-import Ajv, { ValidateFunction } from 'ajv';
+import Ajv from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import albumSchema from '../schemas/albumSchema.json';
 
 let validateAlbum: ValidateFunction<unknown>;
