@@ -7,7 +7,7 @@ import { UploadIcon } from './icons/UploadIcon';
 import { AddImageIcon } from './icons/AddImageIcon';
 import { CloseIcon } from './icons/CloseIcon';
 import { usePageWidth, usePageHeight } from '../states/albumStore';
-import { processAndSaveUpload } from '../services/imageUploadService';
+import { processAndSaveUpload, HeifUnsupportedError } from '../services/imageUploadService';
 
 /**
  * Props for the ImagePool component.
@@ -52,14 +52,49 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
         if (files.length === 0 || !pageWidth || !pageHeight) return;
 
         setIsUploading(true);
+        const successful: PoolImage[] = [];
+        const failed: { name: string; error: unknown }[] = [];
+
         try {
-            const newImages = await Promise.all(
-                files.map(file => processAndSaveUpload(file, pageWidth, pageHeight))
-            );
-            onImport(newImages);
+            for (const file of files) {
+                try {
+                    const newImage = await processAndSaveUpload(file, pageWidth, pageHeight);
+                    successful.push(newImage);
+                } catch (error) {
+                    failed.push({ name: file.name, error });
+                }
+            }
+
+            if (successful.length > 0) {
+                onImport(successful);
+            }
+
+            if (failed.length > 0) {
+                const heifUnsupported = failed.filter(f => f.error instanceof HeifUnsupportedError);
+                const others = failed.filter(f => !(f.error instanceof HeifUnsupportedError));
+
+                if (heifUnsupported.length > 0) {
+                    alert(
+                        `The following HEIC files are not supported by your browser (e.g. HDR or iOS 18 profiles):\n\n` +
+                        `${heifUnsupported.map(f => f.name).join('\n')}\n\n` +
+                        `Workarounds:\n` +
+                        `1. Export as JPEG using the Mac Preview app.\n` +
+                        `2. Set iPhone Camera Formats to 'Most Compatible'.\n` +
+                        `3. Use an online converter.`
+                    );
+                }
+
+                if (others.length > 0) {
+                    const errorMessages = others.map(f => {
+                        const message = f.error instanceof Error ? f.error.message : 'Unknown error';
+                        return `${f.name}: ${message}`;
+                    });
+                    alert(`Failed to upload the following images:\n\n${errorMessages.join('\n')}\n\nThis can happen with very large images or corrupted files.`);
+                }
+            }
         } catch (error) {
-            console.error('Failed to upload images:', error);
-            alert('Failed to upload images. Please try again.');
+            console.error('Critical upload failure:', error);
+            alert('An unexpected error occurred during upload. Please try again.');
         } finally {
             setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

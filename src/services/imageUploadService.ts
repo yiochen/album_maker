@@ -2,6 +2,17 @@ import { PoolImage } from '../types';
 import { uploadedImageDB, UploadedImageRecord } from '../db';
 import { calculateThumbnailSize, calculateCanvasMaxDimensions } from '../utils/imageUtils';
 import exifr from 'exifr';
+import heic2any from 'heic2any';
+
+/**
+ * Custom error for unsupported HEIF formats (e.g., HDR or new iOS profiles).
+ */
+export class HeifUnsupportedError extends Error {
+    constructor(filename: string) {
+        super(`HEIF format not supported for: ${filename}`);
+        this.name = 'HeifUnsupportedError';
+    }
+}
 
 /**
  * Processes a raw File object from an input, generates a thumbnail,
@@ -12,7 +23,35 @@ export async function processAndSaveUpload(
     pageWidth: number,
     pageHeight: number
 ): Promise<PoolImage> {
-    const blob = new Blob([file], { type: file.type });
+    let sourceFile: File = file;
+
+    // Handle HEIC/HEIF conversion
+    if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic')) {
+        try {
+            console.log(`Converting HEIC file: ${file.name}`);
+            const result = await heic2any({
+                blob: file,
+                toType: 'image/jpeg',
+                quality: 0.8,
+                multiple: true // Try enabling multiple to handle containers better
+            });
+
+            // heic2any can return a single blob or an array of blobs
+            const blob = Array.isArray(result) ? result[0] : result;
+            sourceFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                type: 'image/jpeg',
+                lastModified: file.lastModified
+            });
+        } catch (e) {
+            console.error(`Failed to convert HEIC file: ${file.name}`, e);
+            if (e instanceof Error && e.message.includes('ERR_LIBHEIF')) {
+                throw new HeifUnsupportedError(file.name);
+            }
+            // For other errors, we'll continue and let it fail at the Image load stage
+        }
+    }
+
+    const blob = new Blob([sourceFile], { type: sourceFile.type });
 
     // 1. Extract metadata and generate ID
     let creationDate: number | undefined;
@@ -33,12 +72,20 @@ export async function processAndSaveUpload(
 
     // 1. Get image dimensions
     const img = new Image();
-    img.src = URL.createObjectURL(blob);
+    const objectUrl = URL.createObjectURL(sourceFile);
 
     try {
         await new Promise((res, rej) => {
             img.onload = res;
-            img.onerror = rej;
+            img.onerror = (e) => {
+                console.error(`Failed to load image: ${sourceFile.name}`, {
+                    type: sourceFile.type,
+                    size: sourceFile.size,
+                    error: e
+                });
+                rej(new Error(`Failed to load image: ${sourceFile.name}`));
+            };
+            img.src = objectUrl;
         });
 
         const originalWidth = img.width;
@@ -58,7 +105,7 @@ export async function processAndSaveUpload(
         previewCtx.drawImage(img, 0, 0, previewSize.width, previewSize.height);
 
         const previewBlob = await new Promise<Blob>((res) => {
-            previewCanvas.toBlob((b) => res(b!), file.type, 0.85);
+            previewCanvas.toBlob((b) => res(b!), sourceFile.type, 0.85);
         });
 
         // 3. Calculate optimal thumbnail size
@@ -78,7 +125,7 @@ export async function processAndSaveUpload(
         thumbCtx.drawImage(img, 0, 0, thumbSize.width, thumbSize.height);
 
         const thumbnailBlob = await new Promise<Blob>((res) => {
-            thumbCanvas.toBlob((b) => res(b!), file.type, 0.8);
+            thumbCanvas.toBlob((b) => res(b!), sourceFile.type, 0.8);
         });
 
         // 5. Save to IndexedDB
@@ -88,8 +135,8 @@ export async function processAndSaveUpload(
             blob,
             previewBlob,
             thumbnailBlob,
-            filename: file.name,
-            mimeType: file.type,
+            filename: sourceFile.name,
+            mimeType: sourceFile.type,
             width: originalWidth,
             height: originalHeight,
             createdAt: creationDate || Date.now(),
@@ -105,8 +152,8 @@ export async function processAndSaveUpload(
             fullUrl: `/__local__/uploaded/full/${id}`,
             previewUrl: `/__local__/uploaded/preview/${id}`,
             thumbnailUrl: `/__local__/uploaded/thumb/${id}`,
-            filename: file.name,
-            mimeType: file.type,
+            filename: sourceFile.name,
+            mimeType: sourceFile.type,
             width: originalWidth,
             height: originalHeight,
             thumbnailWidth: thumbSize.width,
