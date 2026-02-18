@@ -10,3 +10,4 @@ trigger: always_on
 - **Generalize Patterns:** When implementing something that follows an existing pattern, seek to generalize it into a helper or reusable utility rather than just duplicating the implementation. 
 - **Goal-Oriented Health:** Treat maintaining and improving code health as a primary goal of every task, not just adding new features.
 - **Approval Protocol**: Never start code implementation or modification until the user has provided a specific "Proceed", "Go" or "Implement" command. Without the command, treat user's request as a discussion.
+- **Proactive Discussion**: Do not start implementation plan if user is seeking discussion or asking a question. Wait for user's request to "design", or "come up with a plan" to start working on an implementation plan.
