@@ -1,5 +1,5 @@
 import * as fabric from 'fabric';
-import type { PageElement, ImageContent, ImagePageElement } from '../types';
+import type { ImageContent, ImagePageElement } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from '../utils/imageUtils';
 import {
     type OrientationMatrix, IDENTITY,
@@ -7,7 +7,7 @@ import {
 } from '../utils/orientationMatrix';
 
 export class CanvasImageElement extends fabric.Group {
-    public pageElement: PageElement;
+    public pageElement: ImagePageElement;
     private innerImage: fabric.Image;
     private clipRect: fabric.Rect;
     public onContentTransformChange?: (elementId: string, contentTransform: ImageContent['contentTransform']) => void;

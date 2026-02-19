@@ -1,8 +1,10 @@
 import React from 'react';
 import type { Spread, PageElement, AlbumSettings } from '../types';
+import { isTextElement } from '../types';
 import { useReorderElement } from '../states/albumStore';
 import { SpreadProperties } from './properties/SpreadProperties';
 import { ElementProperties } from './properties/ElementProperties';
+import { TextElementProperties } from './properties/TextElementProperties';
 
 /**
  * Props for the PropertiesPanel component.
@@ -47,30 +49,55 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         <aside className="properties-panel">
             <div className="properties-header">
                 <h2 className="properties-title">
-                    {selectedElement ? 'Image Properties' : 'Spread Properties'}
+                    {selectedElement
+                        ? isTextElement(selectedElement)
+                            ? 'Text Properties'
+                            : 'Image Properties'
+                        : 'Spread Properties'}
                 </h2>
             </div>
 
             <div className="properties-content">
                 {selectedElement ? (
-                    <ElementProperties
-                        element={selectedElement}
-                        settings={settings}
-                        onUpdate={onElementUpdate}
-                        onDelete={onElementDelete}
-                        canBringForward={canBringForward}
-                        canSendBackward={canSendBackward}
-                        onBringForward={() => {
-                            if (canBringForward) {
-                                reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex + 1);
-                            }
-                        }}
-                        onSendBackward={() => {
-                            if (canSendBackward) {
-                                reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex - 1);
-                            }
-                        }}
-                    />
+                    isTextElement(selectedElement) ? (
+                        <TextElementProperties
+                            element={selectedElement}
+                            settings={settings}
+                            onUpdate={onElementUpdate}
+                            onDelete={onElementDelete}
+                            canBringForward={canBringForward}
+                            canSendBackward={canSendBackward}
+                            onBringForward={() => {
+                                if (canBringForward) {
+                                    reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex + 1);
+                                }
+                            }}
+                            onSendBackward={() => {
+                                if (canSendBackward) {
+                                    reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex - 1);
+                                }
+                            }}
+                        />
+                    ) : (
+                        <ElementProperties
+                            element={selectedElement}
+                            settings={settings}
+                            onUpdate={onElementUpdate}
+                            onDelete={onElementDelete}
+                            canBringForward={canBringForward}
+                            canSendBackward={canSendBackward}
+                            onBringForward={() => {
+                                if (canBringForward) {
+                                    reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex + 1);
+                                }
+                            }}
+                            onSendBackward={() => {
+                                if (canSendBackward) {
+                                    reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex - 1);
+                                }
+                            }}
+                        />
+                    )
                 ) : (
                     <SpreadProperties
                         spread={spread}
