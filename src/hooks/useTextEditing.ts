@@ -28,9 +28,11 @@ interface UseTextEditingProps {
     fabricCanvas: fabric.Canvas | null;
     /** Ref to the canvas wrapper element (used for coordinate conversion). */
     wrapperRef: React.RefObject<HTMLDivElement | null>;
+    /** Current zoom level for hiding the toolbar when zooming. */
+    zoom: number;
 }
 
-export const useTextEditing = ({ fabricCanvas, wrapperRef }: UseTextEditingProps) => {
+export const useTextEditing = ({ fabricCanvas, wrapperRef, zoom }: UseTextEditingProps) => {
     const setEditingTextElementId = useSetEditingTextElementId();
     const editingTextElementId = useEditingTextElementId();
     const updateElement = useUpdateElement();
@@ -53,6 +55,28 @@ export const useTextEditing = ({ fabricCanvas, wrapperRef }: UseTextEditingProps
 
     // Toolbar position state (viewport-relative)
     const [toolbarPosition, setToolbarPosition] = useState<TextToolbarPosition | null>(null);
+
+    // Hide toolbar when zoom changes
+    useEffect(() => {
+        if (toolbarPosition) {
+            setTimeout(() => setToolbarPosition(null), 0);
+        }
+    }, [zoom, toolbarPosition]);
+
+    // Hide toolbar when scrolling the viewport
+    useEffect(() => {
+        const viewport = wrapperRef.current;
+        if (!viewport) return;
+
+        const handleScroll = () => {
+            if (toolbarPosition) {
+                setToolbarPosition(null);
+            }
+        };
+
+        viewport.addEventListener('scroll', handleScroll);
+        return () => viewport.removeEventListener('scroll', handleScroll);
+    }, [wrapperRef, toolbarPosition]);
 
     /**
      * Compute the toolbar position above the text element.
@@ -120,16 +144,28 @@ export const useTextEditing = ({ fabricCanvas, wrapperRef }: UseTextEditingProps
             }
         };
 
+        // Show/update toolbar position on interaction if we are still editing
+        const handleInteraction = () => {
+            const activeObj = fabricCanvas.getActiveObject();
+            if (activeObj instanceof CanvasTextElement && activeObj.pageElement.id === editingTextElementId) {
+                updateToolbarPosition(activeObj);
+            }
+        };
+
         fabricCanvas.on('text:editing:entered', handleEditingEntered);
         fabricCanvas.on('text:editing:exited', handleEditingExited);
         fabricCanvas.on('object:moving', handleObjectMoving);
         fabricCanvas.on('object:scaling', handleObjectMoving);
+        fabricCanvas.on('text:changed', handleInteraction);
+        fabricCanvas.on('text:selection:changed', handleInteraction);
 
         return () => {
             fabricCanvas.off('text:editing:entered', handleEditingEntered);
             fabricCanvas.off('text:editing:exited', handleEditingExited);
             fabricCanvas.off('object:moving', handleObjectMoving);
             fabricCanvas.off('object:scaling', handleObjectMoving);
+            fabricCanvas.off('text:changed', handleInteraction);
+            fabricCanvas.off('text:selection:changed', handleInteraction);
         };
     }, [fabricCanvas, editingTextElementId, setEditingTextElementId, updateToolbarPosition]);
 

@@ -63,7 +63,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const {
         toolbarPosition,
         getEditingTextElement,
-    } = useTextEditing({ fabricCanvas, wrapperRef: containerRef });
+    } = useTextEditing({ fabricCanvas, wrapperRef: containerRef, zoom });
 
     // Register this canvas as a drop target for dnd-kit
     useEffect(() => {
