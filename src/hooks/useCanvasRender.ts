@@ -22,6 +22,8 @@ interface UseCanvasRenderProps {
     canvasElRef: React.RefObject<HTMLCanvasElement | null>;
     /** Ref to the container div element. */
     containerRef: React.RefObject<HTMLDivElement | null>;
+    /** Ref to the wrapper div element. */
+    wrapperRef: React.RefObject<HTMLDivElement | null>;
 }
 
 /**
@@ -35,6 +37,7 @@ interface UseCanvasRenderProps {
 export const useCanvasRender = ({
     canvasElRef,
     containerRef,
+    wrapperRef,
 }: UseCanvasRenderProps) => {
     const settings = useAlbumSettings();
 
@@ -57,6 +60,7 @@ export const useCanvasRender = ({
         containerRef,
         canvasWidth,
         canvasHeight,
+        wrapperRef,
         snapLinesRef,
     });
 

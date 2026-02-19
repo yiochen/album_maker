@@ -14,6 +14,8 @@ interface UseCanvasInitializationProps {
     canvasWidth: number;
     /** Height of the canvas in pixels. */
     canvasHeight: number;
+    /** Ref to the wrapper div element (for clipping hidden textarea). */
+    wrapperRef: React.RefObject<HTMLDivElement | null>;
     /** Ref to store active snap lines. */
     snapLinesRef: React.RefObject<fabric.Line[]>;
 }
@@ -29,6 +31,7 @@ export const useCanvasInitialization = ({
     containerRef,
     canvasWidth,
     canvasHeight,
+    wrapperRef,
     snapLinesRef,
 }: UseCanvasInitializationProps) => {
     const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
@@ -44,7 +47,11 @@ export const useCanvasInitialization = ({
             backgroundColor: '#f0f0f0',
             width: canvasWidth,
             height: canvasHeight,
-        });
+            // Force hidden textarea to be inside our clipped wrapper
+            // rather than appended to body, which prevents layout shifts.
+            hiddenTextareaContainer: wrapperRef.current || undefined,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
 
         // Add Seam Line (Center of spread)
         const seam = new fabric.Line([canvasWidth / 2, 0, canvasWidth / 2, canvasHeight], {
@@ -88,7 +95,7 @@ export const useCanvasInitialization = ({
             canvas.dispose();
             setFabricCanvas(null);
         };
-    }, [canvasElRef, containerRef, canvasWidth, canvasHeight, snapLinesRef]);
+    }, [canvasElRef, containerRef, canvasWidth, canvasHeight, wrapperRef, snapLinesRef]);
 
     return { fabricCanvas, seamRef };
 };

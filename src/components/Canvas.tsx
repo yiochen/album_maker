@@ -46,6 +46,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     } = useCanvasRender({
         canvasElRef,
         containerRef,
+        wrapperRef,
     });
 
     // Initialize interaction logic
