@@ -59,11 +59,11 @@ export const Canvas: React.FC<CanvasProps> = ({
         snapLinesRef,
     });
 
-    // Text editing lifecycle
+    // Text editing lifecycle — position relative to the viewport container (not zoomed)
     const {
         toolbarPosition,
         getEditingTextElement,
-    } = useTextEditing({ fabricCanvas, wrapperRef });
+    } = useTextEditing({ fabricCanvas, wrapperRef: containerRef });
 
     // Register this canvas as a drop target for dnd-kit
     useEffect(() => {
@@ -218,12 +218,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                     >
                         <div ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
                             <canvas ref={canvasElRef} data-testid="canvas-layer" />
-                            {toolbarPosition && (
-                                <TextEditingToolbar
-                                    position={toolbarPosition}
-                                    getEditingTextElement={getEditingTextElement}
-                                />
-                            )}
                             {currentSpread.elements.length === 0 && (
                                 <div
                                     className="canvas-placeholder"
@@ -246,6 +240,14 @@ export const Canvas: React.FC<CanvasProps> = ({
                     </DroppableCanvas>
                 </div>
             </div>
+
+            {/* Text editing toolbar — outside zoom container to prevent scaling */}
+            {toolbarPosition && (
+                <TextEditingToolbar
+                    position={toolbarPosition}
+                    getEditingTextElement={getEditingTextElement}
+                />
+            )}
 
             <div className="canvas-controls">
                 <button
