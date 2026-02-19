@@ -141,7 +141,7 @@ export async function renderSpread(
                 });
 
                 // Only sync text content if not currently being edited
-                if (!(existingText as ExtendedFabricObject).preventLayoutSync) {
+                if (!(existingText as ExtendedFabricObject).preventLayoutSync && !existingText.isEditing) {
                     existingText.syncFromRuns(element.content as TextContent);
                     existingText.applyLayout(canvas.width, canvas.height);
                 }
