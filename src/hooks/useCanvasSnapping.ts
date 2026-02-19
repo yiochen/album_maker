@@ -10,10 +10,12 @@
  */
 import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
+import type { ImageContent } from '../types';
 import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 import { CustomFabricObject } from './fabricTypes';
 import { getZoomCompensatedSizes } from '../utils/fabricRenderer';
 import { CanvasImageElement } from './CanvasImageElement';
+import { CanvasTextElement } from './CanvasTextElement';
 import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads, useUpdateElement } from '../states/albumStore';
 
@@ -148,24 +150,32 @@ export const useCanvasSnapping = ({
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const handleObjectModified = (e: { target?: fabric.Object; transform?: any }) => {
-            const obj = e.target as CanvasImageElement;
-            if (!obj || !(obj instanceof CanvasImageElement)) return;
+            const obj = e.target;
+            if (!obj) return;
 
             if (snapLinesRef.current) {
                 snapLinesRef.current.forEach(line => canvas.remove(line));
                 snapLinesRef.current.length = 0;
             }
 
-            // Implementation of anchor locking and normalization
-            obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
-
-            onElementUpdateRef.current(spreadRef.current.id, obj.pageElement.id, {
-                box: obj.pageElement.box,
-                content: {
-                    ...obj.pageElement.content,
-                    contentTransform: obj.pageElement.content.contentTransform,
-                }
-            });
+            // Handle image elements
+            if (obj instanceof CanvasImageElement) {
+                obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
+                const imageContent = obj.pageElement.content as ImageContent;
+                onElementUpdateRef.current(spreadRef.current.id, obj.pageElement.id, {
+                    box: obj.pageElement.box,
+                    content: {
+                        ...imageContent,
+                        contentTransform: imageContent.contentTransform,
+                    }
+                });
+                // Handle text elements
+            } else if (obj instanceof CanvasTextElement) {
+                obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
+                onElementUpdateRef.current(spreadRef.current.id, obj.pageElement.id, {
+                    box: obj.pageElement.box,
+                });
+            }
         };
 
         canvas.on('object:moving', handleObjectMoving);

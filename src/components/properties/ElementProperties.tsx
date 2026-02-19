@@ -1,5 +1,6 @@
 import React from 'react';
 import type { PageElement, AlbumSettings } from '../../types';
+import { isImageElement } from '../../types';
 import { useAlbumImagePool } from '../../states/albumStore';
 import { applyRotate90, applyFlipH, applyFlipV, CONTENT_TRANSFORM_DEFAULTS } from '../../utils/orientationMatrix';
 import {
@@ -46,7 +47,17 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
     onBringForward,
     onSendBackward,
 }) => {
-    const currentZoom = element.content.contentTransform?.zoom ?? 1;
+    // Hooks must be called unconditionally (React rules of hooks)
+    const pool = useAlbumImagePool();
+
+    // This component only handles image elements.
+    // Text elements will be routed to TextElementProperties by the parent.
+    if (!isImageElement(element)) {
+        return null;
+    }
+
+    const imageContent = element.content;
+    const currentZoom = imageContent.contentTransform?.zoom ?? 1;
 
     const ppi = APP_CONFIG.PPI;
     const spreadWidth = settings.pageWidth * 2 * ppi;
@@ -84,26 +95,25 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
             spreadWidth,
             spreadHeight,
             settings.unit,
-            element.content.lockAspectRatio,
+            imageContent.lockAspectRatio,
             ppi
         );
         onUpdate({ box: newBox });
     };
 
     const handleAspectRatioToggle = () => {
-        onUpdate({ content: { ...element.content, lockAspectRatio: !element.content.lockAspectRatio } });
+        onUpdate({ content: { ...imageContent, lockAspectRatio: !imageContent.lockAspectRatio } });
     };
 
-    const pool = useAlbumImagePool();
     const sourceImage = pool.find(img =>
-        img.sourceId === element.content.sourceId &&
-        img.sourceImageId === element.content.sourceImageId
+        img.sourceId === imageContent.sourceId &&
+        img.sourceImageId === imageContent.sourceImageId
     );
 
     const handleZoomChange = (value: number) => {
         const newTransform = calculateNewZoomTransform(
             value,
-            element.content.contentTransform,
+            imageContent.contentTransform,
             currentWidthPx,
             currentHeightPx,
             sourceImage?.width,
@@ -111,7 +121,7 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
         );
 
         onUpdate({
-            content: { ...element.content, contentTransform: newTransform },
+            content: { ...imageContent, contentTransform: newTransform },
         });
     };
 
@@ -124,10 +134,10 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
 
         onUpdate({
             content: {
-                ...element.content,
+                ...imageContent,
                 contentTransform: {
                     ...defaults,
-                    ...(element.content.contentTransform || {}),
+                    ...(imageContent.contentTransform || {}),
                     panX: 0.5,
                     panY: 0.5,
                 },
@@ -136,21 +146,21 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
     };
 
     const handleRotate90 = () => {
-        const ct = element.content.contentTransform ?? CONTENT_TRANSFORM_DEFAULTS;
+        const ct = imageContent.contentTransform ?? CONTENT_TRANSFORM_DEFAULTS;
         const newCt = applyRotate90(ct);
-        onUpdate({ content: { ...element.content, contentTransform: newCt } });
+        onUpdate({ content: { ...imageContent, contentTransform: newCt } });
     };
 
     const handleFlipH = () => {
-        const ct = element.content.contentTransform ?? CONTENT_TRANSFORM_DEFAULTS;
+        const ct = imageContent.contentTransform ?? CONTENT_TRANSFORM_DEFAULTS;
         const newCt = applyFlipH(ct);
-        onUpdate({ content: { ...element.content, contentTransform: newCt } });
+        onUpdate({ content: { ...imageContent, contentTransform: newCt } });
     };
 
     const handleFlipV = () => {
-        const ct = element.content.contentTransform ?? CONTENT_TRANSFORM_DEFAULTS;
+        const ct = imageContent.contentTransform ?? CONTENT_TRANSFORM_DEFAULTS;
         const newCt = applyFlipV(ct);
-        onUpdate({ content: { ...element.content, contentTransform: newCt } });
+        onUpdate({ content: { ...imageContent, contentTransform: newCt } });
     };
 
     return (
@@ -163,11 +173,11 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
                             type="button"
                             className="aspect-lock-button"
                             onClick={handleAspectRatioToggle}
-                            aria-label={element.content.lockAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
-                            aria-pressed={element.content.lockAspectRatio || false}
-                            title={element.content.lockAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                            aria-label={imageContent.lockAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                            aria-pressed={imageContent.lockAspectRatio || false}
+                            title={imageContent.lockAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
                         >
-                            {element.content.lockAspectRatio ? <LockIcon /> : <UnlockIcon />}
+                            {imageContent.lockAspectRatio ? <LockIcon /> : <UnlockIcon />}
                         </button>
                     </div>
                     <NumberInput

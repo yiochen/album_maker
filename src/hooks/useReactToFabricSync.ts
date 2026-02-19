@@ -1,6 +1,7 @@
 import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
 import { APP_CONFIG } from '../config';
+import { isImageElement } from '../types';
 import { renderSpread } from '../utils/fabricRenderer';
 import { CustomFabricObject } from './fabricTypes';
 import { useAlbumSettings, useAlbumSpreads, useUpdateElement } from '../states/albumStore';
@@ -62,7 +63,7 @@ export const useReactToFabricSync = ({
                         if (!currentSpread) return;
 
                         const element = currentSpread.elements.find(e => e.id === elementId);
-                        if (!element) return;
+                        if (!element || !isImageElement(element)) return;
 
                         onElementUpdateRef.current(currentSpread.id, elementId, {
                             content: { ...element.content, contentTransform },

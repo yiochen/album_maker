@@ -63,6 +63,9 @@ export async function renderSpread(
     // Render elements in Z-Order
     // spread.elements are assumed to be ordered correctly in the store
     for (const element of spread.elements) {
+        // Skip text elements — text export not yet supported
+        if (element.type !== 'image') continue;
+
         try {
             // Dynamic URL Selection based on PPI
             let url: string;

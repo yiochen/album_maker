@@ -1,5 +1,5 @@
 import * as fabric from 'fabric';
-import type { PageElement, ImageContent } from '../types';
+import type { PageElement, ImageContent, ImagePageElement } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from '../utils/imageUtils';
 import {
     type OrientationMatrix, IDENTITY,
@@ -15,7 +15,7 @@ export class CanvasImageElement extends fabric.Group {
     public currentUrl: string = '';
 
     constructor(
-        element: PageElement,
+        element: ImagePageElement,
         options: Partial<fabric.FabricObjectProps> & {
             interactive?: boolean;
             uniformScaling?: boolean;
@@ -140,11 +140,12 @@ export class CanvasImageElement extends fabric.Group {
         const imgWidth = this.innerImage.width || 1;
         const imgHeight = this.innerImage.height || 1;
 
+        const content = this.pageElement.content as ImageContent;
         const transform = {
             zoom: 1,
             panX: 0.5,
             panY: 0.5,
-            ...(this.pageElement.content.contentTransform || {})
+            ...(content.contentTransform || {})
         };
 
         const orientation: OrientationMatrix = transform.orientation ?? IDENTITY;
@@ -183,11 +184,12 @@ export class CanvasImageElement extends fabric.Group {
 
         const imgWidth = this.innerImage.width || 1;
         const imgHeight = this.innerImage.height || 1;
+        const content = this.pageElement.content as ImageContent;
         const transform = {
             zoom: 1,
             panX: 0.5,
             panY: 0.5,
-            ...(this.pageElement.content.contentTransform || {})
+            ...(content.contentTransform || {})
         };
 
         const orientation: OrientationMatrix = transform.orientation ?? IDENTITY;
@@ -216,7 +218,7 @@ export class CanvasImageElement extends fabric.Group {
             return false;
         }
 
-        this.pageElement.content.contentTransform = {
+        (this.pageElement.content as ImageContent).contentTransform = {
             ...transform,
             panX: nextPanX,
             panY: nextPanY,

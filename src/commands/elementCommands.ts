@@ -28,13 +28,13 @@ export class UpdateElementCommand implements Command<Album> {
                         versionId: this.newVersionId!,
                         elements: s.elements.map(e =>
                             e.id === this.elementId
-                                ? {
+                                ? ({
                                     ...e,
                                     ...this.updates,
                                     content: this.updates.content
                                         ? { ...e.content, ...this.updates.content }
                                         : e.content,
-                                }
+                                } as PageElement)
                                 : e
                         ),
                     }
@@ -54,13 +54,13 @@ export class UpdateElementCommand implements Command<Album> {
                         versionId: crypto.randomUUID(), // Always bump version on undo to trigger refresh
                         elements: s.elements.map(e =>
                             e.id === this.elementId
-                                ? {
+                                ? ({
                                     ...e,
                                     ...this.oldValues,
                                     content: this.oldValues.content
                                         ? { ...e.content, ...this.oldValues.content }
                                         : e.content,
-                                }
+                                } as PageElement)
                                 : e
                         ),
                     }
@@ -81,7 +81,7 @@ export class UpdateElementCommand implements Command<Album> {
             return new UpdateElementCommand(
                 this.spreadId,
                 this.elementId,
-                { ...this.updates, ...nextCommand.updates },
+                { ...this.updates, ...nextCommand.updates } as Partial<PageElement>,
                 this.oldValues,
                 this.groupId
             );
@@ -232,13 +232,13 @@ export class MoveElementCommand implements Command<Album> {
                 if (s.id === this.toSpreadId) {
                     if (!this.oldToVersionId) this.oldToVersionId = s.versionId;
                     const movedElement = this.updates
-                        ? {
+                        ? ({
                             ...elementToMove,
                             ...this.updates,
                             content: this.updates.content
                                 ? { ...elementToMove.content, ...this.updates.content }
                                 : elementToMove.content,
-                        }
+                        } as PageElement)
                         : elementToMove;
                     return {
                         ...s,
@@ -273,13 +273,13 @@ export class MoveElementCommand implements Command<Album> {
                 }
                 if (s.id === this.fromSpreadId) {
                     const restoredElement = this.oldValues
-                        ? {
+                        ? ({
                             ...elementToMove,
                             ...this.oldValues,
                             content: this.oldValues.content
                                 ? { ...elementToMove.content, ...this.oldValues.content }
                                 : elementToMove.content,
-                        }
+                        } as PageElement)
                         : elementToMove;
                     return {
                         ...s,

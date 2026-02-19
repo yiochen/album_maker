@@ -96,18 +96,50 @@ export interface ImageContent {
   originalAspectRatio?: number;
 }
 
-// Future element content types:
-// export interface TextContent { text: string; fontSize: number; fontFamily: string; color: string; }
+/**
+ * Style properties for a text run or default text style.
+ * All fields are optional when used as run overrides.
+ */
+export interface TextStyle {
+  fontFamily?: string;      // e.g. 'Arial'
+  fontSize?: number;        // in pt (absolute), converted to px via PPI at render time
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+  fill?: string;            // color hex, e.g. '#000000'
+  underline?: boolean;
+}
+
+/**
+ * A consecutive run of text sharing the same style.
+ * The full text is reconstructed by concatenating all runs in order.
+ */
+export interface TextRun {
+  text: string;                // the characters in this run (includes \n for line breaks)
+  style?: Partial<TextStyle>;  // overrides vs. the element's defaultStyle
+}
+
+/**
+ * Content data specific to text elements.
+ * Uses a runs-based model for rich text (mixed styles within the same element).
+ */
+export interface TextContent {
+  runs: TextRun[];
+  /** Base style applied to all runs; individual runs override specific fields. */
+  defaultStyle: Required<TextStyle>;
+  textAlign: 'left' | 'center' | 'right';
+  /** Line height multiplier, e.g. 1.2 */
+  lineHeight: number;
+}
 
 /**
  * A visual element placed on a spread.
  * Uses a discriminated union pattern via `type` + `content` to support
- * different element kinds (image, text, shape, etc.) in the future.
+ * different element kinds (image, text, etc.).
  */
-export interface PageElement {
+export interface ImagePageElement {
   id: string;
-  type: 'image'; // future: 'image' | 'text' | 'shape'
-  content: ImageContent; // future: ImageContent | TextContent | ShapeContent
+  type: 'image';
+  content: ImageContent;
   /**
    * Normalized relative coordinates (0.0 to 1.0) representing the edges.
    * x1: Left, y1: Top, x2: Right, y2: Bottom.
@@ -118,6 +150,30 @@ export interface PageElement {
     x2: number;
     y2: number;
   };
+}
+
+export interface TextPageElement {
+  id: string;
+  type: 'text';
+  content: TextContent;
+  box: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  };
+}
+
+export type PageElement = ImagePageElement | TextPageElement;
+
+/** Type guard: narrows PageElement to image element */
+export function isImageElement(el: PageElement): el is ImagePageElement {
+  return el.type === 'image';
+}
+
+/** Type guard: narrows PageElement to text element */
+export function isTextElement(el: PageElement): el is TextPageElement {
+  return el.type === 'text';
 }
 
 // Position and Size kept for legacy use or general purposes if needed, 

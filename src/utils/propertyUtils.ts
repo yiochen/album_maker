@@ -1,5 +1,5 @@
 import { APP_CONFIG } from '../config';
-import type { Unit, PageElement } from '../types';
+import type { Unit, PageElement, ImageContent } from '../types';
 import { applyCoverTransform } from './imageUtils';
 
 /**
@@ -120,7 +120,7 @@ export const calculateNewBoxSize = (
 
 export const calculateNewZoomTransform = (
     value: number,
-    currentTransform: Partial<PageElement['content']['contentTransform']> | undefined,
+    currentTransform: Partial<ImageContent['contentTransform']> | undefined,
     currentWidthPx: number,
     currentHeightPx: number,
     sourceImageWidth: number | undefined,

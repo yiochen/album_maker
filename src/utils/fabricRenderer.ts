@@ -1,6 +1,7 @@
 import * as fabric from 'fabric';
-import { Spread, AlbumSettings } from '../types';
+import { Spread, AlbumSettings, isImageElement, isTextElement, TextContent } from '../types';
 import { CanvasImageElement } from '../hooks/CanvasImageElement';
+import { CanvasTextElement } from '../hooks/CanvasTextElement';
 import { CustomFabricObject, ExtendedFabricObject } from '../hooks/fabricTypes';
 import { APP_CONFIG } from '../config';
 import { FabricRenderOptions } from './rendererTypes';
@@ -49,81 +50,119 @@ export async function renderSpread(
     const validIds = new Set<string>();
     const loadPromises: Promise<void>[] = [];
 
-    // 2. Sync existing objects, update images if changed, or add new ones
+    // 2. Sync elements — branch on element.type
     spread.elements.forEach(element => {
         validIds.add(element.id);
-        const existingObj = currentObjects.find(o => (o as CustomFabricObject).data?.id === element.id) as CanvasImageElement;
+        const existingObj = currentObjects.find(o => (o as CustomFabricObject).data?.id === element.id);
 
-        // Dynamic URL Selection based on PPI
-        let targetUrl: string;
-        if (options.ppi < 50) {
-            targetUrl = element.content.thumbnailUrl;
-        } else if (options.ppi < 200) {
-            targetUrl = element.content.previewUrl;
-        } else {
-            targetUrl = element.content.fullUrl;
-        }
+        if (isImageElement(element)) {
+            // ── Image element sync ──
+            const existingImage = existingObj instanceof CanvasImageElement ? existingObj : null;
 
-        if (existingObj && existingObj instanceof CanvasImageElement) {
-            // Update reference to latest data from React state
-            existingObj.pageElement = element;
+            // Dynamic URL Selection based on PPI
+            let targetUrl: string;
+            if (options.ppi < 50) {
+                targetUrl = element.content.thumbnailUrl;
+            } else if (options.ppi < 200) {
+                targetUrl = element.content.previewUrl;
+            } else {
+                targetUrl = element.content.fullUrl;
+            }
 
-            existingObj.set({
-                selectable: isInteractive,
-                hasControls: isInteractive,
-                evented: isInteractive,
-                cornerSize: uiSizes.cornerSize,
-                borderScaleFactor: uiSizes.borderScaleFactor,
-                uniformScaling: element.content.lockAspectRatio,
-            });
+            if (existingImage) {
+                existingImage.pageElement = element;
 
-            // Update handles and pan control size based on current zoom/locked state
-            if (isInteractive) {
-                existingObj.updateControlVisibility(element.content.lockAspectRatio ?? true);
-                existingObj.setPanControlSize(uiSizes.panControlSize);
+                existingImage.set({
+                    selectable: isInteractive,
+                    hasControls: isInteractive,
+                    evented: isInteractive,
+                    cornerSize: uiSizes.cornerSize,
+                    borderScaleFactor: uiSizes.borderScaleFactor,
+                    uniformScaling: element.content.lockAspectRatio,
+                });
 
-                // In Fabric v7, uniformScaling is often respected more reliably when set on the canvas.
-                // Sync it if this object is the active one.
-                if (canvas instanceof fabric.Canvas && canvas.getActiveObject() === existingObj) {
-                    canvas.uniformScaling = element.content.lockAspectRatio ?? true;
+                if (isInteractive) {
+                    existingImage.updateControlVisibility(element.content.lockAspectRatio ?? true);
+                    existingImage.setPanControlSize(uiSizes.panControlSize);
+
+                    if (canvas instanceof fabric.Canvas && canvas.getActiveObject() === existingImage) {
+                        canvas.uniformScaling = element.content.lockAspectRatio ?? true;
+                    }
                 }
-            }
 
-            // Only apply state layout if not currently being interacted with in Fabric
-            if (!(existingObj as ExtendedFabricObject).preventLayoutSync) {
-                existingObj.applyLayout(canvas.width, canvas.height);
-            }
-            existingObj.onContentTransformChange = interactiveOpts?.onContentTransformChange;
+                if (!(existingImage as ExtendedFabricObject).preventLayoutSync) {
+                    existingImage.applyLayout(canvas.width, canvas.height);
+                }
+                existingImage.onContentTransformChange = interactiveOpts?.onContentTransformChange;
 
-            // Detect image change
-            const currentUrl = existingObj.currentUrl; // We should probably store/check currentUrl in existingObj
-            if (targetUrl !== currentUrl) {
-                // Update element reference for future comparisons
-                existingObj.pageElement = element;
-                loadPromises.push(existingObj.loadImage(targetUrl));
-            }
-        } else {
-            // [SYNC ADDITION] Create and add immediately so next call finds it
-            const canvasEl = new CanvasImageElement(element, {
-                cornerStyle: 'circle',
-                cornerColor: 'white',
-                cornerStrokeColor: '#333',
-                borderColor: '#333',
-                transparentCorners: false,
-                cornerSize: uiSizes.cornerSize,
-                borderScaleFactor: uiSizes.borderScaleFactor,
-                selectable: isInteractive,
-                hasControls: isInteractive,
-                evented: isInteractive,
-                uniformScaling: element.content.lockAspectRatio,
-                panControlSize: uiSizes.panControlSize,
-                onContentTransformChange: interactiveOpts?.onContentTransformChange,
-            });
+                const currentUrl = existingImage.currentUrl;
+                if (targetUrl !== currentUrl) {
+                    existingImage.pageElement = element;
+                    loadPromises.push(existingImage.loadImage(targetUrl));
+                }
+            } else {
+                // Remove stale object of a different type (e.g. was text, now image)
+                if (existingObj) canvas.remove(existingObj);
 
-            canvas.add(canvasEl);
-            loadPromises.push(canvasEl.loadImage(targetUrl).then(() => {
+                const canvasEl = new CanvasImageElement(element, {
+                    cornerStyle: 'circle',
+                    cornerColor: 'white',
+                    cornerStrokeColor: '#333',
+                    borderColor: '#333',
+                    transparentCorners: false,
+                    cornerSize: uiSizes.cornerSize,
+                    borderScaleFactor: uiSizes.borderScaleFactor,
+                    selectable: isInteractive,
+                    hasControls: isInteractive,
+                    evented: isInteractive,
+                    uniformScaling: element.content.lockAspectRatio,
+                    panControlSize: uiSizes.panControlSize,
+                    onContentTransformChange: interactiveOpts?.onContentTransformChange,
+                });
+
+                canvas.add(canvasEl);
+                loadPromises.push(canvasEl.loadImage(targetUrl).then(() => {
+                    canvasEl.applyLayout(canvas.width, canvas.height);
+                }));
+            }
+        } else if (isTextElement(element)) {
+            // ── Text element sync ──
+            const existingText = existingObj instanceof CanvasTextElement ? existingObj : null;
+
+            if (existingText) {
+                existingText.pageElement = element;
+
+                existingText.set({
+                    selectable: isInteractive,
+                    hasControls: isInteractive,
+                    evented: isInteractive,
+                    cornerSize: uiSizes.cornerSize,
+                    borderScaleFactor: uiSizes.borderScaleFactor,
+                });
+
+                // Only sync text content if not currently being edited
+                if (!(existingText as ExtendedFabricObject).preventLayoutSync) {
+                    existingText.syncFromRuns(element.content as TextContent);
+                    existingText.applyLayout(canvas.width, canvas.height);
+                }
+            } else {
+                // Remove stale object of a different type
+                if (existingObj) canvas.remove(existingObj);
+
+                const canvasEl = new CanvasTextElement(element, APP_CONFIG.PPI, {
+                    cornerStyle: 'circle',
+                    cornerColor: 'white',
+                    cornerStrokeColor: '#333',
+                    borderColor: '#333',
+                    transparentCorners: false,
+                    cornerSize: uiSizes.cornerSize,
+                    borderScaleFactor: uiSizes.borderScaleFactor,
+                    interactive: isInteractive,
+                });
+
+                canvas.add(canvasEl);
                 canvasEl.applyLayout(canvas.width, canvas.height);
-            }));
+            }
         }
     });
 
