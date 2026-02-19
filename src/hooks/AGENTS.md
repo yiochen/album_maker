@@ -20,7 +20,7 @@ The application uses a **normalized box model** for storage and a two-tier pixel
 -   Converted via `toCanvasPx(modelPx)` and `toModelPx(canvasPx)`.
 
 ### FabricJS Origin & Grouping
--   **`CanvasPageElement`**: Uses `originX: 'left', originY: 'top'` for the container group.
+-   **`CanvasImageElement`**: Uses `originX: 'left', originY: 'top'` for the container group.
 -   **Internal Offsets**: Fabric groups use center-relative coordinates for children by default. To align images correctly, internal children (rects, images) are offset by `-width/2` and `-height/2` within the group. 
 -   **Gapless Rendering**: `useReactToFabricSync` calls `calculateGaplessRect()` to convert normalized floats to integer-rounded pixels, ensuring adjacent elements touch perfectly without white seams.
 

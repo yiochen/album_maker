@@ -13,7 +13,7 @@ import * as fabric from 'fabric';
 import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 import { CustomFabricObject } from './fabricTypes';
 import { getZoomCompensatedSizes } from '../utils/fabricRenderer';
-import { CanvasPageElement } from './CanvasPageElement';
+import { CanvasImageElement } from './CanvasImageElement';
 import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads, useUpdateElement } from '../states/albumStore';
 
@@ -148,8 +148,8 @@ export const useCanvasSnapping = ({
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const handleObjectModified = (e: { target?: fabric.Object; transform?: any }) => {
-            const obj = e.target as CanvasPageElement;
-            if (!obj || !(obj instanceof CanvasPageElement)) return;
+            const obj = e.target as CanvasImageElement;
+            if (!obj || !(obj instanceof CanvasImageElement)) return;
 
             if (snapLinesRef.current) {
                 snapLinesRef.current.forEach(line => canvas.remove(line));

@@ -6,7 +6,7 @@ import {
     getOrientedDimensions, decomposeForRendering,
 } from '../utils/orientationMatrix';
 
-export class CanvasPageElement extends fabric.Group {
+export class CanvasImageElement extends fabric.Group {
     public pageElement: PageElement;
     private innerImage: fabric.Image;
     private clipRect: fabric.Rect;
@@ -253,7 +253,7 @@ export class CanvasPageElement extends fabric.Group {
                 touchSizeX: size * 1.4,
                 touchSizeY: size * 1.4,
                 render: (ctx, left, top, _styleOverride, fabricObject) => {
-                    const target = fabricObject as CanvasPageElement;
+                    const target = fabricObject as CanvasImageElement;
                     const size = target.panControlSize || 22;
                     ctx.save();
                     ctx.translate(left, top);
@@ -303,7 +303,7 @@ export class CanvasPageElement extends fabric.Group {
                 },
                 actionHandler: (_eventData, transform, x, y) => {
                     const target = transform.target;
-                    if (!(target instanceof CanvasPageElement)) {
+                    if (!(target instanceof CanvasImageElement)) {
                         return false;
                     }
                     const deltaX = x - transform.lastX;

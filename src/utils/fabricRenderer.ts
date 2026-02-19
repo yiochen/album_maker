@@ -1,6 +1,6 @@
 import * as fabric from 'fabric';
 import { Spread, AlbumSettings } from '../types';
-import { CanvasPageElement } from '../hooks/CanvasPageElement';
+import { CanvasImageElement } from '../hooks/CanvasImageElement';
 import { CustomFabricObject, ExtendedFabricObject } from '../hooks/fabricTypes';
 import { APP_CONFIG } from '../config';
 import { FabricRenderOptions } from './rendererTypes';
@@ -52,7 +52,7 @@ export async function renderSpread(
     // 2. Sync existing objects, update images if changed, or add new ones
     spread.elements.forEach(element => {
         validIds.add(element.id);
-        const existingObj = currentObjects.find(o => (o as CustomFabricObject).data?.id === element.id) as CanvasPageElement;
+        const existingObj = currentObjects.find(o => (o as CustomFabricObject).data?.id === element.id) as CanvasImageElement;
 
         // Dynamic URL Selection based on PPI
         let targetUrl: string;
@@ -64,7 +64,7 @@ export async function renderSpread(
             targetUrl = element.content.fullUrl;
         }
 
-        if (existingObj && existingObj instanceof CanvasPageElement) {
+        if (existingObj && existingObj instanceof CanvasImageElement) {
             // Update reference to latest data from React state
             existingObj.pageElement = element;
 
@@ -104,7 +104,7 @@ export async function renderSpread(
             }
         } else {
             // [SYNC ADDITION] Create and add immediately so next call finds it
-            const canvasEl = new CanvasPageElement(element, {
+            const canvasEl = new CanvasImageElement(element, {
                 cornerStyle: 'circle',
                 cornerColor: 'white',
                 cornerStrokeColor: '#333',
