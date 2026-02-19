@@ -130,20 +130,22 @@ export async function renderSpread(
             const existingText = existingObj instanceof CanvasTextElement ? existingObj : null;
 
             if (existingText) {
-                existingText.pageElement = element;
+                // Only sync properties and content if not currently being edited
+                if (!existingText.isEditing) {
+                    existingText.pageElement = element;
 
-                existingText.set({
-                    selectable: isInteractive,
-                    hasControls: isInteractive,
-                    evented: isInteractive,
-                    cornerSize: uiSizes.cornerSize,
-                    borderScaleFactor: uiSizes.borderScaleFactor,
-                });
+                    existingText.set({
+                        selectable: isInteractive,
+                        hasControls: isInteractive,
+                        evented: isInteractive,
+                        cornerSize: uiSizes.cornerSize,
+                        borderScaleFactor: uiSizes.borderScaleFactor,
+                    });
 
-                // Only sync text content if not currently being edited
-                if (!(existingText as ExtendedFabricObject).preventLayoutSync && !existingText.isEditing) {
-                    existingText.syncFromRuns(element.content as TextContent);
-                    existingText.applyLayout(canvas.width, canvas.height);
+                    if (!(existingText as ExtendedFabricObject).preventLayoutSync) {
+                        existingText.syncFromRuns(element.content as TextContent);
+                        existingText.applyLayout(canvas.width, canvas.height);
+                    }
                 }
             } else {
                 // Remove stale object of a different type

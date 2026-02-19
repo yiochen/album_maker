@@ -107,7 +107,8 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
             el.set(prop, newValue);
         }
 
-        el.canvas?.requestRenderAll();
+        el.set('dirty', true);
+        el.canvas?.renderAll();
         refreshStyle();
     }, [getEditingTextElement, currentStyle, refreshStyle]);
 
@@ -125,7 +126,8 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
             el.set('fontSize', newSize);
         }
 
-        el.canvas?.requestRenderAll();
+        el.set('dirty', true);
+        el.canvas?.renderAll();
         refreshStyle();
     }, [getEditingTextElement, currentStyle, refreshStyle]);
 
@@ -140,7 +142,8 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
             el.set('fill', color);
         }
 
-        el.canvas?.requestRenderAll();
+        el.set('dirty', true);
+        el.canvas?.renderAll();
         refreshStyle();
     }, [getEditingTextElement, refreshStyle]);
 
