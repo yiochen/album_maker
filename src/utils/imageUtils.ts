@@ -1,4 +1,5 @@
 import { APP_CONFIG } from '../config';
+import type { NormalizedRect } from '../types';
 
 /**
  * Calculate optimal thumbnail dimensions that fit within canvas max bounds
@@ -96,7 +97,7 @@ export function toModelPx(value: number): number {
  * @returns Integer pixel coordinates and dimensions
  */
 export function calculateGaplessRect(
-    box: { x1: number; y1: number; x2: number; y2: number },
+    box: NormalizedRect,
     canvasWidth: number,
     canvasHeight: number
 ) {

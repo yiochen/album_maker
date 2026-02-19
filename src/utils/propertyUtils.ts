@@ -1,5 +1,5 @@
 import { APP_CONFIG } from '../config';
-import type { Unit, PageElement, ImageContent } from '../types';
+import type { Unit, NormalizedRect, ImageContent } from '../types';
 import { applyCoverTransform } from './imageUtils';
 
 /**
@@ -46,12 +46,12 @@ export const unitToPx = (unitVal: number, unit: Unit, ppi: number = APP_CONFIG.P
 export const calculateNewBoxPosition = (
     axis: 'x' | 'y',
     value: string,
-    currentBox: PageElement['box'],
+    currentBox: NormalizedRect,
     spreadWidth: number,
     spreadHeight: number,
     unit: Unit,
     ppi: number = APP_CONFIG.PPI
-): PageElement['box'] => {
+): NormalizedRect => {
     const numValue = parseFloat(value) || 0;
     const pxValue = unitToPx(numValue, unit, ppi);
 
@@ -83,13 +83,13 @@ export const calculateNewBoxPosition = (
 export const calculateNewBoxSize = (
     dimension: 'width' | 'height',
     value: string,
-    currentBox: PageElement['box'],
+    currentBox: NormalizedRect,
     spreadWidth: number,
     spreadHeight: number,
     unit: Unit,
     lockAspectRatio: boolean | undefined,
     ppi: number = APP_CONFIG.PPI
-): PageElement['box'] => {
+): NormalizedRect => {
     const numValue = parseFloat(value) || 0;
     const newPx = Math.max(1, unitToPx(numValue, unit, ppi));
 

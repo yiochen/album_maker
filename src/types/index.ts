@@ -132,36 +132,38 @@ export interface TextContent {
 }
 
 /**
- * A visual element placed on a spread.
- * Uses a discriminated union pattern via `type` + `content` to support
- * different element kinds (image, text, etc.).
+ * Normalized relative coordinates (0.0 to 1.0) representing a rectangle's edges.
+ * x1: Left, y1: Top, x2: Right, y2: Bottom.
  */
-export interface ImagePageElement {
-  id: string;
-  type: 'image';
-  content: ImageContent;
-  /**
-   * Normalized relative coordinates (0.0 to 1.0) representing the edges.
-   * x1: Left, y1: Top, x2: Right, y2: Bottom.
-   */
-  box: {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-  };
+export interface NormalizedRect {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
 }
 
-export interface TextPageElement {
+/**
+ * Shared properties for all visual elements placed on a spread.
+ * Uses a discriminated union pattern via `type` + `content` to support
+ * different element kinds (image, text, etc.).
+ *
+ * Each concrete element interface narrows `type` and `content` to its specific values.
+ */
+export interface BasePageElement {
   id: string;
+  type: string;
+  content: ImageContent | TextContent;
+  box: NormalizedRect;
+}
+
+export interface ImagePageElement extends BasePageElement {
+  type: 'image';
+  content: ImageContent;
+}
+
+export interface TextPageElement extends BasePageElement {
   type: 'text';
   content: TextContent;
-  box: {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-  };
 }
 
 export type PageElement = ImagePageElement | TextPageElement;
