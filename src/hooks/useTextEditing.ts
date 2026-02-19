@@ -56,28 +56,6 @@ export const useTextEditing = ({ fabricCanvas, wrapperRef, zoom }: UseTextEditin
     // Toolbar position state (viewport-relative)
     const [toolbarPosition, setToolbarPosition] = useState<TextToolbarPosition | null>(null);
 
-    // Hide toolbar when zoom changes
-    useEffect(() => {
-        if (toolbarPosition) {
-            setTimeout(() => setToolbarPosition(null), 0);
-        }
-    }, [zoom, toolbarPosition]);
-
-    // Hide toolbar when scrolling the viewport
-    useEffect(() => {
-        const viewport = wrapperRef.current;
-        if (!viewport) return;
-
-        const handleScroll = () => {
-            if (toolbarPosition) {
-                setToolbarPosition(null);
-            }
-        };
-
-        viewport.addEventListener('scroll', handleScroll);
-        return () => viewport.removeEventListener('scroll', handleScroll);
-    }, [wrapperRef, toolbarPosition]);
-
     /**
      * Compute the toolbar position above the text element.
      */
@@ -180,6 +158,30 @@ export const useTextEditing = ({ fabricCanvas, wrapperRef, zoom }: UseTextEditin
         }
         return null;
     }, [fabricCanvas, editingTextElementId]);
+
+    // Reposition toolbar when zoom changes (if we are editing)
+    useEffect(() => {
+        const el = getEditingTextElement();
+        if (el) {
+            updateToolbarPosition(el);
+        }
+    }, [zoom, updateToolbarPosition, getEditingTextElement]);
+
+    // Reposition toolbar when scrolling the viewport
+    useEffect(() => {
+        const viewport = wrapperRef.current;
+        if (!viewport) return;
+
+        const handleScroll = () => {
+            const el = getEditingTextElement();
+            if (el && toolbarPosition) {
+                updateToolbarPosition(el);
+            }
+        };
+
+        viewport.addEventListener('scroll', handleScroll);
+        return () => viewport.removeEventListener('scroll', handleScroll);
+    }, [wrapperRef, toolbarPosition, updateToolbarPosition, getEditingTextElement]);
 
     return {
         editingTextElementId,
