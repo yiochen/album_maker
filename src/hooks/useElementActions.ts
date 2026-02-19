@@ -9,7 +9,7 @@
  * Position represents the CENTER of the element (FabricJS uses center origin).
  */
 import { useCallback } from 'react';
-import type { PageElement, PoolImage } from '../types';
+import type { PageElement, PoolImage, TextContent } from '../types';
 import { useAddElement, useUpdateElement, useDeleteElement, useAlbumSettings } from '../states/albumStore';
 import { useSetSelectedElementId, useSetSelectedPageId } from '../states/uiStore';
 import { calculateThumbnailSize } from '../utils/imageUtils';
@@ -122,8 +122,55 @@ export const useElementActions = () => {
         [deleteElement, setSelectedElementId, setSelectedPageId]
     );
 
+    /**
+     * Adds a new text element to the center of the current spread.
+     */
+    const handleAddText = useCallback(
+        (spreadId: string) => {
+            if (!settings) return;
+
+            // Default text box: ~40% spread width, ~10% height, centered
+            const normWidth = 0.4;
+            const normHeight = 0.1;
+
+            const box = {
+                x1: 0.5 - normWidth / 2,
+                y1: 0.5 - normHeight / 2,
+                x2: 0.5 + normWidth / 2,
+                y2: 0.5 + normHeight / 2,
+            };
+
+            const defaultStyle: TextContent['defaultStyle'] = {
+                fontFamily: 'Inter, sans-serif',
+                fontSize: 24, // 24pt
+                fontWeight: 'normal',
+                fontStyle: 'normal',
+                fill: '#000000',
+                underline: false,
+            };
+
+            const newElement: PageElement = {
+                id: crypto.randomUUID(),
+                type: 'text',
+                content: {
+                    runs: [{ text: 'Hello' }],
+                    defaultStyle,
+                    textAlign: 'left',
+                    lineHeight: 1.2,
+                },
+                box,
+            };
+
+            addElement(spreadId, newElement);
+            setSelectedElementId(newElement.id);
+            setSelectedPageId(spreadId);
+        },
+        [addElement, setSelectedElementId, setSelectedPageId, settings]
+    );
+
     return {
         handleImageDrop,
+        handleAddText,
         handleElementUpdate,
         handleElementDelete,
     };

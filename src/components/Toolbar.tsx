@@ -2,6 +2,7 @@ import React from 'react';
 import { UndoIcon } from './icons/UndoIcon';
 import { RedoIcon } from './icons/RedoIcon';
 import { SnappingIcon } from './icons/SnappingIcon';
+import { TextIcon } from './icons/TextIcon';
 
 /**
  * Props for the Toolbar component.
@@ -19,6 +20,8 @@ interface ToolbarProps {
     canUndo: boolean;
     /** Whether redo is currently available. */
     canRedo: boolean;
+    /** Callback fired when the "Add Text" button is clicked. */
+    onAddText: () => void;
 }
 
 /**
@@ -31,6 +34,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     onRedo,
     canUndo,
     canRedo,
+    onAddText,
 }) => {
     return (
         <div className="toolbar-secondary" data-testid="toolbar-secondary">
@@ -61,6 +65,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 >
                     <SnappingIcon width="16" height="16" />
                     <span>Snap</span>
+                </button>
+
+                <button
+                    className="btn btn-ghost"
+                    onClick={onAddText}
+                    title="Add text element"
+                    data-testid="add-text-btn"
+                >
+                    <TextIcon width="16" height="16" />
+                    <span>Text</span>
                 </button>
             </div>
 
