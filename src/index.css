@@ -1516,6 +1516,85 @@ body {
   color: white;
 }
 
+/* =============================================
+   Text Editing Toolbar (floating above text)
+   ============================================= */
+
+.text-editing-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-bg-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  animation: slideUp 0.15s ease-out;
+}
+
+.text-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-family: inherit;
+  transition: background var(--transition-fast);
+}
+
+.text-toolbar-btn:hover {
+  background: var(--color-surface-hover);
+}
+
+.text-toolbar-btn.active {
+  background: var(--color-accent);
+  color: white;
+}
+
+.text-toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+  margin: 0 var(--space-1);
+}
+
+.text-toolbar-size {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.text-toolbar-color {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.text-toolbar-color::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.text-toolbar-color::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
 
 /* =============================================
    Settings Panel

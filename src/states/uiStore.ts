@@ -7,6 +7,8 @@ interface UIState {
   isImagePoolOpen: boolean;
   isSettingsOpen: boolean;
   isSnappingEnabled: boolean;
+  /** ID of the text element currently in inline-editing mode, or null. */
+  editingTextElementId: string | null;
 
   // Actions
   setCurrentSpreadIndex: (index: number) => void;
@@ -18,6 +20,7 @@ interface UIState {
   setSettingsOpen: (isOpen: boolean) => void;
   toggleSnapping: () => void;
   setSnappingEnabled: (enabled: boolean) => void;
+  setEditingTextElementId: (id: string | null) => void;
   resetSelection: () => void;
 }
 
@@ -28,6 +31,7 @@ export const useUIStore = create<UIState>((set) => ({
   isImagePoolOpen: true,
   isSettingsOpen: false,
   isSnappingEnabled: true,
+  editingTextElementId: null,
 
   setCurrentSpreadIndex: (index) => set({ currentSpreadIndex: index }),
 
@@ -47,7 +51,9 @@ export const useUIStore = create<UIState>((set) => ({
 
   setSnappingEnabled: (enabled) => set({ isSnappingEnabled: enabled }),
 
-  resetSelection: () => set({ selectedElementId: null, selectedPageId: null }),
+  setEditingTextElementId: (id) => set({ editingTextElementId: id }),
+
+  resetSelection: () => set({ selectedElementId: null, selectedPageId: null, editingTextElementId: null }),
 }));
 
 // ============ Selector Helper Hooks ============
@@ -97,3 +103,12 @@ export const useSetSettingsOpen = () => useUIStore(state => state.setSettingsOpe
 
 /** Select the setSnappingEnabled action */
 export const useSetSnappingEnabled = () => useUIStore(state => state.setSnappingEnabled);
+
+/** Select the ID of the text element currently being edited */
+export const useEditingTextElementId = () => useUIStore(state => state.editingTextElementId);
+
+/** Select the setEditingTextElementId action */
+export const useSetEditingTextElementId = () => useUIStore(state => state.setEditingTextElementId);
+
+/** Whether a text element is currently in inline-editing mode */
+export const useIsEditingText = () => useUIStore(state => state.editingTextElementId !== null);

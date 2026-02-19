@@ -2,7 +2,9 @@ import React, { useRef, useEffect, useMemo, useState, useLayoutEffect } from 're
 import type { PoolImage } from '../types';
 import { useCanvasRender } from '../hooks/useCanvasRender';
 import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
+import { useTextEditing } from '../hooks/useTextEditing';
 import { DroppableCanvas } from './DroppableCanvas';
+import { TextEditingToolbar } from './canvas/TextEditingToolbar';
 import { useAlbumSpreads } from '../states/albumStore';
 import { useCurrentSpreadIndex } from '../states/uiStore';
 import { useDndDropContext } from '../contexts/DndDropContext';
@@ -56,6 +58,12 @@ export const Canvas: React.FC<CanvasProps> = ({
         zoom,
         snapLinesRef,
     });
+
+    // Text editing lifecycle
+    const {
+        toolbarPosition,
+        getEditingTextElement,
+    } = useTextEditing({ fabricCanvas, wrapperRef });
 
     // Register this canvas as a drop target for dnd-kit
     useEffect(() => {
@@ -210,6 +218,12 @@ export const Canvas: React.FC<CanvasProps> = ({
                     >
                         <div ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
                             <canvas ref={canvasElRef} data-testid="canvas-layer" />
+                            {toolbarPosition && (
+                                <TextEditingToolbar
+                                    position={toolbarPosition}
+                                    getEditingTextElement={getEditingTextElement}
+                                />
+                            )}
                             {currentSpread.elements.length === 0 && (
                                 <div
                                     className="canvas-placeholder"

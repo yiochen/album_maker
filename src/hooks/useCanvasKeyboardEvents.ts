@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject } from './fabricTypes';
-import { useCurrentSpreadIndex } from '../states/uiStore';
+import { useCurrentSpreadIndex, useIsEditingText } from '../states/uiStore';
 import { useAlbumSpreads, useDeleteElement } from '../states/albumStore';
 
 interface UseCanvasKeyboardEventsProps {
@@ -12,16 +12,19 @@ export const useCanvasKeyboardEvents = ({ fabricCanvas }: UseCanvasKeyboardEvent
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const spread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
+    const isEditingText = useIsEditingText();
 
     const onElementDelete = useDeleteElement();
 
     const onElementDeleteRef = useRef(onElementDelete);
     const spreadRef = useRef(spread);
+    const isEditingTextRef = useRef(isEditingText);
 
     useEffect(() => {
         onElementDeleteRef.current = onElementDelete;
         spreadRef.current = spread;
-    }, [onElementDelete, spread]);
+        isEditingTextRef.current = isEditingText;
+    }, [onElementDelete, spread, isEditingText]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -31,6 +34,9 @@ export const useCanvasKeyboardEvents = ({ fabricCanvas }: UseCanvasKeyboardEvent
             }
 
             if (e.key === 'Delete' || e.key === 'Backspace') {
+                // Don't delete the element when user is typing in a text element
+                if (isEditingTextRef.current) return;
+
                 const canvas = fabricCanvas;
                 if (!canvas) return;
                 const activeObj = canvas.getActiveObject() as CustomFabricObject;
