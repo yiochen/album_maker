@@ -216,7 +216,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                         style={canvasStyle}
                         data-testid="interaction-layer"
                     >
-                        <div ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+                        <div ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
                             <canvas ref={canvasElRef} data-testid="canvas-layer" />
                             {currentSpread.elements.length === 0 && (
                                 <div
