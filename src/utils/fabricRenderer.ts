@@ -49,6 +49,7 @@ export async function renderSpread(
     const currentObjects = canvas.getObjects() as CustomFabricObject[];
     const validIds = new Set<string>();
     const loadPromises: Promise<void>[] = [];
+    const hiddenTextareaContainer = canvas.getElement().parentElement;
 
     // 2. Sync elements — branch on element.type
     spread.elements.forEach(element => {
@@ -130,9 +131,11 @@ export async function renderSpread(
             const existingText = existingObj instanceof CanvasTextElement ? existingObj : null;
 
             if (existingText) {
+                (existingText as CanvasTextElement & { hiddenTextareaContainer?: HTMLElement | null }).hiddenTextareaContainer = hiddenTextareaContainer;
                 // Only sync properties and content if not currently being edited
                 if (!existingText.isEditing) {
                     existingText.pageElement = element;
+                    existingText.updateControlVisibility();
 
                     existingText.set({
                         selectable: isInteractive,
@@ -161,6 +164,7 @@ export async function renderSpread(
                     borderScaleFactor: uiSizes.borderScaleFactor,
                     interactive: isInteractive,
                 });
+                (canvasEl as CanvasTextElement & { hiddenTextareaContainer?: HTMLElement | null }).hiddenTextareaContainer = hiddenTextareaContainer;
 
                 canvas.add(canvasEl);
                 canvasEl.applyLayout(canvas.width, canvas.height);

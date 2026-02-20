@@ -5,14 +5,75 @@
  * Positioned absolutely within the canvas wrapper, based on coordinates
  * provided by useTextEditing.
  */
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { CanvasTextElement } from '../../hooks/CanvasTextElement';
 import type { TextToolbarPosition } from '../../hooks/useTextEditing';
-import type { TextStyle } from '../../types';
+import type { TextStyle, TextContent } from '../../types';
+import { APP_CONFIG } from '../../config';
 
 /** Height of the toolbar + gap above the text element. */
 const TOOLBAR_HEIGHT = 36;
 const TOOLBAR_GAP = 8;
+
+function ptToCanvasPx(pt: number): number {
+    return pt * APP_CONFIG.PPI / 72;
+}
+
+function canvasPxToPt(px: number): number {
+    return px * 72 / APP_CONFIG.PPI;
+}
+
+const FONT_OPTIONS = [
+    { label: 'Inter', value: 'Inter, sans-serif' },
+    { label: 'Arial', value: 'Arial, sans-serif' },
+    { label: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
+    { label: 'Georgia', value: 'Georgia, serif' },
+    { label: 'Times New Roman', value: 'Times New Roman, serif' },
+    { label: 'Courier New', value: 'Courier New, monospace' },
+];
+
+type TextAlign = TextContent['textAlign'];
+type ToolbarStyle = Partial<TextStyle> & { textAlign?: TextAlign };
+
+const AlignIcon: React.FC<{ align: TextAlign }> = ({ align }) => {
+    const linesByAlign: Record<TextAlign, Array<[number, number, number]>> = {
+        left: [
+            [2, 14, 3],
+            [2, 11, 7],
+            [2, 14, 11],
+            [2, 9, 15],
+        ],
+        center: [
+            [2, 14, 3],
+            [4, 12, 7],
+            [2, 14, 11],
+            [5, 11, 15],
+        ],
+        right: [
+            [2, 14, 3],
+            [5, 14, 7],
+            [2, 14, 11],
+            [8, 14, 15],
+        ],
+    };
+
+    return (
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            {linesByAlign[align].map(([x1, x2, y], idx) => (
+                <line
+                    key={`${align}-${idx}-${x1}-${x2}-${y}`}
+                    x1={x1}
+                    y1={y}
+                    x2={x2}
+                    y2={y}
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                />
+            ))}
+        </svg>
+    );
+};
 
 interface TextEditingToolbarProps {
     /** Absolute position of the text element (wrapper-relative). */
@@ -24,7 +85,7 @@ interface TextEditingToolbarProps {
 /**
  * Reads the current style at the cursor / selection from the Fabric Textbox.
  */
-function readCurrentStyle(element: CanvasTextElement): Partial<TextStyle> {
+function readCurrentStyle(element: CanvasTextElement): ToolbarStyle {
     // getSelectionStyles returns array of style objects for the selection
     const styles = element.getSelectionStyles();
     if (styles.length === 0) {
@@ -32,8 +93,10 @@ function readCurrentStyle(element: CanvasTextElement): Partial<TextStyle> {
             fontWeight: element.fontWeight as TextStyle['fontWeight'],
             fontStyle: element.fontStyle as TextStyle['fontStyle'],
             underline: element.underline ?? false,
+            fontFamily: element.fontFamily as string,
             fontSize: element.fontSize,
             fill: element.fill as string,
+            textAlign: element.textAlign as TextAlign,
         };
     }
     // Use the first char of selection as representative
@@ -42,8 +105,10 @@ function readCurrentStyle(element: CanvasTextElement): Partial<TextStyle> {
         fontWeight: (first.fontWeight ?? element.fontWeight) as TextStyle['fontWeight'],
         fontStyle: (first.fontStyle ?? element.fontStyle) as TextStyle['fontStyle'],
         underline: (first.underline as boolean | undefined) ?? element.underline ?? false,
+        fontFamily: (first.fontFamily as string | undefined) ?? (element.fontFamily as string),
         fontSize: (first.fontSize as number | undefined) ?? element.fontSize,
         fill: (first.fill as string | undefined) ?? (element.fill as string),
+        textAlign: element.textAlign as TextAlign,
     };
 }
 
@@ -51,7 +116,9 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
     position,
     getEditingTextElement,
 }) => {
-    const [currentStyle, setCurrentStyle] = useState<Partial<TextStyle>>({});
+    const [currentStyle, setCurrentStyle] = useState<ToolbarStyle>({});
+    const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
+    const fontMenuRef = useRef<HTMLDivElement>(null);
 
     // Refresh style info periodically and on interaction
     const refreshStyle = useCallback(() => {
@@ -83,6 +150,17 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
         };
     }, [getEditingTextElement, refreshStyle]);
 
+    useEffect(() => {
+        if (!isFontMenuOpen) return;
+        const handlePointerDown = (event: MouseEvent) => {
+            if (fontMenuRef.current && !fontMenuRef.current.contains(event.target as Node)) {
+                setIsFontMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handlePointerDown);
+        return () => document.removeEventListener('mousedown', handlePointerDown);
+    }, [isFontMenuOpen]);
+
     /** Toggle a boolean style property (bold, italic, underline). */
     const toggleStyle = useCallback((prop: 'fontWeight' | 'fontStyle' | 'underline') => {
         const el = getEditingTextElement();
@@ -112,18 +190,47 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
         refreshStyle();
     }, [getEditingTextElement, currentStyle, refreshStyle]);
 
-    /** Change font size. */
-    const handleSizeChange = useCallback((delta: number) => {
+    const handleFontChange = useCallback((fontFamily: string) => {
         const el = getEditingTextElement();
         if (!el) return;
 
-        const currentSize = (currentStyle.fontSize as number) || el.fontSize || 16;
-        const newSize = Math.max(6, Math.min(200, currentSize + delta));
+        if (el.selectionStart !== el.selectionEnd) {
+            el.setSelectionStyles({ fontFamily });
+        } else {
+            el.setSelectionStyles({ fontFamily });
+            el.set('fontFamily', fontFamily);
+        }
+
+        el.set('dirty', true);
+        el.canvas?.renderAll();
+        setIsFontMenuOpen(false);
+        refreshStyle();
+    }, [getEditingTextElement, refreshStyle]);
+
+    const handleAlignmentChange = useCallback((textAlign: TextAlign) => {
+        const el = getEditingTextElement();
+        if (!el) return;
+
+        el.set('textAlign', textAlign);
+        el.set('dirty', true);
+        el.canvas?.renderAll();
+        refreshStyle();
+    }, [getEditingTextElement, refreshStyle]);
+
+    /** Change font size in pt (display unit); Fabric still stores px. */
+    const handleSizeChange = useCallback((deltaPt: number) => {
+        const el = getEditingTextElement();
+        if (!el) return;
+
+        const currentSizePx = (currentStyle.fontSize as number) || el.fontSize || ptToCanvasPx(12);
+        const currentSizePt = canvasPxToPt(currentSizePx);
+        const newSizePt = Math.max(6, Math.min(200, currentSizePt + deltaPt));
+        const newSizePx = ptToCanvasPx(newSizePt);
 
         if (el.selectionStart !== el.selectionEnd) {
-            el.setSelectionStyles({ fontSize: newSize });
+            el.setSelectionStyles({ fontSize: newSizePx });
         } else {
-            el.set('fontSize', newSize);
+            el.set('fontSize', newSizePx);
         }
 
         el.set('dirty', true);
@@ -150,7 +257,10 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
     const isBold = currentStyle.fontWeight === 'bold';
     const isItalic = currentStyle.fontStyle === 'italic';
     const isUnderline = !!currentStyle.underline;
-    const fontSize = Math.round((currentStyle.fontSize as number) || 16);
+    const textAlign = currentStyle.textAlign ?? 'left';
+    const activeFontFamily = currentStyle.fontFamily || FONT_OPTIONS[0].value;
+    const fontLabel = FONT_OPTIONS.find(opt => opt.value === activeFontFamily)?.label ?? activeFontFamily.split(',')[0];
+    const fontSizePt = Math.round(canvasPxToPt((currentStyle.fontSize as number) || ptToCanvasPx(12)));
     const fillColor = (currentStyle.fill as string) || '#000000';
 
     return (
@@ -167,6 +277,35 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
             // Prevent clicks on toolbar from deselecting the text
             onMouseDown={(e) => e.preventDefault()}
         >
+            <div className="text-toolbar-font" ref={fontMenuRef}>
+                <button
+                    className="text-toolbar-font-trigger"
+                    onClick={() => setIsFontMenuOpen(v => !v)}
+                    title="Font"
+                    data-testid="text-font-trigger"
+                >
+                    <span className="text-toolbar-font-label">{fontLabel}</span>
+                    <span className="text-toolbar-font-caret">{isFontMenuOpen ? '▾' : '▴'}</span>
+                </button>
+                {isFontMenuOpen && (
+                    <div className="text-toolbar-font-menu" data-testid="text-font-menu">
+                        {FONT_OPTIONS.map((font) => (
+                            <button
+                                key={font.value}
+                                className={`text-toolbar-font-option ${font.value === activeFontFamily ? 'active' : ''}`}
+                                style={{ fontFamily: font.value }}
+                                onClick={() => handleFontChange(font.value)}
+                                data-testid={`text-font-option-${font.label.toLowerCase().replace(/\s+/g, '-')}`}
+                            >
+                                {font.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <span className="text-toolbar-separator" />
+
             <button
                 className={`text-toolbar-btn ${isBold ? 'active' : ''}`}
                 onClick={() => toggleStyle('fontWeight')}
@@ -195,20 +334,47 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
             <span className="text-toolbar-separator" />
 
             <button
+                className={`text-toolbar-btn ${textAlign === 'left' ? 'active' : ''}`}
+                onClick={() => handleAlignmentChange('left')}
+                title="Align left"
+                data-testid="text-align-left-btn"
+            >
+                <AlignIcon align="left" />
+            </button>
+            <button
+                className={`text-toolbar-btn ${textAlign === 'center' ? 'active' : ''}`}
+                onClick={() => handleAlignmentChange('center')}
+                title="Align center"
+                data-testid="text-align-center-btn"
+            >
+                <AlignIcon align="center" />
+            </button>
+            <button
+                className={`text-toolbar-btn ${textAlign === 'right' ? 'active' : ''}`}
+                onClick={() => handleAlignmentChange('right')}
+                title="Align right"
+                data-testid="text-align-right-btn"
+            >
+                <AlignIcon align="right" />
+            </button>
+
+            <span className="text-toolbar-separator" />
+
+            <button
                 className="text-toolbar-btn"
                 onClick={() => handleSizeChange(-1)}
-                title="Decrease font size"
+                title="Decrease font size (pt)"
                 data-testid="text-size-decrease"
             >
                 −
             </button>
             <span className="text-toolbar-size" data-testid="text-size-display">
-                {fontSize}
+                {fontSizePt}pt
             </span>
             <button
                 className="text-toolbar-btn"
                 onClick={() => handleSizeChange(1)}
-                title="Increase font size"
+                title="Increase font size (pt)"
                 data-testid="text-size-increase"
             >
                 +

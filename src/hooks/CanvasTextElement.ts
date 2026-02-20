@@ -76,10 +76,12 @@ export class CanvasTextElement extends fabric.Textbox {
             lineHeight: textContent.lineHeight,
             styles: convertedStyles,
             lockRotation: true,
-            splitByGrapheme: false,
-            // Text elements are always freely resizable (no aspect lock)
+            // Keep long unbroken strings wrapping within the textbox width.
+            splitByGrapheme: true,
+            // Text width is resizable; height is auto by content.
             uniformScaling: false,
             lockUniScaling: false,
+            lockScalingY: true,
             selectable: options.interactive !== false,
             evented: options.interactive !== false,
         });
@@ -180,10 +182,20 @@ export class CanvasTextElement extends fabric.Textbox {
         );
 
         const runs = fabricStylesToRuns(this.text, stylesInPt, textContent.defaultStyle);
+        const defaultStyle: Required<TextStyle> = {
+            ...textContent.defaultStyle,
+            fontFamily: (this.fontFamily as string) || textContent.defaultStyle.fontFamily,
+            fontSize: canvasPxToPt(this.fontSize || ptToCanvasPx(textContent.defaultStyle.fontSize, this.ppi), this.ppi),
+            fontWeight: (this.fontWeight as TextStyle['fontWeight']) || textContent.defaultStyle.fontWeight,
+            fontStyle: (this.fontStyle as TextStyle['fontStyle']) || textContent.defaultStyle.fontStyle,
+            fill: (this.fill as string) || textContent.defaultStyle.fill,
+            underline: this.underline ?? textContent.defaultStyle.underline,
+        };
 
         return {
             ...textContent,
             runs,
+            defaultStyle,
             textAlign: this.textAlign as TextContent['textAlign'],
         };
     }
@@ -212,19 +224,18 @@ export class CanvasTextElement extends fabric.Textbox {
     }
 
     /**
-     * Shows all resize handles for text (no aspect ratio lock).
-     * Hides rotation handle.
+     * Text supports horizontal resize only.
      */
     updateControlVisibility() {
         this.setControlsVisibility({
-            mt: true,
-            mb: true,
+            mt: false,
+            mb: false,
             ml: true,
             mr: true,
-            tl: true,
-            tr: true,
-            bl: true,
-            br: true,
+            tl: false,
+            tr: false,
+            bl: false,
+            br: false,
             mtr: false,
         });
     }

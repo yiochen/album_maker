@@ -37,7 +37,6 @@ export const useCanvasInitialization = ({
     const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
     const seamRef = useRef<fabric.Line | null>(null);
 
-
     useEffect(() => {
         if (!canvasElRef.current) return;
 
@@ -47,9 +46,6 @@ export const useCanvasInitialization = ({
             backgroundColor: '#f0f0f0',
             width: canvasWidth,
             height: canvasHeight,
-            // Force hidden textarea to be inside our clipped wrapper
-            // rather than appended to body, which prevents layout shifts.
-            hiddenTextareaContainer: wrapperRef.current || undefined,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
 
