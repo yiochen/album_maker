@@ -118,7 +118,7 @@ export function fabricStylesToRuns(
  * Compute which style fields differ from the default.
  * Returns only the fields that differ, or undefined if all match.
  */
-function computeOverrides(
+export function computeOverrides(
     style: Partial<TextStyle> | undefined,
     defaultStyle: Required<TextStyle>
 ): Partial<TextStyle> | undefined {
@@ -140,7 +140,7 @@ function computeOverrides(
 }
 
 /** Compare two style override objects for equality. */
-function stylesEqual(
+export function stylesEqual(
     a: Partial<TextStyle> | undefined,
     b: Partial<TextStyle> | undefined
 ): boolean {
@@ -153,6 +153,90 @@ function stylesEqual(
 }
 
 /** Build a TextRun, omitting the style field if there are no overrides. */
-function buildRun(text: string, style: Partial<TextStyle> | undefined): TextRun {
+export function buildRun(text: string, style: Partial<TextStyle> | undefined): TextRun {
     return style ? { text, style } : { text };
 }
+
+/** Build a TextRun with layout coordinates, omitting style/coords when not needed. */
+export function buildLayoutRun(
+    text: string,
+    style: Partial<TextStyle> | undefined,
+    x: number,
+    baselineY: number
+): TextRun {
+    const run: TextRun = { text, x, baselineY };
+    if (style) run.style = style;
+    return run;
+}
+
+/**
+ * Convert Fabric.js visual lines + per-character styles → TextRun[] with layout coordinates.
+ *
+ * Unlike `fabricStylesToRuns`, this function is **line-aware**: it splits runs at every
+ * visual line boundary (including soft word-wrap breaks). Each resulting run represents
+ * a contiguous, single-line text fragment with its position relative to the text box
+ * origin (in whatever units the coordinate callbacks provide — typically pt).
+ *
+ * @param textLines         Fabric's `_textLines` — array of grapheme arrays, one per visual line.
+ * @param styles            Fabric's per-character style map (lineIndex → charIndex → overrides).
+ * @param defaultStyle      The element's base style (in the caller's unit, e.g. pt).
+ * @param getRunX           Returns the x offset for a character (lineIndex, charIndex) in the caller's unit.
+ * @param getBaselineY      Returns the baseline Y offset for a visual line in the caller's unit.
+ */
+export function fabricLinesToRuns(
+    textLines: string[][],
+    styles: FabricStyleMap,
+    defaultStyle: Required<TextStyle>,
+    getRunX: (lineIndex: number, charIndex: number) => number,
+    getBaselineY: (lineIndex: number) => number,
+): TextRun[] {
+    if (textLines.length === 0) {
+        return [{ text: '' }];
+    }
+
+    const runs: TextRun[] = [];
+
+    for (let lineIdx = 0; lineIdx < textLines.length; lineIdx++) {
+        const line = textLines[lineIdx];
+        const baselineY = getBaselineY(lineIdx);
+
+        let currentRunText = '';
+        let currentRunStyle: Partial<TextStyle> | undefined;
+        let currentRunStartChar = 0;
+
+        for (let charIdx = 0; charIdx < line.length; charIdx++) {
+            const charStyle = styles[lineIdx]?.[charIdx];
+            const overrides = computeOverrides(charStyle, defaultStyle);
+
+            if (currentRunText.length === 0) {
+                // First character on this line
+                currentRunStyle = overrides;
+                currentRunText = line[charIdx];
+                currentRunStartChar = charIdx;
+            } else if (stylesEqual(currentRunStyle, overrides)) {
+                // Same style — extend run
+                currentRunText += line[charIdx];
+            } else {
+                // Style changed — flush current run
+                const x = getRunX(lineIdx, currentRunStartChar);
+                runs.push(buildLayoutRun(currentRunText, currentRunStyle, x, baselineY));
+                currentRunText = line[charIdx];
+                currentRunStyle = overrides;
+                currentRunStartChar = charIdx;
+            }
+        }
+
+        // Flush remaining run for this line (even if empty — preserves empty lines)
+        if (currentRunText.length > 0) {
+            const x = getRunX(lineIdx, currentRunStartChar);
+            runs.push(buildLayoutRun(currentRunText, currentRunStyle, x, baselineY));
+        } else {
+            // Empty visual line — still record it so the offscreen renderer can account for blank lines
+            const x = getRunX(lineIdx, 0);
+            runs.push(buildLayoutRun('', undefined, x, baselineY));
+        }
+    }
+
+    return runs.length > 0 ? runs : [{ text: '' }];
+}
+

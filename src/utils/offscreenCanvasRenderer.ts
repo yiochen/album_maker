@@ -1,4 +1,4 @@
-import { Spread, AlbumSettings } from '../types';
+import { Spread, AlbumSettings, TextContent } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from './imageUtils';
 import { OffscreenRenderOptions } from './rendererTypes';
 import { decomposeForRendering, IDENTITY, getOrientedDimensions } from './orientationMatrix';
@@ -29,6 +29,70 @@ async function loadImage(url: string, fetcher: typeof fetch = fetch): Promise<Im
         const size = blob.size;
         throw new Error(`Failed to decode ${type} image (${size} bytes) from ${url}: ${e}`);
     }
+}
+
+/**
+ * Build a CSS font string from style properties and a font size in px.
+ */
+function buildFontString(fontStyle: string, fontWeight: string, fontSizePx: number, fontFamily: string): string {
+    return `${fontStyle} ${fontWeight} ${fontSizePx}px ${fontFamily}`;
+}
+
+/**
+ * Render a text element onto the canvas context.
+ *
+ * Uses pre-computed layout coordinates (x, baselineY in pt) from Fabric.js,
+ * so no text wrapping or measurement is needed here.
+ */
+function renderTextElement(
+    ctx: OffscreenCanvasRenderingContext2D,
+    content: TextContent,
+    boxLeft: number,
+    boxTop: number,
+    boxWidth: number,
+    boxHeight: number,
+    ppi: number,
+): void {
+    const pxPerPt = ppi / 72;
+
+    ctx.save();
+
+    // Clip to the text box frame
+    ctx.beginPath();
+    ctx.rect(boxLeft, boxTop, boxWidth, boxHeight);
+    ctx.clip();
+
+    ctx.textBaseline = 'alphabetic';
+
+    for (const run of content.runs) {
+        if (run.text.length === 0) continue;
+
+        // Merge run style overrides with default style
+        const style = { ...content.defaultStyle, ...run.style };
+        const fontSizePx = style.fontSize * pxPerPt;
+
+        ctx.font = buildFontString(
+            style.fontStyle ?? 'normal',
+            style.fontWeight ?? 'normal',
+            fontSizePx,
+            style.fontFamily,
+        );
+        ctx.fillStyle = style.fill;
+
+        const x = boxLeft + (run.x ?? 0) * pxPerPt;
+        const y = boxTop + (run.baselineY ?? 0) * pxPerPt;
+        ctx.fillText(run.text, x, y);
+
+        // Draw underline decoration
+        if (style.underline) {
+            const textWidth = ctx.measureText(run.text).width;
+            const underlineThickness = Math.max(1, fontSizePx * 0.05);
+            const underlineY = y + fontSizePx * 0.1;
+            ctx.fillRect(x, underlineY, textWidth, underlineThickness);
+        }
+    }
+
+    ctx.restore();
 }
 
 /**
@@ -63,7 +127,14 @@ export async function renderSpread(
     // Render elements in Z-Order
     // spread.elements are assumed to be ordered correctly in the store
     for (const element of spread.elements) {
-        // Skip text elements — text export not yet supported
+        if (element.type === 'text') {
+            // --- Text element rendering ---
+            const content = element.content as TextContent;
+            const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
+            renderTextElement(ctx, content, box.left, box.top, box.width, box.height, ppi);
+            continue;
+        }
+
         if (element.type !== 'image') continue;
 
         try {

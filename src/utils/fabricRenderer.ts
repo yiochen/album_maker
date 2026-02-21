@@ -154,7 +154,7 @@ export async function renderSpread(
                 // Remove stale object of a different type
                 if (existingObj) canvas.remove(existingObj);
 
-                const canvasEl = new CanvasTextElement(element, APP_CONFIG.PPI, {
+                const canvasEl = new CanvasTextElement(element, options.ppi, {
                     cornerStyle: 'circle',
                     cornerColor: 'white',
                     cornerStrokeColor: '#333',

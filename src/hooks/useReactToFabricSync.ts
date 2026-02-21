@@ -54,7 +54,7 @@ export const useReactToFabricSync = ({
             if (!canvas || !spread || !settings) return;
 
             await renderSpread(spread, settings, canvas, {
-                ppi: APP_CONFIG.PPI,
+                ppi: APP_CONFIG.SCREEN_PPI,
                 interactivityOptions: {
                     zoom,
                     showPageSeam: true,

@@ -116,6 +116,10 @@ export interface TextStyle {
 export interface TextRun {
   text: string;                // the characters in this run (includes \n for line breaks)
   style?: Partial<TextStyle>;  // overrides vs. the element's defaultStyle
+  /** Horizontal offset from text box left edge, in pt. Set by Fabric.js layout engine. */
+  x?: number;
+  /** Vertical baseline offset from text box top edge, in pt. Set by Fabric.js layout engine. */
+  baselineY?: number;
 }
 
 /**

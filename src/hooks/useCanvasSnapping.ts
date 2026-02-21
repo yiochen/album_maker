@@ -172,8 +172,10 @@ export const useCanvasSnapping = ({
                 // Handle text elements
             } else if (obj instanceof CanvasTextElement) {
                 obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
+                const updatedContent = obj.syncToRuns();
                 onElementUpdateRef.current(spreadRef.current.id, obj.pageElement.id, {
                     box: obj.pageElement.box,
+                    content: updatedContent,
                 });
             }
         };

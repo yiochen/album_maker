@@ -9,7 +9,8 @@
  */
 import * as fabric from 'fabric';
 import type { PageElement, TextContent, TextStyle } from '../types';
-import { runsToFabricStyles, fabricStylesToRuns } from '../utils/textStyleUtils';
+import { runsToFabricStyles, fabricLinesToRuns } from '../utils/textStyleUtils';
+import type { FabricStyleMap } from '../utils/textStyleUtils';
 import { calculateGaplessRect } from '../utils/imageUtils';
 
 /**
@@ -169,28 +170,71 @@ export class CanvasTextElement extends fabric.Textbox {
 
     /**
      * Read current Fabric text + styles and convert back to TextRun[].
-     * Font sizes are converted from px → pt for persistence.
+     *
+     * Splits runs at visual line boundaries (including soft word-wrap breaks) and
+     * annotates each run with `x` and `baselineY` in **pt**, so the offscreen
+     * renderer can paint text with simple `fillText()` calls.
+     *
+     * ## Coordinate system
+     * `this.ppi` matches the Fabric canvas PPI (provided by the render pipeline
+     * via `options.ppi`). All layout values — font sizes, x offsets, and
+     * baselineY — are converted to pt using `this.ppi`, keeping them in a
+     * consistent, PPI-independent coordinate space.
      */
     syncToRuns(): TextContent {
         const textContent = this.pageElement.content as TextContent;
+        const ppi = this.ppi;
 
-        // Convert Fabric styles (px font sizes) → pt
+        // Convert Fabric per-char styles (px font sizes) → pt for persistence
         const stylesInPt = convertStylesFontSize(
             this.styles as Record<number, Record<number, Partial<TextStyle>>>,
-            this.ppi,
+            ppi,
             canvasPxToPt
         );
 
-        const runs = fabricStylesToRuns(this.text, stylesInPt, textContent.defaultStyle);
+        // Build the default style in pt from current Fabric properties
         const defaultStyle: Required<TextStyle> = {
             ...textContent.defaultStyle,
             fontFamily: (this.fontFamily as string) || textContent.defaultStyle.fontFamily,
-            fontSize: canvasPxToPt(this.fontSize || ptToCanvasPx(textContent.defaultStyle.fontSize, this.ppi), this.ppi),
+            fontSize: canvasPxToPt(this.fontSize || ptToCanvasPx(textContent.defaultStyle.fontSize, ppi), ppi),
             fontWeight: (this.fontWeight as TextStyle['fontWeight']) || textContent.defaultStyle.fontWeight,
             fontStyle: (this.fontStyle as TextStyle['fontStyle']) || textContent.defaultStyle.fontStyle,
             fill: (this.fill as string) || textContent.defaultStyle.fill,
             underline: this.underline ?? textContent.defaultStyle.underline,
         };
+
+        // Pre-compute cumulative line top offsets (in canvas px).
+        // Mirrors Fabric's _renderTextCommon which accumulates getHeightOfLine().
+        const textLines = this._textLines;
+        const lineTopsPx: number[] = [];
+        let accumulatedHeight = 0;
+        for (let i = 0; i < textLines.length; i++) {
+            lineTopsPx[i] = accumulatedHeight;
+            accumulatedHeight += this.getHeightOfLine(i);
+        }
+
+        // Coordinate callbacks for fabricLinesToRuns (return values in pt)
+        const getRunX = (lineIndex: number, charIndex: number): number => {
+            const lineLeftOffsetPx = this._getLineLeftOffset(lineIndex);
+            const charLeftPx = this.__charBounds[lineIndex]?.[charIndex]?.left ?? 0;
+            return canvasPxToPt(lineLeftOffsetPx + charLeftPx, ppi);
+        };
+
+        const getBaselineY = (lineIndex: number): number => {
+            // Fabric's baseline = lineTop + lineImplHeight * (1 - _fontSizeFraction)
+            // lineImplHeight = getHeightOfLine / lineHeight (i.e. without the lineHeight multiplier)
+            const lineImplHeight = this.getHeightOfLine(lineIndex) / this.lineHeight;
+            const baselinePx = lineTopsPx[lineIndex] + lineImplHeight * (1 - this._fontSizeFraction);
+            return canvasPxToPt(baselinePx, ppi);
+        };
+
+        const runs = fabricLinesToRuns(
+            textLines,
+            stylesInPt as FabricStyleMap,
+            defaultStyle,
+            getRunX,
+            getBaselineY,
+        );
 
         return {
             ...textContent,
