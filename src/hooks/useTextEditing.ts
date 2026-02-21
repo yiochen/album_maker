@@ -1,191 +1,214 @@
 /**
- * useTextEditing — Hook for managing text element inline-editing lifecycle.
+ * useTextEditing — Hook for managing the Tiptap text editing lifecycle.
  *
  * Responsibilities:
- * - Listens to Fabric.js `text:editing:entered` and `text:editing:exited` events
- * - Syncs editing state to uiStore (editingTextElementId)
- * - On exit, persists the edited text/styles back to React state via syncToRuns()
- * - Tracks the absolute position (px) of the active text box for toolbar placement
+ * - Detects double-click on text elements via Fabric canvas events
+ * - Manages editing state (which element is being edited)
+ * - Computes overlay position for the Tiptap editor and toolbar
+ * - Provides save/cancel callbacks that persist TextContent to the store
  */
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import * as fabric from 'fabric';
 import { CanvasTextElement } from './CanvasTextElement';
 import { useSetEditingTextElementId, useEditingTextElementId } from '../states/uiStore';
 import { useUpdateElement } from '../states/albumStore';
-import { useCurrentSpreadIndex, useSelectedPageId } from '../states/uiStore';
+import { useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
+import type { TextContent, PageElement } from '../types';
 
-/**
- * Position rectangle for the floating toolbar, in viewport-relative pixels.
- */
+/** Position rectangle for the floating toolbar, in viewport-relative pixels. */
 export interface TextToolbarPosition {
     top: number;
     left: number;
     width: number;
 }
 
-interface UseTextEditingProps {
-    fabricCanvas: fabric.Canvas | null;
-    /** Ref to the canvas wrapper element (used for coordinate conversion). */
-    wrapperRef: React.RefObject<HTMLDivElement | null>;
-    /** Current zoom level for hiding the toolbar when zooming. */
-    zoom: number;
+/** State exposed by this hook for the Canvas component to render the Tiptap overlay. */
+export interface TextEditingState {
+    /** Currently editing element ID (null if not editing). */
+    editingTextElementId: string | null;
+    /** The PageElement being edited (null if not editing). */
+    editingElement: PageElement | null;
+    /** Toolbar position in container-relative pixels. */
+    toolbarPosition: TextToolbarPosition | null;
+    /** Canvas width in px (for overlay positioning). */
+    canvasWidth: number;
+    /** Canvas height in px (for overlay positioning). */
+    canvasHeight: number;
+    /** Save edited content and exit editing. */
+    handleSave: (content: TextContent) => void;
+    /** Cancel editing without saving. */
+    handleCancel: () => void;
+    /** Update text alignment during editing (persists immediately). */
+    handleTextAlignChange: (align: TextContent['textAlign']) => void;
+    /** Current text alignment of the editing element. */
+    currentTextAlign: TextContent['textAlign'];
 }
 
-export const useTextEditing = ({ fabricCanvas, wrapperRef, zoom }: UseTextEditingProps) => {
+interface UseTextEditingProps {
+    fabricCanvas: fabric.Canvas | null;
+    /** Ref to the canvas container element (used for toolbar coordinate conversion). */
+    containerRef: React.RefObject<HTMLDivElement | null>;
+    /** Current zoom level for toolbar repositioning. */
+    zoom: number;
+    /** Canvas width in px. */
+    canvasWidth: number;
+    /** Canvas height in px. */
+    canvasHeight: number;
+}
+
+export const useTextEditing = ({
+    fabricCanvas,
+    containerRef,
+    zoom,
+    canvasWidth,
+    canvasHeight,
+}: UseTextEditingProps): TextEditingState => {
     const setEditingTextElementId = useSetEditingTextElementId();
     const editingTextElementId = useEditingTextElementId();
     const updateElement = useUpdateElement();
-    const selectedPageId = useSelectedPageId();
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
 
-    // Stable refs for use in event handlers
+    // Stable refs
     const updateElementRef = useRef(updateElement);
-    const selectedPageIdRef = useRef(selectedPageId);
     const spreadsRef = useRef(spreads);
     const currentSpreadIndexRef = useRef(currentSpreadIndex);
 
     useEffect(() => {
         updateElementRef.current = updateElement;
-        selectedPageIdRef.current = selectedPageId;
         spreadsRef.current = spreads;
         currentSpreadIndexRef.current = currentSpreadIndex;
-    }, [updateElement, selectedPageId, spreads, currentSpreadIndex]);
+    }, [updateElement, spreads, currentSpreadIndex]);
 
-    // Toolbar position state (viewport-relative)
+    // Toolbar position state
     const [toolbarPosition, setToolbarPosition] = useState<TextToolbarPosition | null>(null);
+    // Text align state (live during editing, synced to store)
+    const [currentTextAlign, setCurrentTextAlign] = useState<TextContent['textAlign']>('left');
 
-    /**
-     * Compute the toolbar position above the text element.
-     */
-    const updateToolbarPosition = useCallback((textElement: CanvasTextElement) => {
-        if (!fabricCanvas || !wrapperRef.current) return;
+    // Find the element being edited
+    const editingElement = useMemo(() => {
+        if (!editingTextElementId) return null;
+        const spread = spreads[currentSpreadIndex];
+        return spread?.elements.find(e => e.id === editingTextElementId) ?? null;
+    }, [editingTextElementId, spreads, currentSpreadIndex]);
 
-        // Get the bounding rect of the text element on the canvas (in viewport coords)
-        const bound = textElement.getBoundingRect();
-        const wrapperRect = wrapperRef.current.getBoundingClientRect();
+    // Compute toolbar position from the Fabric canvas object
+    const updateToolbarPosition = useCallback((textObj: CanvasTextElement) => {
+        if (!fabricCanvas || !containerRef.current) return;
 
-        // Canvas element's position on screen
+        const bound = textObj.getBoundingRect();
         const canvasEl = fabricCanvas.getElement();
         const canvasRect = canvasEl.getBoundingClientRect();
+        const containerRect = containerRef.current.getBoundingClientRect();
 
-        // Convert Fabric canvas coordinates to screen coordinates
         const screenLeft = canvasRect.left + bound.left * (canvasRect.width / (fabricCanvas.width || 1));
         const screenTop = canvasRect.top + bound.top * (canvasRect.height / (fabricCanvas.height || 1));
         const screenWidth = bound.width * (canvasRect.width / (fabricCanvas.width || 1));
 
-        // Convert to wrapper-relative coordinates
         setToolbarPosition({
-            top: screenTop - wrapperRect.top,
-            left: screenLeft - wrapperRect.left,
+            top: screenTop - containerRect.top,
+            left: screenLeft - containerRect.left,
             width: screenWidth,
         });
-    }, [fabricCanvas, wrapperRef]);
+    }, [fabricCanvas, containerRef]);
 
-    /**
-     * Listen for Fabric text editing enter/exit events.
-     */
+    // Enter editing on double-click
     useEffect(() => {
         if (!fabricCanvas) return;
 
-        const handleEditingEntered = (e: { target: fabric.FabricObject }) => {
-            const target = e.target;
+        const handleDblClick = (e: fabric.TPointerEventInfo) => {
+            const target = fabricCanvas.findTarget(e.e);
             if (target instanceof CanvasTextElement) {
                 const id = target.pageElement.id;
+                const content = target.pageElement.content as TextContent;
+
                 setEditingTextElementId(id);
+                setCurrentTextAlign(content.textAlign);
                 updateToolbarPosition(target);
+
+                // Deselect the Fabric object so it doesn't interfere
+                fabricCanvas.discardActiveObject();
+                fabricCanvas.requestRenderAll();
             }
         };
 
-        const handleEditingExited = (e: { target: fabric.FabricObject }) => {
-            const target = e.target;
-            if (target instanceof CanvasTextElement) {
-                // Persist edited text back to React state
-                const spreadId = spreadsRef.current[currentSpreadIndexRef.current]?.id;
-                if (spreadId) {
-                    const updatedContent = target.syncToRuns();
-                    updateElementRef.current(spreadId, target.pageElement.id, {
-                        content: updatedContent,
-                    });
-                }
-                setEditingTextElementId(null);
-                setToolbarPosition(null);
-            }
-        };
-
-        // Update toolbar position on object moving/scaling during editing
-        const handleObjectMoving = (e: { target: fabric.FabricObject }) => {
-            const target = e.target;
-            if (target instanceof CanvasTextElement && editingTextElementId) {
-                updateToolbarPosition(target);
-            }
-        };
-
-        // Show/update toolbar position on interaction if we are still editing
-        const handleInteraction = () => {
-            const activeObj = fabricCanvas.getActiveObject();
-            if (activeObj instanceof CanvasTextElement && activeObj.pageElement.id === editingTextElementId) {
-                updateToolbarPosition(activeObj);
-            }
-        };
-
-        fabricCanvas.on('text:editing:entered', handleEditingEntered);
-        fabricCanvas.on('text:editing:exited', handleEditingExited);
-        fabricCanvas.on('object:moving', handleObjectMoving);
-        fabricCanvas.on('object:scaling', handleObjectMoving);
-        fabricCanvas.on('text:changed', handleInteraction);
-        fabricCanvas.on('text:selection:changed', handleInteraction);
-
+        fabricCanvas.on('mouse:dblclick', handleDblClick);
         return () => {
-            fabricCanvas.off('text:editing:entered', handleEditingEntered);
-            fabricCanvas.off('text:editing:exited', handleEditingExited);
-            fabricCanvas.off('object:moving', handleObjectMoving);
-            fabricCanvas.off('object:scaling', handleObjectMoving);
-            fabricCanvas.off('text:changed', handleInteraction);
-            fabricCanvas.off('text:selection:changed', handleInteraction);
+            fabricCanvas.off('mouse:dblclick', handleDblClick);
         };
-    }, [fabricCanvas, editingTextElementId, setEditingTextElementId, updateToolbarPosition]);
+    }, [fabricCanvas, setEditingTextElementId, updateToolbarPosition]);
 
-    /**
-     * Get the currently-editing CanvasTextElement instance.
-     */
-    const getEditingTextElement = useCallback((): CanvasTextElement | null => {
-        if (!fabricCanvas || !editingTextElementId) return null;
-        const activeObj = fabricCanvas.getActiveObject();
-        if (activeObj instanceof CanvasTextElement && activeObj.pageElement.id === editingTextElementId) {
-            return activeObj;
+    // Save handler
+    const handleSave = useCallback((content: TextContent) => {
+        const spread = spreadsRef.current[currentSpreadIndexRef.current];
+        if (spread && editingTextElementId) {
+            updateElementRef.current(spread.id, editingTextElementId, { content });
         }
-        return null;
-    }, [fabricCanvas, editingTextElementId]);
+        setEditingTextElementId(null);
+        setToolbarPosition(null);
+    }, [editingTextElementId, setEditingTextElementId]);
 
-    // Reposition toolbar when zoom changes (if we are editing)
-    useEffect(() => {
-        const el = getEditingTextElement();
-        if (el) {
-            updateToolbarPosition(el);
+    // Cancel handler
+    const handleCancel = useCallback(() => {
+        setEditingTextElementId(null);
+        setToolbarPosition(null);
+    }, [setEditingTextElementId]);
+
+    // Text align change handler (persists immediately so Fabric re-renders)
+    const handleTextAlignChange = useCallback((align: TextContent['textAlign']) => {
+        setCurrentTextAlign(align);
+        const spread = spreadsRef.current[currentSpreadIndexRef.current];
+        if (spread && editingTextElementId) {
+            const element = spread.elements.find(e => e.id === editingTextElementId);
+            if (element) {
+                const content = element.content as TextContent;
+                updateElementRef.current(spread.id, editingTextElementId, {
+                    content: { ...content, textAlign: align },
+                });
+            }
         }
-    }, [zoom, updateToolbarPosition, getEditingTextElement]);
+    }, [editingTextElementId]);
 
-    // Reposition toolbar when scrolling the viewport
+    // Reposition toolbar on zoom or scroll changes
     useEffect(() => {
-        const viewport = wrapperRef.current;
-        if (!viewport) return;
+        if (!editingTextElementId || !fabricCanvas) return;
+
+        const textObj = (fabricCanvas.getObjects() as fabric.FabricObject[])
+            .find(o => o instanceof CanvasTextElement && o.pageElement.id === editingTextElementId) as CanvasTextElement | undefined;
+
+        if (textObj) {
+            updateToolbarPosition(textObj);
+        }
+    }, [zoom, editingTextElementId, fabricCanvas, updateToolbarPosition]);
+
+    // Scroll-based toolbar repositioning
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container || !editingTextElementId) return;
 
         const handleScroll = () => {
-            const el = getEditingTextElement();
-            if (el && toolbarPosition) {
-                updateToolbarPosition(el);
+            if (!fabricCanvas) return;
+            const textObj = (fabricCanvas.getObjects() as fabric.FabricObject[])
+                .find(o => o instanceof CanvasTextElement && o.pageElement.id === editingTextElementId) as CanvasTextElement | undefined;
+            if (textObj) {
+                updateToolbarPosition(textObj);
             }
         };
 
-        viewport.addEventListener('scroll', handleScroll);
-        return () => viewport.removeEventListener('scroll', handleScroll);
-    }, [wrapperRef, toolbarPosition, updateToolbarPosition, getEditingTextElement]);
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [containerRef, editingTextElementId, fabricCanvas, updateToolbarPosition]);
 
     return {
         editingTextElementId,
+        editingElement,
         toolbarPosition,
-        getEditingTextElement,
+        canvasWidth,
+        canvasHeight,
+        handleSave,
+        handleCancel,
+        handleTextAlignChange,
+        currentTextAlign,
     };
 };

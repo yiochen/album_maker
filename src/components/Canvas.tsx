@@ -1,9 +1,12 @@
-import React, { useRef, useEffect, useMemo, useState, useLayoutEffect } from 'react';
-import type { PoolImage } from '../types';
+import React, { useRef, useEffect, useMemo, useState, useLayoutEffect, useCallback } from 'react';
+import type { Editor } from '@tiptap/react';
+import type { PoolImage, TextContent } from '../types';
+import { isTextElement } from '../types';
 import { useCanvasRender } from '../hooks/useCanvasRender';
 import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
 import { useTextEditing } from '../hooks/useTextEditing';
 import { DroppableCanvas } from './DroppableCanvas';
+import { TiptapTextEditor } from './canvas/TiptapTextEditor';
 import { TextEditingToolbar } from './canvas/TextEditingToolbar';
 import { useAlbumSpreads } from '../states/albumStore';
 import { useCurrentSpreadIndex } from '../states/uiStore';
@@ -60,11 +63,26 @@ export const Canvas: React.FC<CanvasProps> = ({
         snapLinesRef,
     });
 
-    // Text editing lifecycle — position relative to the viewport container (not zoomed)
+    // Text editing lifecycle — Tiptap-based overlay
     const {
+        editingElement,
         toolbarPosition,
-        getEditingTextElement,
-    } = useTextEditing({ fabricCanvas, wrapperRef: containerRef, zoom });
+        handleSave,
+        handleCancel,
+        handleTextAlignChange,
+        currentTextAlign,
+    } = useTextEditing({
+        fabricCanvas,
+        containerRef,
+        zoom,
+        canvasWidth,
+        canvasHeight,
+    });
+
+    // Track the Tiptap editor instance for the toolbar
+    const [tiptapEditor, setTiptapEditor] = useState<Editor | null>(null);
+    const handleEditorReady = useCallback((editor: Editor) => setTiptapEditor(editor), []);
+    const handleEditorDestroy = useCallback(() => setTiptapEditor(null), []);
 
     // Register this canvas as a drop target for dnd-kit
     useEffect(() => {
@@ -180,6 +198,11 @@ export const Canvas: React.FC<CanvasProps> = ({
         transformOrigin: '0 0', // Top-left origin for standard expansion
     };
 
+    // Resolve editing element content for the overlay
+    const editingContent = editingElement && isTextElement(editingElement)
+        ? editingElement.content as TextContent
+        : null;
+
     if (!currentSpread) return null;
 
     return (
@@ -237,16 +260,33 @@ export const Canvas: React.FC<CanvasProps> = ({
                                     </span>
                                 </div>
                             )}
+                            {/* Tiptap text editor overlay — inside canvas wrapper for zoom scaling */}
+                            {editingElement && editingContent && (
+                                <TiptapTextEditor
+                                    content={editingContent}
+                                    box={editingElement.box}
+                                    canvasWidth={canvasWidth}
+                                    canvasHeight={canvasHeight}
+                                    onSave={handleSave}
+                                    onCancel={handleCancel}
+                                    onEditorReady={handleEditorReady}
+                                    onEditorDestroy={handleEditorDestroy}
+                                    textAlign={currentTextAlign}
+                                />
+                            )}
                         </div>
                     </DroppableCanvas>
                 </div>
             </div>
 
             {/* Text editing toolbar — outside zoom container to prevent scaling */}
-            {toolbarPosition && (
+            {toolbarPosition && tiptapEditor && editingContent && (
                 <TextEditingToolbar
                     position={toolbarPosition}
-                    getEditingTextElement={getEditingTextElement}
+                    editor={tiptapEditor}
+                    defaultFontSizePt={editingContent.defaultStyle.fontSize}
+                    onTextAlignChange={handleTextAlignChange}
+                    textAlign={currentTextAlign}
                 />
             )}
 

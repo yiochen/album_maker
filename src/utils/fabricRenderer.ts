@@ -49,7 +49,7 @@ export async function renderSpread(
     const currentObjects = canvas.getObjects() as CustomFabricObject[];
     const validIds = new Set<string>();
     const loadPromises: Promise<void>[] = [];
-    const hiddenTextareaContainer = canvas.getElement().parentElement;
+
 
     // 2. Sync elements — branch on element.type
     spread.elements.forEach(element => {
@@ -131,24 +131,20 @@ export async function renderSpread(
             const existingText = existingObj instanceof CanvasTextElement ? existingObj : null;
 
             if (existingText) {
-                (existingText as CanvasTextElement & { hiddenTextareaContainer?: HTMLElement | null }).hiddenTextareaContainer = hiddenTextareaContainer;
-                // Only sync properties and content if not currently being edited
-                if (!existingText.isEditing) {
-                    existingText.pageElement = element;
-                    existingText.updateControlVisibility();
+                existingText.pageElement = element;
+                existingText.updateControlVisibility();
 
-                    existingText.set({
-                        selectable: isInteractive,
-                        hasControls: isInteractive,
-                        evented: isInteractive,
-                        cornerSize: uiSizes.cornerSize,
-                        borderScaleFactor: uiSizes.borderScaleFactor,
-                    });
+                existingText.set({
+                    selectable: isInteractive,
+                    hasControls: isInteractive,
+                    evented: isInteractive,
+                    cornerSize: uiSizes.cornerSize,
+                    borderScaleFactor: uiSizes.borderScaleFactor,
+                });
 
-                    if (!(existingText as ExtendedFabricObject).preventLayoutSync) {
-                        existingText.syncFromRuns(element.content as TextContent);
-                        existingText.applyLayout(canvas.width, canvas.height);
-                    }
+                if (!(existingText as ExtendedFabricObject).preventLayoutSync) {
+                    existingText.syncFromRuns(element.content as TextContent);
+                    existingText.applyLayout(canvas.width, canvas.height);
                 }
             } else {
                 // Remove stale object of a different type
@@ -164,7 +160,7 @@ export async function renderSpread(
                     borderScaleFactor: uiSizes.borderScaleFactor,
                     interactive: isInteractive,
                 });
-                (canvasEl as CanvasTextElement & { hiddenTextareaContainer?: HTMLElement | null }).hiddenTextareaContainer = hiddenTextareaContainer;
+
 
                 canvas.add(canvasEl);
                 canvasEl.applyLayout(canvas.width, canvas.height);

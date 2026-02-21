@@ -85,6 +85,8 @@ export class CanvasTextElement extends fabric.Textbox {
             lockScalingY: true,
             selectable: options.interactive !== false,
             evented: options.interactive !== false,
+            // Text editing is handled by Tiptap overlay, not Fabric.
+            editable: false,
         });
 
         this.pageElement = element;
