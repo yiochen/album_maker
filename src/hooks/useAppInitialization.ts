@@ -33,7 +33,10 @@ export const useAppInitialization = () => {
     const init = async () => {
       try {
         // Initialize photo sources
-        await initializeSources();
+        // We catch errors here so source initialization failure doesn't block the app
+        await initializeSources().catch(err => {
+            console.warn('Source initialization failed/timed out, continuing app load:', err);
+        });
 
         if (!isMounted.current) return;
 
@@ -56,13 +59,13 @@ export const useAppInitialization = () => {
           albumToSet = migrated;
         } else {
           // Load from IndexedDB with a timeout to prevent infinite hangs
-          // (e.g., if IndexedDB is locked or corrupted)
+          // Increased to 5s to be safe in slower CI environments
           const loadPromise = albumStorage.loadCurrentAlbum();
           const timeoutPromise = new Promise<null>((resolve) =>
             setTimeout(() => {
               if (isMounted.current) console.warn('DB load timed out, falling back to new album');
               resolve(null);
-            }, 3000)
+            }, 5000)
           );
 
           const loadedAlbum = await Promise.race([loadPromise, timeoutPromise]);
