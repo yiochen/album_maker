@@ -3,6 +3,8 @@ import { googlePhotosSource } from './googlePhotos';
 import { dummyColorsSource } from './dummyColors';
 import { uploadPhotoSource } from './UploadPhotoSource';
 
+const SOURCE_INIT_TIMEOUT_MS = 5000;
+
 // Re-export types
 export * from './types';
 
@@ -39,9 +41,27 @@ export const unregisterSource = (id: string): boolean => {
 
 // Initialize all sources that need initialization
 export const initializeSources = async (): Promise<void> => {
+    const withTimeout = async (promise: Promise<void>): Promise<void> => {
+        let timeoutId: number | undefined;
+        try {
+            await Promise.race([
+                promise,
+                new Promise<void>((_, reject) => {
+                    timeoutId = window.setTimeout(() => {
+                        reject(new Error(`Initialization timed out after ${SOURCE_INIT_TIMEOUT_MS}ms`));
+                    }, SOURCE_INIT_TIMEOUT_MS);
+                }),
+            ]);
+        } finally {
+            if (timeoutId !== undefined) {
+                window.clearTimeout(timeoutId);
+            }
+        }
+    };
+
     const initPromises = Array.from(sources.values())
         .filter(isInitializableSource)
-        .map(source => source.initialize().catch(err => {
+        .map(source => withTimeout(source.initialize()).catch(err => {
             console.error(`Failed to initialize source ${source.id}:`, err);
         }));
 

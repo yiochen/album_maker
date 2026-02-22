@@ -7,6 +7,8 @@ import { GooglePhotosIcon } from '../components/icons/GooglePhotosIcon';
 const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/photoslibrary.readonly';
 const API_BASE = 'https://photoslibrary.googleapis.com/v1';
+const GSI_SCRIPT_ID = 'google-gsi-script';
+const GSI_INIT_TIMEOUT_MS = 5000;
 
 // Declare Google types (loaded dynamically via script)
 declare const google: {
@@ -52,20 +54,17 @@ class GooglePhotosSource implements PhotoSource, InitializableSource {
         if (this.initialized) return;
 
         return new Promise((resolve, reject) => {
-            // Load Google Identity Services script
-            if (document.getElementById('google-gsi-script')) {
-                this.initialized = true;
-                resolve();
-                return;
-            }
+            const timeoutIdRef: { current: number | undefined } = { current: undefined };
 
-            const script = document.createElement('script');
-            script.id = 'google-gsi-script';
-            script.src = 'https://accounts.google.com/gsi/client';
-            script.async = true;
-            script.defer = true;
+            const cleanup = (script: HTMLScriptElement, onLoad: () => void, onError: () => void): void => {
+                script.removeEventListener('load', onLoad);
+                script.removeEventListener('error', onError);
+                if (timeoutIdRef.current !== undefined) {
+                    window.clearTimeout(timeoutIdRef.current);
+                }
+            };
 
-            script.onload = () => {
+            const finishInitialization = (): void => {
                 tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: CLIENT_ID,
                     scope: SCOPES,
@@ -75,11 +74,39 @@ class GooglePhotosSource implements PhotoSource, InitializableSource {
                 resolve();
             };
 
-            script.onerror = () => {
+            let script = document.getElementById(GSI_SCRIPT_ID) as HTMLScriptElement | null;
+            if (!script) {
+                script = document.createElement('script');
+                script.id = GSI_SCRIPT_ID;
+                script.src = 'https://accounts.google.com/gsi/client';
+                script.async = true;
+                script.defer = true;
+                document.head.appendChild(script);
+            }
+
+            // If already loaded, initialize immediately.
+            if (typeof google !== 'undefined' && google.accounts?.oauth2) {
+                finishInitialization();
+                return;
+            }
+
+            const onLoad = (): void => {
+                cleanup(script!, onLoad, onError);
+                finishInitialization();
+            };
+
+            const onError = (): void => {
+                cleanup(script!, onLoad, onError);
                 reject(new Error('Failed to load Google Identity Services'));
             };
 
-            document.head.appendChild(script);
+            script.addEventListener('load', onLoad);
+            script.addEventListener('error', onError);
+
+            timeoutIdRef.current = window.setTimeout(() => {
+                cleanup(script!, onLoad, onError);
+                reject(new Error(`Google Identity Services load timed out after ${GSI_INIT_TIMEOUT_MS}ms`));
+            }, GSI_INIT_TIMEOUT_MS);
         });
     }
 
