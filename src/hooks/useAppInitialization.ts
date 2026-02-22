@@ -37,7 +37,7 @@ export const useAppInitialization = () => {
 
         if (!isMounted.current) return;
 
-        let albumToSet: Album;
+        let albumToSet: Album | null = null;
 
         // Check for legacy localStorage data and migrate
         const legacyAlbum = loadFromLocalStorage();
@@ -55,17 +55,30 @@ export const useAppInitialization = () => {
           clearLocalStorage();
           albumToSet = migrated;
         } else {
-          // Load from IndexedDB
-          const album = await albumStorage.loadCurrentAlbum();
-          // Ensure settings exist
-          if (!album.settings) {
-            album.settings = { ...APP_CONFIG.DEFAULT_ALBUM_SETTINGS };
+          // Load from IndexedDB with a timeout to prevent infinite hangs
+          // (e.g., if IndexedDB is locked or corrupted)
+          const loadPromise = albumStorage.loadCurrentAlbum();
+          const timeoutPromise = new Promise<null>((resolve) =>
+            setTimeout(() => {
+              if (isMounted.current) console.warn('DB load timed out, falling back to new album');
+              resolve(null);
+            }, 3000)
+          );
+
+          const loadedAlbum = await Promise.race([loadPromise, timeoutPromise]);
+
+          if (loadedAlbum) {
+            // Ensure settings exist
+            if (!loadedAlbum.settings) {
+              loadedAlbum.settings = { ...APP_CONFIG.DEFAULT_ALBUM_SETTINGS };
+            }
+            albumToSet = loadedAlbum;
           }
-          albumToSet = album;
         }
 
         if (isMounted.current) {
-          setAlbum(albumToSet);
+          // If loading failed or timed out, create a new album
+          setAlbum(albumToSet || createNewAlbum());
         }
       } catch (error) {
         console.error('Failed to initialize app:', error);
@@ -98,6 +111,8 @@ export const useAppInitialization = () => {
 
     return () => {
       isMounted.current = false;
+      // Close the DB connection on unmount to prevent locking issues in tests
+      db.close();
     };
   }, [setAlbum]);
 
