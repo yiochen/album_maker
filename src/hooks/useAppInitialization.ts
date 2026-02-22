@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Album } from '../types';
 import { APP_CONFIG } from '../config';
 import {
@@ -16,7 +16,7 @@ import { db } from '../db';
  *
  * Responsibilities:
  * 1. Initializes external photo sources.
- * 2. Checks for legacy data in localStorage and migrates it to IndexedDB.
+ * 2. Checks for legacy localStorage data and migrates it to IndexedDB.
  * 3. Loads the most recent album from IndexedDB (or creates a new one).
  * 4. Handles database errors by optionally clearing the DB and resetting.
  *
@@ -25,12 +25,17 @@ import { db } from '../db';
 export const useAppInitialization = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { setAlbum } = useAlbumStore();
+  const isMounted = useRef(false);
 
   useEffect(() => {
+    isMounted.current = true;
+
     const init = async () => {
       try {
         // Initialize photo sources
         await initializeSources();
+
+        if (!isMounted.current) return;
 
         let albumToSet: Album;
 
@@ -58,9 +63,15 @@ export const useAppInitialization = () => {
           }
           albumToSet = album;
         }
-        setAlbum(albumToSet);
+
+        if (isMounted.current) {
+          setAlbum(albumToSet);
+        }
       } catch (error) {
         console.error('Failed to initialize app:', error);
+
+        // Prevent multiple resets if unmounted
+        if (!isMounted.current) return;
 
         if (APP_CONFIG.CLEAR_INDEX_DB_ON_LOAD_ERROR) {
           console.warn('Clearing IndexedDB due to load error...');
@@ -73,13 +84,21 @@ export const useAppInitialization = () => {
         }
 
         // Fallback to new album
-        setAlbum(createNewAlbum());
+        if (isMounted.current) {
+          setAlbum(createNewAlbum());
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted.current) {
+          setIsLoading(false);
+        }
       }
     };
 
     init();
+
+    return () => {
+      isMounted.current = false;
+    };
   }, [setAlbum]);
 
   return { isLoading };
