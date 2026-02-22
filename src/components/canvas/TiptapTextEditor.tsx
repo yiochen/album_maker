@@ -191,7 +191,41 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         };
     }, [editor, handleSave]);
 
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+        const startX = e.clientX;
+        const startWidth = width;
+        const overlay = e.currentTarget.closest('.tiptap-text-editor-overlay') as HTMLElement;
+        if (!overlay) return;
+
+        const handlePointerMove = (moveEvent: PointerEvent) => {
+            // Horizontal change in screen pixels
+            const dx = moveEvent.clientX - startX;
+            // Convert screen change to canvas-equivalent change
+            const dxCanvas = dx / (canvasZoom / 100);
+            const newWidth = Math.max(50, startWidth + dxCanvas);
+            overlay.style.width = `${newWidth}px`;
+        };
+
+        const handlePointerUp = () => {
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+        };
+
+        document.addEventListener('pointermove', handlePointerMove);
+        document.addEventListener('pointerup', handlePointerUp);
+
+        e.preventDefault();
+        e.stopPropagation();
+    }, [width, canvasZoom]);
+
     if (!editor) return null;
+
+    // UI elements (border, handles) are inside the scaled wrapper,
+    // so we must inversely scale them to keep them a constant physical size.
+    const zoomScale = 100 / canvasZoom;
+    const borderWidth = 2 * zoomScale;
+    const handleWidth = 4 * zoomScale; // The visual bar
+    const handleTouchArea = 24 * zoomScale; // Easy to grab
 
     return (
         <div
@@ -205,18 +239,49 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
                 minHeight: height,
                 zIndex: 100,
                 boxSizing: 'border-box',
-                background: 'rgba(255, 255, 255, 0.95)',
-                border: '2px solid var(--color-accent, #4A90D9)',
-                borderRadius: '2px',
-                resize: 'horizontal',
-                overflow: 'hidden',
-                paddingRight: '12px', // space for resize handle
+                background: 'rgba(255, 255, 255, 0.98)',
+                border: `${borderWidth}px solid var(--color-accent, #4A90D9)`,
+                borderRadius: `${2 * zoomScale}px`,
+                overflow: 'visible', // Allow handle to stick out slightly if needed
+                paddingRight: handleWidth + 2 * zoomScale,
+                transition: 'border-color 0.2s',
             }}
             // Prevent clicks from propagating to the canvas
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
         >
             <EditorContent editor={editor} />
+
+            {/* Custom Resize Handle (Corner Style) */}
+            <div
+                className="resize-handle"
+                onPointerDown={handlePointerDown}
+                style={{
+                    position: 'absolute',
+                    right: 0,
+                    bottom: 0,
+                    width: handleTouchArea,
+                    height: handleTouchArea,
+                    cursor: 'nwse-resize',
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'flex-end',
+                    background: 'transparent',
+                    zIndex: 10,
+                    padding: 2 * zoomScale,
+                }}
+            >
+                <svg
+                    width={10 * zoomScale}
+                    height={10 * zoomScale}
+                    viewBox="0 0 10 10"
+                    style={{ opacity: 0.5, pointerEvents: 'none', marginBottom: 2 * zoomScale, marginRight: 2 * zoomScale }}
+                >
+                    <line x1="10" y1="2" x2="2" y2="10" stroke="var(--color-accent, #4A90D9)" strokeWidth="1" />
+                    <line x1="10" y1="5" x2="5" y2="10" stroke="var(--color-accent, #4A90D9)" strokeWidth="1" />
+                    <line x1="10" y1="8" x2="8" y2="10" stroke="var(--color-accent, #4A90D9)" strokeWidth="1" />
+                </svg>
+            </div>
         </div>
     );
 };
