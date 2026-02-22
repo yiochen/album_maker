@@ -177,24 +177,14 @@ export function extractLayoutFromDOM(
 
                     const xPt = pxToPt(charLeftPx);
 
-                    // The trick: characters on the same line will have identical (or very close) `charRect.bottom` values.
-                    // We can't rely solely on the injected baseline marker for wrapped lines because a single text node
-                    // might wrap and we only injected one marker at its start!
-                    // Let's use `findBaselineForTop(charTopPx)` but we MUST realize that if a word wraps, 
-                    // its `charRect.top` moves down, so it will find a DIFFERENT baseline marker ONLY IF there's one on that line.
-                    // Actually, if there's not one on that line, `findBaselineForTop(charTopPx)` will find the closest one.
-                    // Wait, if it's the SAME DOM text node wrapping, there IS NO baseline marker on the 2nd line!
-                    // Let's use `charRect.bottom` to group them into runs directly!
+                    // Characters on the same line typically share similar `charRect.bottom` values.
+                    // We attempt to find an injected baseline marker for the current line using `findBaselineForTop`.
+                    // However, wrapped lines within a single text node may lack a marker.
+                    // In such cases, or if no marker is close, we fallback to estimating the baseline from `charRect.bottom`.
 
-                    // We can estimate the baseline from the charBottom bounds minus a small descent offset, 
-                    // or just use `charRect.bottom` directly to detect line breaks within the same node.
-                    // Let's detect if this character is visually lower than the last one in the current run.
+                    // We also track line breaks by monitoring significant changes in the character's top coordinate (`charTopPx`).
                     const lastRun = runs[runs.length - 1];
                     const isStyleEqualValues = isStyleEqual(lastRun?.style, styleKeysLength > 0 ? style : undefined);
-
-                    // Fabric texts are typically positioned by top-left or bottom-left.
-                    // Let's just use the `findBaselineForTop(charTopPx)` but add a fallback if it fails.
-                    // Actually, the simplest fix is to consider characters on a new line if their `top` drastically changes!
 
                     const markerBaseline = findBaselineForTop(charTopPx);
                     // Standard fonts have a descent of ~10-20% of their size.
