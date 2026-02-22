@@ -77,16 +77,14 @@ export class CanvasTextElement extends fabric.Textbox {
             lineHeight: textContent.lineHeight,
             styles: convertedStyles,
             lockRotation: true,
-            // Keep long unbroken strings wrapping within the textbox width.
-            splitByGrapheme: true,
+            // Keep long unbroken strings wrapping within the textbox width but prefer word boundaries.
+            splitByGrapheme: false,
             // Text width is resizable; height is auto by content.
             uniformScaling: false,
             lockUniScaling: false,
             lockScalingY: true,
             selectable: options.interactive !== false,
             evented: options.interactive !== false,
-            // Text editing is handled by Tiptap overlay, not Fabric.
-            editable: false,
         });
 
         this.pageElement = element;

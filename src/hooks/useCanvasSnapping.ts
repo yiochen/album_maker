@@ -10,7 +10,7 @@
  */
 import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
-import type { ImageContent } from '../types';
+import type { ImageContent, TextContent } from '../types';
 import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 import { CustomFabricObject } from './fabricTypes';
 import { getZoomCompensatedSizes } from '../utils/fabricRenderer';
@@ -169,13 +169,11 @@ export const useCanvasSnapping = ({
                         contentTransform: imageContent.contentTransform,
                     }
                 });
-                // Handle text elements
             } else if (obj instanceof CanvasTextElement) {
                 obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
-                const updatedContent = obj.syncToRuns();
                 onElementUpdateRef.current(spreadRef.current.id, obj.pageElement.id, {
                     box: obj.pageElement.box,
-                    content: updatedContent,
+                    content: obj.pageElement.content as TextContent, // Preserve existing content
                 });
             }
         };

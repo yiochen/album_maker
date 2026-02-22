@@ -129,7 +129,6 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         el.style.textAlign = textAlign;
     }, [editor, textAlign]);
 
-    // Save handler — convert Tiptap doc back to TextRun[]
     const handleSave = useCallback(() => {
         if (!editor) return;
 

@@ -118,14 +118,13 @@ export const useTextEditing = ({
         if (!fabricCanvas) return;
 
         const handleDblClick = (e: fabric.TPointerEventInfo) => {
-            const target = fabricCanvas.findTarget(e.e);
-            if (target instanceof CanvasTextElement) {
-                const id = target.pageElement.id;
-                const content = target.pageElement.content as TextContent;
+            if (e.target instanceof CanvasTextElement) {
+                const id = e.target.pageElement.id;
+                const content = e.target.pageElement.content as TextContent;
 
                 setEditingTextElementId(id);
                 setCurrentTextAlign(content.textAlign);
-                updateToolbarPosition(target);
+                updateToolbarPosition(e.target);
 
                 // Deselect the Fabric object so it doesn't interfere
                 fabricCanvas.discardActiveObject();
@@ -140,14 +139,28 @@ export const useTextEditing = ({
     }, [fabricCanvas, setEditingTextElementId, updateToolbarPosition]);
 
     // Save handler
-    const handleSave = useCallback((content: TextContent) => {
+    const handleSave = useCallback((newContent: TextContent) => {
         const spread = spreadsRef.current[currentSpreadIndexRef.current];
-        if (spread && editingTextElementId) {
-            updateElementRef.current(spread.id, editingTextElementId, { content });
+        if (spread && editingTextElementId && fabricCanvas) {
+            let finalContent = newContent;
+
+            // Find the Fabric object
+            const textObj = (fabricCanvas.getObjects() as fabric.FabricObject[])
+                .find(o => o instanceof CanvasTextElement && o.pageElement.id === editingTextElementId) as CanvasTextElement | undefined;
+
+            if (textObj) {
+                // 1. Temporarily apply the new text/styles to Fabric so it computes its internal text layout
+                textObj.syncFromRuns(newContent);
+                // 2. Extract the beautifully laid-out coordinates (x, baselineY) back into the runs
+                // This ensures the offscreen exporter perfectly matches Fabric's canvas rendering!
+                finalContent = textObj.syncToRuns();
+            }
+
+            updateElementRef.current(spread.id, editingTextElementId, { content: finalContent });
         }
         setEditingTextElementId(null);
         setToolbarPosition(null);
-    }, [editingTextElementId, setEditingTextElementId]);
+    }, [editingTextElementId, setEditingTextElementId, fabricCanvas]);
 
     // Cancel handler
     const handleCancel = useCallback(() => {

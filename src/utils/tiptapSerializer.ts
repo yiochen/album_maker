@@ -66,11 +66,13 @@ export function textContentToTiptapDoc(content: TextContent): JSONContent {
 /**
  * Convert Tiptap JSONContent → TextContent (preserving existing defaultStyle/textAlign/lineHeight).
  *
+ * It performs a simple structure conversion into flat text runs (without layout coordinates).
+ *
  * Only updates `runs` — the caller should preserve other TextContent fields.
  */
 export function tiptapDocToTextRuns(
     doc: JSONContent,
-    defaultStyle: Required<TextStyle>,
+    defaultStyle: Required<TextStyle>
 ): TextRun[] {
     const runs: TextRun[] = [];
     const paragraphs = doc.content ?? [];
