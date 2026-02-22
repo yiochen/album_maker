@@ -1,6 +1,7 @@
 import * as fabric from 'fabric';
 import { useCanvasSelection } from './useCanvasSelection';
 import { useCanvasSnapping } from './useCanvasSnapping';
+import { useCanvasPersistence } from './useCanvasPersistence';
 import { useCanvasKeyboardEvents } from './useCanvasKeyboardEvents';
 
 /**
@@ -51,6 +52,12 @@ export const useCanvasInteraction = ({
         canvasHeight,
         zoom,
         snapLinesRef,
+    });
+
+    useCanvasPersistence({
+        fabricCanvas,
+        canvasWidth,
+        canvasHeight,
     });
 
     return {

@@ -1,5 +1,5 @@
 import * as fabric from 'fabric';
-import { Spread, AlbumSettings, isImageElement, isTextElement, TextContent } from '../types';
+import { Spread, AlbumSettings, isImageElement, isTextElement } from '../types';
 import { CanvasImageElement } from '../hooks/CanvasImageElement';
 import { CanvasTextElement } from '../hooks/CanvasTextElement';
 import { CustomFabricObject, ExtendedFabricObject } from '../hooks/fabricTypes';
@@ -143,7 +143,7 @@ export async function renderSpread(
                 });
 
                 if (!(existingText as ExtendedFabricObject).preventLayoutSync) {
-                    existingText.syncFromRuns(element.content as TextContent);
+                    existingText.syncFromRuns();
                     existingText.applyLayout(canvas.width, canvas.height);
                 }
             } else {
@@ -151,13 +151,6 @@ export async function renderSpread(
                 if (existingObj) canvas.remove(existingObj);
 
                 const canvasEl = new CanvasTextElement(element, options.ppi, {
-                    cornerStyle: 'circle',
-                    cornerColor: 'white',
-                    cornerStrokeColor: '#333',
-                    borderColor: '#333',
-                    transparentCorners: false,
-                    cornerSize: uiSizes.cornerSize,
-                    borderScaleFactor: uiSizes.borderScaleFactor,
                     interactive: isInteractive,
                 });
 

@@ -11,7 +11,7 @@
 import { useCallback } from 'react';
 import type { PageElement, PoolImage, TextContent } from '../types';
 import { useAddElement, useUpdateElement, useDeleteElement, useAlbumSettings } from '../states/albumStore';
-import { useSetSelectedElementId, useSetSelectedPageId } from '../states/uiStore';
+import { useSetSelectedElementId, useSetSelectedPageId, useSetEditingTextElementId } from '../states/uiStore';
 import { calculateThumbnailSize } from '../utils/imageUtils';
 import { APP_CONFIG } from '../config';
 
@@ -33,6 +33,7 @@ export const useElementActions = () => {
     const deleteElement = useDeleteElement();
     const setSelectedElementId = useSetSelectedElementId();
     const setSelectedPageId = useSetSelectedPageId();
+    const setEditingTextElementId = useSetEditingTextElementId();
 
     const settings = useAlbumSettings();
     const ppi = APP_CONFIG.PPI;
@@ -153,7 +154,7 @@ export const useElementActions = () => {
                 id: crypto.randomUUID(),
                 type: 'text',
                 content: {
-                    runs: [{ text: 'Hello' }],
+                    runs: [{ text: '' }],
                     defaultStyle,
                     textAlign: 'left',
                     lineHeight: 1.2,
@@ -164,8 +165,9 @@ export const useElementActions = () => {
             addElement(spreadId, newElement);
             setSelectedElementId(newElement.id);
             setSelectedPageId(spreadId);
+            setEditingTextElementId(newElement.id);
         },
-        [addElement, setSelectedElementId, setSelectedPageId, settings]
+        [addElement, setSelectedElementId, setSelectedPageId, setEditingTextElementId, settings]
     );
 
     return {

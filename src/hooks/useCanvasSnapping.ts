@@ -10,14 +10,11 @@
  */
 import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
-import type { ImageContent, TextContent } from '../types';
 import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
 import { CustomFabricObject } from './fabricTypes';
 import { getZoomCompensatedSizes } from '../utils/fabricRenderer';
-import { CanvasImageElement } from './CanvasImageElement';
-import { CanvasTextElement } from './CanvasTextElement';
 import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
-import { useAlbumSpreads, useUpdateElement } from '../states/albumStore';
+import { useAlbumSpreads } from '../states/albumStore';
 
 /**
  * Props for useCanvasSnapping.
@@ -50,20 +47,16 @@ export const useCanvasSnapping = ({
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const spread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
-    const onElementUpdate = useUpdateElement();
-
-    const onElementUpdateRef = useRef(onElementUpdate);
     const spreadRef = useRef(spread);
     const isSnappingEnabledRef = useRef(isSnappingEnabled);
     // Cache UI sizes to avoid recalculating on every mouse move
     const uiSizesRef = useRef(getZoomCompensatedSizes(zoom));
 
     useEffect(() => {
-        onElementUpdateRef.current = onElementUpdate;
         spreadRef.current = spread;
         isSnappingEnabledRef.current = isSnappingEnabled;
         uiSizesRef.current = getZoomCompensatedSizes(zoom);
-    }, [onElementUpdate, spread, isSnappingEnabled, zoom]);
+    }, [spread, isSnappingEnabled, zoom]);
 
     useEffect(() => {
         const canvas = fabricCanvas;
@@ -148,42 +141,10 @@ export const useCanvasSnapping = ({
             // No constraints - allow elements to move freely including outside canvas (bleed)
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const handleObjectModified = (e: { target?: fabric.Object; transform?: any }) => {
-            const obj = e.target;
-            if (!obj) return;
-
-            if (snapLinesRef.current) {
-                snapLinesRef.current.forEach(line => canvas.remove(line));
-                snapLinesRef.current.length = 0;
-            }
-
-            // Handle image elements
-            if (obj instanceof CanvasImageElement) {
-                obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
-                const imageContent = obj.pageElement.content as ImageContent;
-                onElementUpdateRef.current(spreadRef.current.id, obj.pageElement.id, {
-                    box: obj.pageElement.box,
-                    content: {
-                        ...imageContent,
-                        contentTransform: imageContent.contentTransform,
-                    }
-                });
-            } else if (obj instanceof CanvasTextElement) {
-                obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
-                onElementUpdateRef.current(spreadRef.current.id, obj.pageElement.id, {
-                    box: obj.pageElement.box,
-                    content: obj.pageElement.content as TextContent, // Preserve existing content
-                });
-            }
-        };
-
         canvas.on('object:moving', handleObjectMoving);
-        canvas.on('object:modified', handleObjectModified);
 
         return () => {
             canvas.off('object:moving', handleObjectMoving);
-            canvas.off('object:modified', handleObjectModified);
         };
     }, [fabricCanvas, canvasWidth, canvasHeight, snapLinesRef]);
 };

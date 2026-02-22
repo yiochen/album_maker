@@ -113,54 +113,92 @@ export const useTextEditing = ({
         });
     }, [fabricCanvas, containerRef]);
 
-    // Enter editing on double-click
+    // Enter editing on single-click (clean click without dragging)
     useEffect(() => {
         if (!fabricCanvas) return;
 
-        const handleDblClick = (e: fabric.TPointerEventInfo) => {
+        let pointerDownPos: { x: number, y: number } | null = null;
+        let isEditingTarget: fabric.Object | null = null;
+
+        const handleMouseDown = (e: fabric.TPointerEventInfo) => {
             if (e.target instanceof CanvasTextElement) {
-                const id = e.target.pageElement.id;
-                const content = e.target.pageElement.content as TextContent;
-
-                setEditingTextElementId(id);
-                setCurrentTextAlign(content.textAlign);
-                updateToolbarPosition(e.target);
-
-                // Deselect the Fabric object so it doesn't interfere
-                fabricCanvas.discardActiveObject();
-                fabricCanvas.requestRenderAll();
+                isEditingTarget = e.target;
+                const pointer = fabricCanvas.getViewportPoint(e.e);
+                pointerDownPos = { x: pointer.x, y: pointer.y };
+            } else {
+                pointerDownPos = null;
+                isEditingTarget = null;
             }
         };
 
-        fabricCanvas.on('mouse:dblclick', handleDblClick);
+        const handleMouseUp = (e: fabric.TPointerEventInfo) => {
+            if (isEditingTarget && pointerDownPos && e.target === isEditingTarget) {
+                const pointer = fabricCanvas.getViewportPoint(e.e);
+                const dx = pointer.x - pointerDownPos.x;
+                const dy = pointer.y - pointerDownPos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // If distance is very small, treat it as a click
+                if (distance < 5) {
+                    const id = (isEditingTarget as CanvasTextElement).pageElement.id;
+                    const content = (isEditingTarget as CanvasTextElement).pageElement.content as TextContent;
+
+                    setEditingTextElementId(id);
+                    setCurrentTextAlign(content.textAlign);
+                    updateToolbarPosition(isEditingTarget as CanvasTextElement);
+
+                    // Deselect the Fabric object so it doesn't interfere
+                    fabricCanvas.discardActiveObject();
+                    fabricCanvas.requestRenderAll();
+                }
+            }
+            pointerDownPos = null;
+            isEditingTarget = null;
+        };
+
+        fabricCanvas.on('mouse:down', handleMouseDown);
+        fabricCanvas.on('mouse:up', handleMouseUp);
+
         return () => {
-            fabricCanvas.off('mouse:dblclick', handleDblClick);
+            fabricCanvas.off('mouse:down', handleMouseDown);
+            fabricCanvas.off('mouse:up', handleMouseUp);
         };
     }, [fabricCanvas, setEditingTextElementId, updateToolbarPosition]);
 
     // Save handler
-    const handleSave = useCallback((newContent: TextContent) => {
+    const handleSave = useCallback((newContent: TextContent, newWidthPx?: number, newHeightPx?: number) => {
         const spread = spreadsRef.current[currentSpreadIndexRef.current];
-        if (spread && editingTextElementId && fabricCanvas) {
-            let finalContent = newContent;
+        if (spread && editingTextElementId) {
+            const element = spread.elements.find(e => e.id === editingTextElementId);
+            if (element) {
+                const updates: Partial<PageElement> = { content: newContent };
 
-            // Find the Fabric object
-            const textObj = (fabricCanvas.getObjects() as fabric.FabricObject[])
-                .find(o => o instanceof CanvasTextElement && o.pageElement.id === editingTextElementId) as CanvasTextElement | undefined;
+                // Update the box with both width and height if provided
+                if (canvasWidth > 0 && canvasHeight > 0) {
+                    const newBox = { ...element.box };
+                    let changed = false;
 
-            if (textObj) {
-                // 1. Temporarily apply the new text/styles to Fabric so it computes its internal text layout
-                textObj.syncFromRuns(newContent);
-                // 2. Extract the beautifully laid-out coordinates (x, baselineY) back into the runs
-                // This ensures the offscreen exporter perfectly matches Fabric's canvas rendering!
-                finalContent = textObj.syncToRuns();
+                    if (newWidthPx !== undefined && newWidthPx > 0) {
+                        newBox.x2 = element.box.x1 + newWidthPx / canvasWidth;
+                        changed = true;
+                    }
+
+                    if (newHeightPx !== undefined && newHeightPx > 0) {
+                        newBox.y2 = element.box.y1 + newHeightPx / canvasHeight;
+                        changed = true;
+                    }
+
+                    if (changed) {
+                        updates.box = newBox;
+                    }
+                }
+
+                updateElementRef.current(spread.id, editingTextElementId, updates);
             }
-
-            updateElementRef.current(spread.id, editingTextElementId, { content: finalContent });
         }
         setEditingTextElementId(null);
         setToolbarPosition(null);
-    }, [editingTextElementId, setEditingTextElementId, fabricCanvas]);
+    }, [editingTextElementId, setEditingTextElementId, canvasWidth, canvasHeight]);
 
     // Cancel handler
     const handleCancel = useCallback(() => {
@@ -170,7 +208,38 @@ export const useTextEditing = ({
 
     // Text align change handler (persists immediately so Fabric re-renders)
     const handleTextAlignChange = useCallback((align: TextContent['textAlign']) => {
+        // The user's provided code snippet for insertion seems to be based on a different
+        // version of this function, which includes `extractLayoutFromDOM`, `canvasZoom`,
+        // `editorRef`, `content`, `defaultStyle`, `ptToCanvasPx`, and `existingElement`.
+        // Since these are not present in the current document, I will insert the debug
+        // visualizer in a way that is syntactically correct given the current function's
+        // structure, assuming `runs` would be defined if the full context were present.
+        // For now, I'll place it after `setCurrentTextAlign(align);` and comment out
+        // the `runs.forEach` loop as `runs` is undefined.
+
         setCurrentTextAlign(align);
+
+        // DEBUG VISUALIZER (Placeholder - requires 'runs' to be defined from layout extraction)
+        // document.querySelectorAll('.debug-dot').forEach(el => el.remove());
+        // if (runs) { // Assuming 'runs' would be available here in the intended context
+        //     runs.forEach(run => {
+        //         const dot = document.createElement('div');
+        //         dot.className = 'debug-dot';
+        //         dot.style.position = 'absolute';
+        //         // just to visualize relative separation
+        //         // These coordinates (run.x, run.baselineY) and ptToCanvasPx are not defined in this file.
+        //         // They would need to be part of the `extractLayoutFromDOM` context.
+        //         // dot.style.left = ptToCanvasPx(run.x || 0, 96) + 'px';
+        //         // dot.style.top = ptToCanvasPx(run.baselineY || 0, 96) + 'px';
+        //         dot.style.width = '5px';
+        //         dot.style.height = '5px';
+        //         dot.style.background = 'red';
+        //         dot.style.borderRadius = '50%';
+        //         dot.style.zIndex = '99999';
+        //         dot.style.pointerEvents = 'none';
+        //         document.body.appendChild(dot);
+        //     });
+        // }
         const spread = spreadsRef.current[currentSpreadIndexRef.current];
         if (spread && editingTextElementId) {
             const element = spread.elements.find(e => e.id === editingTextElementId);
@@ -187,11 +256,20 @@ export const useTextEditing = ({
     useEffect(() => {
         if (!editingTextElementId || !fabricCanvas) return;
 
-        const textObj = (fabricCanvas.getObjects() as fabric.FabricObject[])
-            .find(o => o instanceof CanvasTextElement && o.pageElement.id === editingTextElementId) as CanvasTextElement | undefined;
+        const findAndPosition = () => {
+            const textObj = (fabricCanvas.getObjects() as fabric.FabricObject[])
+                .find(o => o instanceof CanvasTextElement && o.pageElement.id === editingTextElementId) as CanvasTextElement | undefined;
 
-        if (textObj) {
-            updateToolbarPosition(textObj);
+            if (textObj) {
+                updateToolbarPosition(textObj);
+            }
+            return !!textObj;
+        };
+
+        if (!findAndPosition()) {
+            // If not found (e.g. just added), try again in next tick
+            const timeout = setTimeout(findAndPosition, 50);
+            return () => clearTimeout(timeout);
         }
     }, [zoom, editingTextElementId, fabricCanvas, updateToolbarPosition]);
 

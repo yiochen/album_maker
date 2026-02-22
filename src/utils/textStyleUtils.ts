@@ -16,6 +16,32 @@ import type { TextRun, TextStyle } from '../types';
 export type FabricStyleMap = Record<number, Record<number, Partial<TextStyle>>>;
 
 /**
+ * Convert font size from points to canvas pixels.
+ * 1 pt = 1/72 inch. Canvas pixels = inches × PPI.
+ */
+export function ptToCanvasPx(pt: number, ppi: number): number {
+    return (pt * ppi) / 72;
+}
+
+/**
+ * Convert font size from canvas pixels back to points.
+ */
+export function canvasPxToPt(px: number, ppi: number): number {
+    return (px * 72) / ppi;
+}
+
+/**
+ * Convert a TextStyle (in pt) to Fabric-compatible style properties (in px).
+ * Only converts fontSize; other properties pass through as-is.
+ */
+export function textStyleToPx(style: Required<TextStyle>, ppi: number): Required<TextStyle> {
+    return {
+        ...style,
+        fontSize: ptToCanvasPx(style.fontSize, ppi),
+    };
+}
+
+/**
  * Convert TextRun[] → plain text string + Fabric.js per-character style map.
  *
  * Only style properties that differ from `defaultStyle` are included in the output map,

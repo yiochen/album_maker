@@ -267,6 +267,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                                     box={editingElement.box}
                                     canvasWidth={canvasWidth}
                                     canvasHeight={canvasHeight}
+                                    canvasZoom={zoom}
                                     onSave={handleSave}
                                     onCancel={handleCancel}
                                     onEditorReady={handleEditorReady}

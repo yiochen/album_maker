@@ -19,7 +19,8 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import FontFamily from '@tiptap/extension-font-family';
 import { FontSize } from '../../extensions/tiptapFontSize';
-import { textContentToTiptapDoc, tiptapDocToTextRuns } from '../../utils/tiptapSerializer';
+import { textContentToTiptapDoc } from '../../utils/tiptapSerializer';
+import { extractLayoutFromDOM } from '../../utils/domLayoutExtractor';
 import type { TextContent, NormalizedRect } from '../../types';
 
 /** Props for the overlay position and styling. */
@@ -32,8 +33,8 @@ interface TiptapTextEditorProps {
     canvasWidth: number;
     /** Canvas height in px (at canvas PPI). */
     canvasHeight: number;
-    /** Called when editing is complete with updated content. */
-    onSave: (content: TextContent) => void;
+    /** Called when editing is complete with updated content. Optional width/height update for resizing. */
+    onSave: (content: TextContent, newWidthPx?: number, newHeightPx?: number) => void;
     /** Called when the user cancels editing (Escape). */
     onCancel: () => void;
     /** Called with the editor instance once it's ready (for toolbar integration). */
@@ -42,6 +43,8 @@ interface TiptapTextEditorProps {
     onEditorDestroy?: () => void;
     /** Current text alignment (controlled externally so toolbar can update it). */
     textAlign: TextContent['textAlign'];
+    /** Current canvas zoom percentage to scale layout values properly */
+    canvasZoom: number;
 }
 
 export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
@@ -54,6 +57,7 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
     onEditorReady,
     onEditorDestroy,
     textAlign,
+    canvasZoom,
 }) => {
     const { defaultStyle } = content;
 
@@ -133,14 +137,26 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         if (!editor) return;
 
         const doc = editor.getJSON();
-        const runs = tiptapDocToTextRuns(doc, defaultStyle);
+        const editorEl = editor.view.dom as HTMLElement;
+        const containerEl = editorEl.closest('.tiptap-text-editor-overlay') as HTMLElement;
+        const finalWidthPx = containerEl?.offsetWidth;
+        const finalHeightPx = containerEl?.offsetHeight;
+
+        // Extract pixel-perfect layout from the DOM directly!
+        const runs = extractLayoutFromDOM(
+            editorEl,
+            doc,
+            defaultStyle as Required<import('../../types').TextStyle>,
+            canvasWidth,
+            canvasZoom
+        );
 
         onSave({
             ...content,
             runs,
             textAlign,
-        });
-    }, [editor, defaultStyle, content, textAlign, onSave]);
+        }, finalWidthPx, finalHeightPx);
+    }, [editor, defaultStyle, content, textAlign, canvasWidth, canvasZoom, onSave]);
 
     // Handle Escape key
     useEffect(() => {
@@ -192,6 +208,9 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
                 background: 'rgba(255, 255, 255, 0.95)',
                 border: '2px solid var(--color-accent, #4A90D9)',
                 borderRadius: '2px',
+                resize: 'horizontal',
+                overflow: 'hidden',
+                paddingRight: '12px', // space for resize handle
             }}
             // Prevent clicks from propagating to the canvas
             onMouseDown={(e) => e.stopPropagation()}
