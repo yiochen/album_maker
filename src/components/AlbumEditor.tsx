@@ -21,7 +21,8 @@ import {
   useSetCurrentSpreadIndex,
   useSetImagePoolOpen,
   useSetSettingsOpen,
-  useSetSnappingEnabled
+  useSetSnappingEnabled,
+  useEditingTextElementId,
 } from '../states/uiStore';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -63,6 +64,7 @@ export const AlbumEditor: React.FC = () => {
   const setImagePoolOpen = useSetImagePoolOpen();
   const setSettingsOpen = useSetSettingsOpen();
   const setSnappingEnabled = useSetSnappingEnabled();
+  const editingTextElementId = useEditingTextElementId();
 
   // Auto-save
   useAutoSave();
@@ -87,10 +89,12 @@ export const AlbumEditor: React.FC = () => {
     return album?.spreads[currentSpreadIndex];
   }, [album, currentSpreadIndex]);
 
+  const effectiveSelectedElementId = selectedElementId || editingTextElementId;
+
   const selectedElement = useMemo(() => {
-    if (!selectedElementId || !currentSpread) return null;
-    return currentSpread.elements.find((e: PageElement) => e.id === selectedElementId) || null;
-  }, [currentSpread, selectedElementId]);
+    if (!effectiveSelectedElementId || !currentSpread) return null;
+    return currentSpread.elements.find((e: PageElement) => e.id === effectiveSelectedElementId) || null;
+  }, [currentSpread, effectiveSelectedElementId]);
 
   // Ensure currentSpreadIndex is valid
   if (album && currentSpreadIndex > Math.max(0, album.spreads.length - 1)) {
@@ -149,13 +153,13 @@ export const AlbumEditor: React.FC = () => {
               selectedElement={selectedElement}
               selectedPageId={selectedPageId}
               onElementUpdate={(updates, groupId) => {
-                if (selectedElementId && selectedPageId) {
-                  handleElementUpdate(selectedPageId, selectedElementId, updates, groupId);
+                if (effectiveSelectedElementId && selectedPageId) {
+                  handleElementUpdate(selectedPageId, effectiveSelectedElementId, updates, groupId);
                 }
               }}
               onElementDelete={() => {
-                if (selectedElementId && selectedPageId) {
-                  handleElementDelete(selectedPageId, selectedElementId);
+                if (effectiveSelectedElementId && selectedPageId) {
+                  handleElementDelete(selectedPageId, effectiveSelectedElementId);
                 }
               }}
             />

@@ -165,6 +165,25 @@ export const useTextEditing = ({
         };
     }, [fabricCanvas, setEditingTextElementId, updateToolbarPosition]);
 
+    // Helper to restore Fabric selection back to the text element after editing
+    const restoreSelection = useCallback((id: string) => {
+        if (!fabricCanvas) return;
+
+        // Small delay to ensure any concurrent Fabric selection events (from clicking another object)
+        // have already processed.
+        setTimeout(() => {
+            if (!fabricCanvas.getActiveObject()) {
+                const textObj = (fabricCanvas.getObjects() as fabric.FabricObject[])
+                    .find(o => o instanceof CanvasTextElement && o.pageElement.id === id);
+
+                if (textObj) {
+                    fabricCanvas.setActiveObject(textObj);
+                    fabricCanvas.requestRenderAll();
+                }
+            }
+        }, 50);
+    }, [fabricCanvas]);
+
     // Save handler
     const handleSave = useCallback((newContent: TextContent, newWidthPx?: number, newHeightPx?: number) => {
         const spread = spreadsRef.current[currentSpreadIndexRef.current];
@@ -196,15 +215,27 @@ export const useTextEditing = ({
                 updateElementRef.current(spread.id, editingTextElementId, updates);
             }
         }
+
+        // Capture ID for restoration before clearing
+        const idToRestore = editingTextElementId;
         setEditingTextElementId(null);
         setToolbarPosition(null);
-    }, [editingTextElementId, setEditingTextElementId, canvasWidth, canvasHeight]);
+
+        if (idToRestore) {
+            restoreSelection(idToRestore);
+        }
+    }, [editingTextElementId, setEditingTextElementId, canvasWidth, canvasHeight, restoreSelection]);
 
     // Cancel handler
     const handleCancel = useCallback(() => {
+        const idToRestore = editingTextElementId;
         setEditingTextElementId(null);
         setToolbarPosition(null);
-    }, [setEditingTextElementId]);
+
+        if (idToRestore) {
+            restoreSelection(idToRestore);
+        }
+    }, [editingTextElementId, setEditingTextElementId, restoreSelection]);
 
     // Text align change handler (persists immediately so Fabric re-renders)
     const handleTextAlignChange = useCallback((align: TextContent['textAlign']) => {
