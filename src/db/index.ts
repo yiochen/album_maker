@@ -40,30 +40,6 @@ class AlbumDatabase extends Dexie {
         this.version(1).stores({
             albums: 'id, name, lastModified',
             settings: 'key',
-        });
-
-        // Version 2: Add spread thumbnails
-        // Note: We are changing the schema of spreadThumbnails to use spreadId.
-        // If users have existing v2 data with spreadIndex, this might cause issues or just be ignored/overwritten.
-        this.version(2).stores({
-            albums: 'id, name, lastModified',
-            spreadThumbnails: 'id, albumId, spreadIndex, timestamp', // Legacy
-            settings: 'key',
-        });
-
-        this.version(3).upgrade(tx => {
-            // Optional: migrate or clear old thumbnails. Clearing is safer/easier.
-            return tx.table('spreadThumbnails').clear();
-        });
-
-        // Version 4: Add uploaded images table
-        this.version(4).stores({
-            uploadedImages: 'id, createdAt',
-        });
-
-        // Version 5: Add previewBlob to uploadedImages (Dexie handles schema update automatically if stores don't change, 
-        // but we increment version to be explicit and allow for potential future migrations)
-        this.version(5).stores({
             uploadedImages: 'id, createdAt',
         });
     }
