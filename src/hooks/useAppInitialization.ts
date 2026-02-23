@@ -11,6 +11,15 @@ import { initializeSources } from '../sources';
 import { useAlbumStore } from '../states/albumStore';
 import { db } from '../db';
 
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    )
+  ]);
+};
+
 /**
  * Hook for initializing the application state.
  *
@@ -65,8 +74,11 @@ export const useAppInitialization = () => {
         if (APP_CONFIG.CLEAR_INDEX_DB_ON_LOAD_ERROR) {
           console.warn('Clearing IndexedDB due to load error...');
           try {
-            await db.delete();
-            await db.open();
+            await withTimeout(
+              db.delete().then(() => db.open()),
+              5000,
+              'Database reset timed out after 5 seconds'
+            );
           } catch (dbError) {
             console.error('Failed to clear/reset DB:', dbError);
           }
