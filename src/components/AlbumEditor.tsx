@@ -151,7 +151,6 @@ export const AlbumEditor: React.FC = () => {
               spread={currentSpread}
               settings={album.settings}
               selectedElement={selectedElement}
-              selectedPageId={selectedPageId}
               onElementUpdate={(updates, groupId) => {
                 if (effectiveSelectedElementId && selectedPageId) {
                   handleElementUpdate(selectedPageId, effectiveSelectedElementId, updates, groupId);

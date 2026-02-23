@@ -16,8 +16,6 @@ interface PropertiesPanelProps {
     settings: AlbumSettings;
     /** The currently selected element (if any). */
     selectedElement: PageElement | null;
-    /** The ID of the currently selected page (spread). */
-    selectedPageId: string | null;
     /** Callback fired when an element's properties are updated. */
     onElementUpdate: (updates: Partial<PageElement>, groupId?: string) => void;
     /** Callback fired when the selected element is deleted. */
