@@ -2,10 +2,11 @@
  * useTextEditing — Hook for managing the Tiptap text editing lifecycle.
  *
  * Responsibilities:
- * - Detects double-click on text elements via Fabric canvas events
+ * - Detects single-click on text elements via Fabric canvas events
  * - Manages editing state (which element is being edited)
  * - Computes overlay position for the Tiptap editor and toolbar
  * - Provides save/cancel callbacks that persist TextContent to the store
+ * - Exposes registerSave so Canvas can wire up external save triggers
  */
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import * as fabric from 'fabric';
@@ -43,6 +44,12 @@ export interface TextEditingState {
     handleTextAlignChange: (align: TextContent['textAlign']) => void;
     /** Current text alignment of the editing element. */
     currentTextAlign: TextContent['textAlign'];
+    /**
+     * Register an external save function.
+     * Canvas wires this up so that clicking blank space or another element
+     * triggers the Tiptap editor's own save path (which has access to content/DOM).
+     */
+    registerSave: (fn: (() => void) | null) => void;
 }
 
 interface UseTextEditingProps {
@@ -80,6 +87,20 @@ export const useTextEditing = ({
         spreadsRef.current = spreads;
         currentSpreadIndexRef.current = currentSpreadIndex;
     }, [updateElement, spreads, currentSpreadIndex]);
+
+    // Ref that always holds the current editingTextElementId for use inside event handlers
+    const editingTextElementIdRef = useRef(editingTextElementId);
+    useEffect(() => {
+        editingTextElementIdRef.current = editingTextElementId;
+    }, [editingTextElementId]);
+
+    // Ref for the external save function registered by Canvas/TiptapTextEditor
+    const externalSaveRef = useRef<(() => void) | null>(null);
+
+    /** Register (or clear) the external save callback. */
+    const registerSave = useCallback((fn: (() => void) | null) => {
+        externalSaveRef.current = fn;
+    }, []);
 
     // Toolbar position state
     const [toolbarPosition, setToolbarPosition] = useState<TextToolbarPosition | null>(null);
@@ -143,6 +164,11 @@ export const useTextEditing = ({
                     const id = (isEditingTarget as CanvasTextElement).pageElement.id;
                     const content = (isEditingTarget as CanvasTextElement).pageElement.content as TextContent;
 
+                    // If already editing a different element, save the current one first
+                    if (editingTextElementIdRef.current && editingTextElementIdRef.current !== id) {
+                        externalSaveRef.current?.();
+                    }
+
                     setEditingTextElementId(id);
                     setCurrentTextAlign(content.textAlign);
                     updateToolbarPosition(isEditingTarget as CanvasTextElement);
@@ -151,6 +177,9 @@ export const useTextEditing = ({
                     fabricCanvas.discardActiveObject();
                     fabricCanvas.requestRenderAll();
                 }
+            } else if (editingTextElementIdRef.current) {
+                // Clicked blank canvas space or a non-text element — trigger save
+                externalSaveRef.current?.();
             }
             pointerDownPos = null;
             isEditingTarget = null;
@@ -184,7 +213,7 @@ export const useTextEditing = ({
         }, 50);
     }, [fabricCanvas]);
 
-    // Save handler
+    // Save handler — called by TiptapTextEditor with the final TextContent
     const handleSave = useCallback((newContent: TextContent, newWidthPx?: number, newHeightPx?: number) => {
         const spread = spreadsRef.current[currentSpreadIndexRef.current];
         if (spread && editingTextElementId) {
@@ -220,6 +249,7 @@ export const useTextEditing = ({
         const idToRestore = editingTextElementId;
         setEditingTextElementId(null);
         setToolbarPosition(null);
+        externalSaveRef.current = null;
 
         if (idToRestore) {
             restoreSelection(idToRestore);
@@ -231,6 +261,7 @@ export const useTextEditing = ({
         const idToRestore = editingTextElementId;
         setEditingTextElementId(null);
         setToolbarPosition(null);
+        externalSaveRef.current = null;
 
         if (idToRestore) {
             restoreSelection(idToRestore);
@@ -239,38 +270,8 @@ export const useTextEditing = ({
 
     // Text align change handler (persists immediately so Fabric re-renders)
     const handleTextAlignChange = useCallback((align: TextContent['textAlign']) => {
-        // The user's provided code snippet for insertion seems to be based on a different
-        // version of this function, which includes `extractLayoutFromDOM`, `canvasZoom`,
-        // `editorRef`, `content`, `defaultStyle`, `ptToCanvasPx`, and `existingElement`.
-        // Since these are not present in the current document, I will insert the debug
-        // visualizer in a way that is syntactically correct given the current function's
-        // structure, assuming `runs` would be defined if the full context were present.
-        // For now, I'll place it after `setCurrentTextAlign(align);` and comment out
-        // the `runs.forEach` loop as `runs` is undefined.
-
         setCurrentTextAlign(align);
 
-        // DEBUG VISUALIZER (Placeholder - requires 'runs' to be defined from layout extraction)
-        // document.querySelectorAll('.debug-dot').forEach(el => el.remove());
-        // if (runs) { // Assuming 'runs' would be available here in the intended context
-        //     runs.forEach(run => {
-        //         const dot = document.createElement('div');
-        //         dot.className = 'debug-dot';
-        //         dot.style.position = 'absolute';
-        //         // just to visualize relative separation
-        //         // These coordinates (run.x, run.baselineY) and ptToCanvasPx are not defined in this file.
-        //         // They would need to be part of the `extractLayoutFromDOM` context.
-        //         // dot.style.left = ptToCanvasPx(run.x || 0, 96) + 'px';
-        //         // dot.style.top = ptToCanvasPx(run.baselineY || 0, 96) + 'px';
-        //         dot.style.width = '5px';
-        //         dot.style.height = '5px';
-        //         dot.style.background = 'red';
-        //         dot.style.borderRadius = '50%';
-        //         dot.style.zIndex = '99999';
-        //         dot.style.pointerEvents = 'none';
-        //         document.body.appendChild(dot);
-        //     });
-        // }
         const spread = spreadsRef.current[currentSpreadIndexRef.current];
         if (spread && editingTextElementId) {
             const element = spread.elements.find(e => e.id === editingTextElementId);
@@ -332,5 +333,6 @@ export const useTextEditing = ({
         handleCancel,
         handleTextAlignChange,
         currentTextAlign,
+        registerSave,
     };
 };

@@ -71,6 +71,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         handleCancel,
         handleTextAlignChange,
         currentTextAlign,
+        registerSave,
     } = useTextEditing({
         fabricCanvas,
         containerRef,
@@ -81,8 +82,26 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     // Track the Tiptap editor instance for the toolbar
     const [tiptapEditor, setTiptapEditor] = useState<Editor | null>(null);
-    const handleEditorReady = useCallback((editor: Editor) => setTiptapEditor(editor), []);
-    const handleEditorDestroy = useCallback(() => setTiptapEditor(null), []);
+
+    /**
+     * When the Tiptap editor mounts, register its save function with useTextEditing
+     * so that canvas-level events (clicking blank space, clicking another element)
+     * can trigger a proper save through the editor's own code path.
+     */
+    const handleEditorReady = useCallback((editor: Editor) => {
+        setTiptapEditor(editor);
+        registerSave(() => {
+            // Programmatically blur the editor — TiptapTextEditor's blur handler
+            // will detect this is not a properties-panel/toolbar focus change and
+            // will call its own handleSave (which has access to content, DOM, etc.)
+            editor.commands.blur();
+        });
+    }, [registerSave]);
+
+    const handleEditorDestroy = useCallback(() => {
+        setTiptapEditor(null);
+        registerSave(null);
+    }, [registerSave]);
 
     // Register this canvas as a drop target for dnd-kit
     useEffect(() => {
