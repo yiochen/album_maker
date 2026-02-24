@@ -172,31 +172,6 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [onCancel]);
 
-    // Save on blur — but not when focus moves to the properties panel or toolbar
-    useEffect(() => {
-        if (!editor) return;
-
-        const handleBlur = (event: FocusEvent) => {
-            const relatedTarget = event.relatedTarget as HTMLElement | null;
-            // If focus moved to the properties panel or toolbar, don't save yet
-            const isPropertiesPanel = relatedTarget?.closest('.properties-panel');
-            const isToolbar = relatedTarget?.closest('.text-editing-toolbar');
-            if (isPropertiesPanel || isToolbar) return;
-
-            setTimeout(() => {
-                if (!editor.isFocused) {
-                    handleSave();
-                }
-            }, 150);
-        };
-
-        const editorEl = editor.view.dom as HTMLElement;
-        editorEl.addEventListener('blur', handleBlur, true);
-        return () => {
-            editorEl.removeEventListener('blur', handleBlur, true);
-        };
-    }, [editor, handleSave]);
-
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
         const startX = e.clientX;
         const startWidth = width;

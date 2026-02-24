@@ -134,63 +134,35 @@ export const useTextEditing = ({
         });
     }, [fabricCanvas, containerRef]);
 
-    // Enter editing on single-click (clean click without dragging)
+    // Enter editing on mouse:down; save current editing session if one is active
     useEffect(() => {
         if (!fabricCanvas) return;
 
-        let pointerDownPos: { x: number, y: number } | null = null;
-        let isEditingTarget: fabric.Object | null = null;
-
         const handleMouseDown = (e: fabric.TPointerEventInfo) => {
-            if (e.target instanceof CanvasTextElement) {
-                isEditingTarget = e.target;
-                const pointer = fabricCanvas.getViewportPoint(e.e);
-                pointerDownPos = { x: pointer.x, y: pointer.y };
-            } else {
-                pointerDownPos = null;
-                isEditingTarget = null;
-            }
-        };
-
-        const handleMouseUp = (e: fabric.TPointerEventInfo) => {
-            if (isEditingTarget && pointerDownPos && e.target === isEditingTarget) {
-                const pointer = fabricCanvas.getViewportPoint(e.e);
-                const dx = pointer.x - pointerDownPos.x;
-                const dy = pointer.y - pointerDownPos.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-
-                // If distance is very small, treat it as a click
-                if (distance < 5) {
-                    const id = (isEditingTarget as CanvasTextElement).pageElement.id;
-                    const content = (isEditingTarget as CanvasTextElement).pageElement.content as TextContent;
-
-                    // If already editing a different element, save the current one first
-                    if (editingTextElementIdRef.current && editingTextElementIdRef.current !== id) {
-                        externalSaveRef.current?.();
-                    }
-
-                    setEditingTextElementId(id);
-                    setCurrentTextAlign(content.textAlign);
-                    updateToolbarPosition(isEditingTarget as CanvasTextElement);
-
-                    // Deselect the Fabric object so it doesn't interfere
-                    fabricCanvas.discardActiveObject();
-                    fabricCanvas.requestRenderAll();
-                }
-            } else if (editingTextElementIdRef.current) {
-                // Clicked blank canvas space or a non-text element — trigger save
+            // If we're currently editing, save and close on any canvas mouse:down
+            if (editingTextElementIdRef.current) {
                 externalSaveRef.current?.();
+                return;
             }
-            pointerDownPos = null;
-            isEditingTarget = null;
+
+            // Not editing — check if clicking a text element to enter editing
+            if (e.target instanceof CanvasTextElement) {
+                const id = e.target.pageElement.id;
+                const content = e.target.pageElement.content as TextContent;
+
+                setEditingTextElementId(id);
+                setCurrentTextAlign(content.textAlign);
+                updateToolbarPosition(e.target);
+
+                fabricCanvas.discardActiveObject();
+                fabricCanvas.requestRenderAll();
+            }
         };
 
         fabricCanvas.on('mouse:down', handleMouseDown);
-        fabricCanvas.on('mouse:up', handleMouseUp);
 
         return () => {
             fabricCanvas.off('mouse:down', handleMouseDown);
-            fabricCanvas.off('mouse:up', handleMouseUp);
         };
     }, [fabricCanvas, setEditingTextElementId, updateToolbarPosition]);
 
