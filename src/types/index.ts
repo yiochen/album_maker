@@ -54,6 +54,8 @@ export interface ImageContent {
   fullUrl: string;
   previewUrl: string;
   thumbnailUrl: string;
+  /** Editor-only frame placeholder state. Placeholder image elements are skipped during export rendering. */
+  isPlaceholder?: boolean;
   /** Identifies which photo source/provider this image came from (e.g., "google-photos", "dummy-colors") */
   sourceId: string;
   /** The unique ID of this image within its source (e.g., Google Photos media item ID) */
@@ -268,4 +270,3 @@ export interface ExportProgress {
   status: 'idle' | 'exporting' | 'complete' | 'error';
   error?: string;
 }
-

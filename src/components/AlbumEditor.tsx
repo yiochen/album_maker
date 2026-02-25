@@ -73,7 +73,7 @@ export const AlbumEditor: React.FC = () => {
   useKeyboardShortcuts();
 
   // Element actions (drop, update, delete)
-  const { handleImageDrop, handleAddText, handleElementUpdate, handleElementDelete } = useElementActions();
+  const { handleImageDrop, handleAddImage, handleAddText, handleElementUpdate, handleElementDelete } = useElementActions();
 
   // Album lifecycle (CRUD, import/export)
   const {
@@ -130,6 +130,9 @@ export const AlbumEditor: React.FC = () => {
         onRedo={redo}
         canUndo={canUndo}
         canRedo={canRedo}
+        onAddImage={() => {
+          if (currentSpread) handleAddImage(currentSpread.id);
+        }}
         onAddText={() => {
           if (currentSpread) handleAddText(currentSpread.id);
         }}

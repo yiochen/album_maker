@@ -19,6 +19,14 @@ describe('Canvas', () => {
             cy.importDummyImages();
         });
 
+        it('should add a placeholder image element from toolbar', () => {
+            cy.get('[data-testid="add-image-btn"]').click();
+
+            cy.contains('Drag images here').should('not.exist');
+            cy.contains('button', 'Properties').click({ force: true });
+            cy.contains('.properties-title', 'Image Properties', { timeout: 10000 }).should('be.visible');
+        });
+
         it('should allow dropping image onto canvas', () => {
             // Drag the first image from the pool to the canvas using dndKitDragTo
             cy.get('[data-testid="pool-image"]').first()
@@ -35,6 +43,19 @@ describe('Canvas', () => {
 
             // Verify element added by checking properties panel title
             cy.contains('.properties-title', 'Image Properties', { timeout: 10000 }).should('be.visible');
+        });
+
+        it('should replace placeholder image when dropping onto it', () => {
+            cy.get('[data-testid="add-image-btn"]').click();
+
+            cy.get('[data-testid="pool-image"]').first()
+                .dndKitDragTo('[data-testid="interaction-layer"]');
+
+            cy.get('[data-testid="canvas-container"]').should('have.attr', 'data-has-selection', 'true');
+
+            // If drop replaced the placeholder, deleting once should clear the canvas.
+            cy.get('body').type('{del}');
+            cy.contains('Drag images here', { timeout: 10000 }).should('be.visible');
         });
     });
 

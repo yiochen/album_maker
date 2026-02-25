@@ -10,7 +10,8 @@
  */
 import { useCallback } from 'react';
 import type { PageElement, PoolImage, TextContent } from '../types';
-import { useAddElement, useUpdateElement, useDeleteElement, useAlbumSettings } from '../states/albumStore';
+import { isImageElement } from '../types';
+import { useAddElement, useUpdateElement, useDeleteElement, useAlbumSettings, useAlbumSpreads } from '../states/albumStore';
 import { useSetSelectedElementId, useSetSelectedPageId, useSetEditingTextElementId } from '../states/uiStore';
 import { calculateThumbnailSize } from '../utils/imageUtils';
 import { APP_CONFIG } from '../config';
@@ -36,14 +37,48 @@ export const useElementActions = () => {
     const setEditingTextElementId = useSetEditingTextElementId();
 
     const settings = useAlbumSettings();
+    const spreads = useAlbumSpreads();
     const ppi = APP_CONFIG.PPI;
 
     /**
      * Handles dropping an image from the pool onto a spread.
      */
     const handleImageDrop = useCallback(
-        (spreadId: string, image: PoolImage, position: { x: number; y: number }) => {
+        (
+            spreadId: string,
+            image: PoolImage,
+            position: { x: number; y: number },
+            targetElementId?: string
+        ) => {
             if (!settings) return;
+
+            if (targetElementId) {
+                const spread = spreads.find(s => s.id === spreadId);
+                const target = spread?.elements.find(e => e.id === targetElementId);
+
+                if (target && isImageElement(target)) {
+                    updateElement(spreadId, targetElementId, {
+                        content: {
+                            fullUrl: image.fullUrl,
+                            previewUrl: image.previewUrl,
+                            thumbnailUrl: image.thumbnailUrl,
+                            sourceId: image.sourceId,
+                            sourceImageId: image.sourceImageId,
+                            contentTransform: {
+                                zoom: 1,
+                                panX: 0.5,
+                                panY: 0.5,
+                            },
+                            originalAspectRatio: (image.width || 1) / (image.height || 1),
+                            lockAspectRatio: true,
+                            isPlaceholder: false,
+                        },
+                    });
+                    setSelectedElementId(targetElementId);
+                    setSelectedPageId(spreadId);
+                    return;
+                }
+            }
 
             const spreadWidth = settings.pageWidth * 2 * ppi;
             const spreadHeight = settings.pageHeight * ppi;
@@ -85,6 +120,7 @@ export const useElementActions = () => {
                     },
                     originalAspectRatio: (image.width || 1) / (image.height || 1),
                     lockAspectRatio: true,
+                    isPlaceholder: false,
                 },
                 box,
             };
@@ -93,7 +129,50 @@ export const useElementActions = () => {
             setSelectedElementId(newElement.id);
             setSelectedPageId(spreadId);
         },
-        [addElement, setSelectedElementId, setSelectedPageId, settings, ppi]
+        [addElement, setSelectedElementId, setSelectedPageId, settings, ppi, spreads, updateElement]
+    );
+
+    /**
+     * Adds a new placeholder image element to the center of the current spread.
+     */
+    const handleAddImage = useCallback(
+        (spreadId: string) => {
+            const normWidth = 0.4;
+            const normHeight = 0.4;
+
+            const box = {
+                x1: 0.5 - normWidth / 2,
+                y1: 0.5 - normHeight / 2,
+                x2: 0.5 + normWidth / 2,
+                y2: 0.5 + normHeight / 2,
+            };
+
+            const newElement: PageElement = {
+                id: crypto.randomUUID(),
+                type: 'image',
+                content: {
+                    fullUrl: '',
+                    previewUrl: '',
+                    thumbnailUrl: '',
+                    sourceId: 'placeholder',
+                    sourceImageId: `placeholder-${Date.now()}`,
+                    contentTransform: {
+                        zoom: 1,
+                        panX: 0.5,
+                        panY: 0.5,
+                    },
+                    originalAspectRatio: 1,
+                    lockAspectRatio: true,
+                    isPlaceholder: true,
+                },
+                box,
+            };
+
+            addElement(spreadId, newElement);
+            setSelectedElementId(newElement.id);
+            setSelectedPageId(spreadId);
+        },
+        [addElement, setSelectedElementId, setSelectedPageId]
     );
 
     /**
@@ -172,6 +251,7 @@ export const useElementActions = () => {
 
     return {
         handleImageDrop,
+        handleAddImage,
         handleAddText,
         handleElementUpdate,
         handleElementDelete,

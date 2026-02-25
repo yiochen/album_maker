@@ -1,10 +1,12 @@
 import React, { useRef, useEffect, useMemo, useState, useLayoutEffect } from 'react';
+import * as fabric from 'fabric';
 import type { PoolImage, TextContent } from '../types';
 import { isTextElement } from '../types';
 import { useCanvasRender } from '../hooks/useCanvasRender';
 import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
 import { useTextEditing } from '../hooks/useTextEditing';
 import { useTextEditingSelection } from '../hooks/useTextEditingSelection';
+import { CanvasImageElement } from '../hooks/CanvasImageElement';
 import { DroppableCanvas } from './DroppableCanvas';
 import { TiptapTextEditor } from './canvas/TiptapTextEditor';
 import { TextEditingToolbar } from './canvas/TextEditingToolbar';
@@ -17,7 +19,12 @@ import { useDndDropContext } from '../contexts/DndDropContext';
  */
 interface CanvasProps {
     /** Callback fired when an image is dropped onto the canvas. */
-    onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
+    onImageDrop: (
+        spreadId: string,
+        image: PoolImage,
+        position: { x: number; y: number },
+        targetElementId?: string
+    ) => void;
 }
 
 /**
@@ -85,17 +92,36 @@ export const Canvas: React.FC<CanvasProps> = ({
     useEffect(() => {
         if (!currentSpread) return;
 
+        const getDropTargetImageElementId = (canvasX: number, canvasY: number): string | null => {
+            if (!fabricCanvas) return null;
+
+            const point = new fabric.Point(canvasX, canvasY);
+            const objects = fabricCanvas.getObjects();
+
+            // Iterate from top-most object down to match visual hit testing.
+            for (let i = objects.length - 1; i >= 0; i -= 1) {
+                const obj = objects[i];
+                if (!(obj instanceof CanvasImageElement)) continue;
+                if (obj.containsPoint(point)) {
+                    return obj.pageElement.id;
+                }
+            }
+
+            return null;
+        };
+
         registerCanvasDropTarget({
             wrapperRef,
             zoom,
             spreadId: currentSpread.id,
+            getDropTargetImageElementId,
             onImageDrop,
         });
 
         return () => {
             registerCanvasDropTarget(null);
         };
-    }, [registerCanvasDropTarget, wrapperRef, zoom, currentSpread?.id, onImageDrop, currentSpread]);
+    }, [registerCanvasDropTarget, wrapperRef, zoom, currentSpread?.id, onImageDrop, currentSpread, fabricCanvas]);
 
     // Styles for scrollable content
     const zoomedWidth = canvasWidth * (zoom / 100);

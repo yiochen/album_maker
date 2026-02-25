@@ -136,6 +136,7 @@ export async function renderSpread(
         }
 
         if (element.type !== 'image') continue;
+        if (element.content.isPlaceholder) continue;
 
         try {
             // Dynamic URL Selection based on PPI

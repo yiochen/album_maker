@@ -10,6 +10,9 @@ export class CanvasImageElement extends fabric.Group {
     public pageElement: ImagePageElement;
     private innerImage: fabric.Image;
     private clipRect: fabric.Rect;
+    private placeholderFrame: fabric.Rect;
+    private placeholderPlusH: fabric.Rect;
+    private placeholderPlusV: fabric.Rect;
     public onContentTransformChange?: (elementId: string, contentTransform: ImageContent['contentTransform']) => void;
     private panControlSize: number;
     public currentUrl: string = '';
@@ -32,8 +35,44 @@ export class CanvasImageElement extends fabric.Group {
             top: 0,
         });
 
+        // Editor-only placeholder visuals for image frames that have no assigned photo yet.
+        const placeholderFrame = new fabric.Rect({
+            originX: 'left',
+            originY: 'top',
+            left: 0,
+            top: 0,
+            fill: '#f8fafc',
+            stroke: '#94a3b8',
+            strokeWidth: 1,
+            strokeDashArray: [6, 6],
+            selectable: false,
+            evented: false,
+        });
+        const placeholderPlusH = new fabric.Rect({
+            originX: 'center',
+            originY: 'center',
+            width: 30,
+            height: 4,
+            rx: 2,
+            ry: 2,
+            fill: '#64748b',
+            selectable: false,
+            evented: false,
+        });
+        const placeholderPlusV = new fabric.Rect({
+            originX: 'center',
+            originY: 'center',
+            width: 4,
+            height: 30,
+            rx: 2,
+            ry: 2,
+            fill: '#64748b',
+            selectable: false,
+            evented: false,
+        });
+
         // Initialize group with children and explicit left-top origin
-        super([innerImage], {
+        super([placeholderFrame, placeholderPlusH, placeholderPlusV, innerImage], {
             ...options,
             originX: 'left',
             originY: 'top',
@@ -50,6 +89,9 @@ export class CanvasImageElement extends fabric.Group {
 
         this.pageElement = element;
         this.innerImage = innerImage;
+        this.placeholderFrame = placeholderFrame;
+        this.placeholderPlusH = placeholderPlusH;
+        this.placeholderPlusV = placeholderPlusV;
         this.onContentTransformChange = options.onContentTransformChange;
         this.panControlSize = options.panControlSize ?? 22;
 
@@ -69,12 +111,18 @@ export class CanvasImageElement extends fabric.Group {
         });
 
         this.clipPath = this.clipRect;
+        this.updatePlaceholderVisibility();
     }
 
     /**
      * Load image and update layout
      */
     async loadImage(url: string) {
+        if (!url) {
+            this.clearImage();
+            return;
+        }
+
         this.currentUrl = url;
         return new Promise<void>((resolve, reject) => {
             // Check if we are in a worker or browser main thread
@@ -103,6 +151,12 @@ export class CanvasImageElement extends fabric.Group {
         });
     }
 
+    clearImage() {
+        this.currentUrl = '';
+        this.innerImage.setElement(null as unknown as HTMLImageElement);
+        this.applyLayout();
+    }
+
     /**
      * Calculate position and size based on normalized box model
      */
@@ -127,6 +181,8 @@ export class CanvasImageElement extends fabric.Group {
             height: rect.height,
         });
 
+        this.updatePlaceholderLayout(rect.width, rect.height);
+        this.updatePlaceholderVisibility();
         this.applyCover();
         this.setCoords();
     }
@@ -177,6 +233,7 @@ export class CanvasImageElement extends fabric.Group {
             flipY: false,
             angle: angleDeg,
         });
+        this.updatePlaceholderVisibility();
     }
 
     updatePanFromDelta(deltaX: number, deltaY: number) {
@@ -228,6 +285,36 @@ export class CanvasImageElement extends fabric.Group {
         this.setCoords();
         // REMOVED: this.onContentTransformChange?.(this.pageElement.id, this.pageElement.content.contentTransform);
         return true;
+    }
+
+    private updatePlaceholderLayout(width: number, height: number) {
+        this.placeholderFrame.set({
+            left: -width / 2,
+            top: -height / 2,
+            width,
+            height,
+        });
+        this.placeholderPlusH.set({
+            left: 0,
+            top: 0,
+            width: Math.max(24, Math.min(40, width * 0.18)),
+            height: Math.max(3, Math.min(6, height * 0.02)),
+        });
+        this.placeholderPlusV.set({
+            left: 0,
+            top: 0,
+            width: Math.max(3, Math.min(6, width * 0.02)),
+            height: Math.max(24, Math.min(40, height * 0.18)),
+        });
+    }
+
+    private updatePlaceholderVisibility() {
+        const content = this.pageElement.content as ImageContent;
+        const showPlaceholder = !!content.isPlaceholder;
+        this.placeholderFrame.set({ visible: showPlaceholder });
+        this.placeholderPlusH.set({ visible: showPlaceholder });
+        this.placeholderPlusV.set({ visible: showPlaceholder });
+        this.innerImage.set({ visible: !showPlaceholder });
     }
 
     setPanControlSize(size: number) {

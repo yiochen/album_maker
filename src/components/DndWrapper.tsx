@@ -89,7 +89,7 @@ export const DndWrapper: React.FC<DndWrapperProps> = ({
 
         // Only call handler if dropped over the canvas
         if (image && event.over?.id === 'canvas' && canvasDropTarget) {
-            const { wrapperRef, zoom, spreadId, onImageDrop } = canvasDropTarget;
+            const { wrapperRef, zoom, spreadId, getDropTargetImageElementId, onImageDrop } = canvasDropTarget;
             const rect = wrapperRef.current?.getBoundingClientRect();
 
             if (rect) {
@@ -104,12 +104,13 @@ export const DndWrapper: React.FC<DndWrapperProps> = ({
                 const scale = zoom / 100;
                 const canvasX = domX / scale;
                 const canvasY = domY / scale;
+                const targetElementId = getDropTargetImageElementId(canvasX, canvasY) || undefined;
 
                 // Convert to model pixels and call the handler
                 onImageDrop(spreadId, image, {
                     x: toModelPx(canvasX),
                     y: toModelPx(canvasY),
-                });
+                }, targetElementId);
             }
         }
 

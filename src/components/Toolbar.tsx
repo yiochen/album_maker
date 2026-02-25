@@ -3,6 +3,7 @@ import { UndoIcon } from './icons/UndoIcon';
 import { RedoIcon } from './icons/RedoIcon';
 import { SnappingIcon } from './icons/SnappingIcon';
 import { TextIcon } from './icons/TextIcon';
+import { AddImageIcon } from './icons/AddImageIcon';
 
 /**
  * Props for the Toolbar component.
@@ -22,6 +23,8 @@ interface ToolbarProps {
     canRedo: boolean;
     /** Callback fired when the "Add Text" button is clicked. */
     onAddText: () => void;
+    /** Callback fired when the "Add Image" button is clicked. */
+    onAddImage: () => void;
 }
 
 /**
@@ -35,6 +38,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     canUndo,
     canRedo,
     onAddText,
+    onAddImage,
 }) => {
     return (
         <div className="toolbar-secondary" data-testid="toolbar-secondary">
@@ -65,6 +69,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 >
                     <SnappingIcon width="16" height="16" />
                     <span>Snap</span>
+                </button>
+
+                <button
+                    className="btn btn-ghost"
+                    onClick={onAddImage}
+                    title="Add image placeholder"
+                    data-testid="add-image-btn"
+                >
+                    <AddImageIcon width="16" height="16" />
+                    <span>Image</span>
                 </button>
 
                 <button

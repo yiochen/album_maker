@@ -106,7 +106,9 @@ export async function renderSpread(
                 existingImage.onContentTransformChange = interactiveOpts?.onContentTransformChange;
 
                 const currentUrl = existingImage.currentUrl;
-                if (targetUrl !== currentUrl) {
+                if (!targetUrl) {
+                    existingImage.clearImage();
+                } else if (targetUrl !== currentUrl) {
                     existingImage.pageElement = element;
                     loadPromises.push(existingImage.loadImage(targetUrl));
                 }
@@ -127,9 +129,13 @@ export async function renderSpread(
                 });
 
                 canvas.add(canvasEl);
-                loadPromises.push(canvasEl.loadImage(targetUrl).then(() => {
+                if (targetUrl) {
+                    loadPromises.push(canvasEl.loadImage(targetUrl).then(() => {
+                        canvasEl.applyLayout(canvas.width, canvas.height);
+                    }));
+                } else {
                     canvasEl.applyLayout(canvas.width, canvas.height);
-                }));
+                }
             }
         } else if (isTextElement(element)) {
             // ── Text element sync ──

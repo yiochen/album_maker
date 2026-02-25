@@ -14,8 +14,15 @@ interface CanvasDropTarget {
     zoom: number;
     /** Current spread ID to receive the dropped image */
     spreadId: string;
+    /** Resolve target image element ID under the drop point (canvas px), if any. */
+    getDropTargetImageElementId: (canvasX: number, canvasY: number) => string | null;
     /** Handler to call when an image is dropped */
-    onImageDrop: (spreadId: string, image: PoolImage, position: { x: number; y: number }) => void;
+    onImageDrop: (
+        spreadId: string,
+        image: PoolImage,
+        position: { x: number; y: number },
+        targetElementId?: string
+    ) => void;
 }
 
 interface DndContextValue {
