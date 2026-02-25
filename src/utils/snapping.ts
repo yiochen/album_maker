@@ -145,9 +145,10 @@ export function calculateResizeSnap(
     const right = position.x + size.width;
     const bottom = position.y + size.height;
 
-    // Check vertical snaps based on which edge is being resized
+    // Fabric corner names use l/r/t/b (tl,tr,ml,mr,...) rather than e/w/n/s.
+    // Check vertical snaps based on which edge is being resized.
     for (const target of targets.filter(t => t.orientation === 'vertical')) {
-        if (resizeHandle.includes('e')) {
+        if (resizeHandle.includes('r')) {
             // Resizing right edge
             if (Math.abs(right - target.position) < threshold) {
                 newWidth = target.position - position.x;
@@ -155,7 +156,7 @@ export function calculateResizeSnap(
                 break;
             }
         }
-        if (resizeHandle.includes('w')) {
+        if (resizeHandle.includes('l')) {
             // Resizing left edge
             if (Math.abs(position.x - target.position) < threshold) {
                 const diff = position.x - target.position;
@@ -169,7 +170,7 @@ export function calculateResizeSnap(
 
     // Check horizontal snaps
     for (const target of targets.filter(t => t.orientation === 'horizontal')) {
-        if (resizeHandle.includes('s')) {
+        if (resizeHandle.includes('b')) {
             // Resizing bottom edge
             if (Math.abs(bottom - target.position) < threshold) {
                 newHeight = target.position - position.y;
@@ -177,7 +178,7 @@ export function calculateResizeSnap(
                 break;
             }
         }
-        if (resizeHandle.includes('n')) {
+        if (resizeHandle.includes('t')) {
             // Resizing top edge
             if (Math.abs(position.y - target.position) < threshold) {
                 const diff = position.y - target.position;
@@ -193,6 +194,110 @@ export function calculateResizeSnap(
         position: { x: newX, y: newY },
         size: { width: Math.max(5, newWidth), height: Math.max(5, newHeight) },
         snappedEdges,
+    };
+}
+
+/**
+ * Calculate snapped size for aspect-locked corner resize.
+ * Keeps the opposite corner fixed and snaps either X edge or Y edge
+ * (whichever requires less movement while preserving aspect ratio).
+ */
+export function calculateAspectLockedResizeSnap(
+    position: Position,
+    size: Size,
+    resizeHandle: string,
+    threshold: number = SNAP_THRESHOLD
+): { position: Position; size: Size; snappedEdges: SnapEdge[] } {
+    // Aspect lock only supports corner handles in this app.
+    const isCornerHandle = resizeHandle.includes('l') || resizeHandle.includes('r')
+        ? (resizeHandle.includes('t') || resizeHandle.includes('b'))
+        : false;
+    if (!isCornerHandle || size.height === 0) {
+        return { position, size, snappedEdges: [] };
+    }
+
+    const left = position.x;
+    const top = position.y;
+    const right = position.x + size.width;
+    const bottom = position.y + size.height;
+    const ratio = size.width / size.height;
+
+    if (!Number.isFinite(ratio) || ratio <= 0) {
+        return { position, size, snappedEdges: [] };
+    }
+
+    const movingLeft = resizeHandle.includes('l');
+    const movingTop = resizeHandle.includes('t');
+    const anchorX = movingLeft ? right : left;
+    const anchorY = movingTop ? bottom : top;
+    const movingX = movingLeft ? left : right;
+    const movingY = movingTop ? top : bottom;
+
+    type Candidate = {
+        position: Position;
+        size: Size;
+        snappedEdges: SnapEdge[];
+        score: number;
+    };
+    const candidates: Candidate[] = [];
+
+    for (const target of VERTICAL_TARGETS) {
+        if (Math.abs(movingX - target.position) >= threshold) continue;
+
+        const width = movingLeft ? anchorX - target.position : target.position - anchorX;
+        if (width < 5) continue;
+
+        const height = width / ratio;
+        if (height < 5) continue;
+
+        const x = movingLeft ? target.position : anchorX;
+        const y = movingTop ? anchorY - height : anchorY;
+
+        const nextMovingX = movingLeft ? x : x + width;
+        const nextMovingY = movingTop ? y : y + height;
+        const score = Math.abs(nextMovingX - movingX) + Math.abs(nextMovingY - movingY);
+
+        candidates.push({
+            position: { x, y },
+            size: { width, height },
+            snappedEdges: [target.edge],
+            score,
+        });
+    }
+
+    for (const target of HORIZONTAL_TARGETS) {
+        if (Math.abs(movingY - target.position) >= threshold) continue;
+
+        const height = movingTop ? anchorY - target.position : target.position - anchorY;
+        if (height < 5) continue;
+
+        const width = height * ratio;
+        if (width < 5) continue;
+
+        const y = movingTop ? target.position : anchorY;
+        const x = movingLeft ? anchorX - width : anchorX;
+
+        const nextMovingX = movingLeft ? x : x + width;
+        const nextMovingY = movingTop ? y : y + height;
+        const score = Math.abs(nextMovingX - movingX) + Math.abs(nextMovingY - movingY);
+
+        candidates.push({
+            position: { x, y },
+            size: { width, height },
+            snappedEdges: [target.edge],
+            score,
+        });
+    }
+
+    if (candidates.length === 0) {
+        return { position, size, snappedEdges: [] };
+    }
+
+    const best = candidates.reduce((prev, curr) => (curr.score < prev.score ? curr : prev));
+    return {
+        position: best.position,
+        size: best.size,
+        snappedEdges: best.snappedEdges,
     };
 }
 

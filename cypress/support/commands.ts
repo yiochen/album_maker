@@ -56,10 +56,10 @@ declare global {
 
 // Wait for the app to be fully loaded
 Cypress.Commands.add('waitForAppReady', () => {
-    // Wait for the main app container to be visible
-    cy.get('[data-testid="album-editor"]', { timeout: 10000 }).should('be.visible');
-    // Wait for the canvas to be ready
-    cy.get('[data-testid="canvas-container"]', { timeout: 10000 }).should('exist');
+    // Wait for route transition + app initialization to settle.
+    cy.contains('Loading...', { timeout: 30000 }).should('not.exist');
+    cy.get('[data-testid="album-editor"]', { timeout: 30000 }).should('be.visible');
+    cy.get('[data-testid="canvas-container"]', { timeout: 30000 }).should('exist');
 });
 
 // Create a new album

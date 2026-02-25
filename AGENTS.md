@@ -94,6 +94,14 @@ Registered via `src/registerSW.ts` from `main.tsx`. Uses `skipWaiting()` + `clie
 6.  **Fabric.js v7 Specifics**:
     *   **Uniform Scaling**: In Fabric v7, the `uniformScaling` option for controls is a **canvas-level** setting (`canvas.uniformScaling`), not strictly per-object. When synchronizing selections or updating element properties, always ensure `canvas.uniformScaling` is synced with the active object's requirements to ensure consistent behavior.
 
+## Cypress Test Writing Notes
+
+- **Reset IndexedDB safely**: In Cypress support `beforeEach`, navigate to `about:blank` first, then clear stores inside `AlbumEditorDB` (`albums`, `settings`, `uploadedImages`). Avoid repeated `indexedDB.deleteDatabase()` in test loops because blocked/open handles can cause startup hangs.
+- **Use a robust app-ready gate**: `waitForAppReady()` should wait for loading UI to disappear and then assert key app containers (`[data-testid="album-editor"]`, `[data-testid="canvas-container"]`) with a generous timeout.
+- **Avoid external auth/network boot dependencies**: E2E tests should not depend on Google auth script initialization. Prefer local/dummy sources unless a spec explicitly tests provider auth.
+- **Follow the text editing product model**: Text style controls are in the floating text-editing toolbar (not the right properties panel). While text is in editing mode, keyboard delete should not remove the text element.
+- **Prefer stable selectors**: Use `data-testid` selectors for interaction/assertions. Avoid brittle assertions tied to incidental UI copy or layout.
+
 ## Development
 
 ```bash

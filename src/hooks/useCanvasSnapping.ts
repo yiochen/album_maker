@@ -10,8 +10,10 @@
  */
 import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
-import { calculateSnap, getActiveSnapLines } from '../utils/snapping';
+import { calculateSnap, calculateResizeSnap, calculateAspectLockedResizeSnap, getActiveSnapLines } from '../utils/snapping';
+import type { SnapEdge } from '../types';
 import { CustomFabricObject } from './fabricTypes';
+import { CanvasImageElement } from './CanvasImageElement';
 import { getZoomCompensatedSizes } from '../utils/fabricRenderer';
 import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
@@ -62,6 +64,45 @@ export const useCanvasSnapping = ({
         const canvas = fabricCanvas;
         if (!canvas) return;
 
+        const clearSnapLines = () => {
+            const snapLines = snapLinesRef.current;
+            if (!snapLines || snapLines.length === 0) return;
+            snapLines.forEach(line => canvas.remove(line));
+            snapLines.length = 0;
+        };
+
+        const drawSnapLines = (snappedEdges: SnapEdge[]) => {
+            if (snappedEdges.length === 0) return;
+
+            const activeLines = getActiveSnapLines(snappedEdges);
+            const uiSizes = uiSizesRef.current;
+            const snapLines = snapLinesRef.current;
+            if (!snapLines) return;
+
+            activeLines.forEach(lineData => {
+                let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+                if (lineData.orientation === 'vertical') {
+                    x1 = x2 = (lineData.position / 100) * canvasWidth;
+                    y1 = 0;
+                    y2 = canvasHeight;
+                } else {
+                    y1 = y2 = (lineData.position / 100) * canvasHeight;
+                    x1 = 0;
+                    x2 = canvasWidth;
+                }
+
+                const fabricLine = new fabric.Line([x1, y1, x2, y2], {
+                    stroke: '#ff00ff',
+                    strokeWidth: uiSizes.snapLineStrokeWidth,
+                    selectable: false,
+                    evented: false,
+                    strokeDashArray: [uiSizes.snapLineDash, uiSizes.snapLineDash],
+                });
+                canvas.add(fabricLine);
+                snapLines.push(fabricLine);
+            });
+        };
+
         const handleObjectMoving = (e: { target?: fabric.Object }) => {
             const obj = e.target as CustomFabricObject;
             if (!obj || !obj.data) return;
@@ -73,11 +114,7 @@ export const useCanvasSnapping = ({
             let newTop = obj.top!;
 
             // Clear existing snap lines
-            const snapLines = snapLinesRef.current;
-            if (snapLines && snapLines.length > 0) {
-                snapLines.forEach(line => canvas.remove(line));
-                snapLines.length = 0;
-            }
+            clearSnapLines();
 
             // Convert current position to top-left for snapping calculations
             const isCenterOrigin = obj.originX === 'center';
@@ -105,31 +142,7 @@ export const useCanvasSnapping = ({
                     newLeft = isCenterOrigin ? snappedTopLeftX + halfWidth : snappedTopLeftX;
                     newTop = isCenterOrigin ? snappedTopLeftY + halfHeight : snappedTopLeftY;
 
-                    const activeLines = getActiveSnapLines(snapResult.snappedEdges);
-                    const uiSizes = uiSizesRef.current;
-
-                    activeLines.forEach(lineData => {
-                        let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
-                        if (lineData.orientation === 'vertical') {
-                            x1 = x2 = (lineData.position / 100) * canvasWidth;
-                            y1 = 0;
-                            y2 = canvasHeight;
-                        } else {
-                            y1 = y2 = (lineData.position / 100) * canvasHeight;
-                            x1 = 0;
-                            x2 = canvasWidth;
-                        }
-
-                        const fabricLine = new fabric.Line([x1, y1, x2, y2], {
-                            stroke: '#ff00ff',
-                            strokeWidth: uiSizes.snapLineStrokeWidth,
-                            selectable: false,
-                            evented: false,
-                            strokeDashArray: [uiSizes.snapLineDash, uiSizes.snapLineDash],
-                        });
-                        canvas.add(fabricLine);
-                        snapLines.push(fabricLine);
-                    });
+                    drawSnapLines(snapResult.snappedEdges);
                 }
             }
 
@@ -141,10 +154,61 @@ export const useCanvasSnapping = ({
             // No constraints - allow elements to move freely including outside canvas (bleed)
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const handleObjectScaling = (e: { target?: fabric.Object; transform?: any }) => {
+            const obj = e.target;
+            if (!(obj instanceof CanvasImageElement) || !obj.data) return;
+
+            clearSnapLines();
+            if (!isSnappingEnabledRef.current) return;
+
+            const corner = e.transform?.corner || '';
+            if (!corner) return;
+
+            const left = obj.left ?? 0;
+            const top = obj.top ?? 0;
+            const width = obj.getScaledWidth();
+            const height = obj.getScaledHeight();
+
+            const snapResult = (obj.pageElement.content.lockAspectRatio ?? true)
+                ? calculateAspectLockedResizeSnap(
+                    { x: (left / canvasWidth) * 100, y: (top / canvasHeight) * 100 },
+                    { width: (width / canvasWidth) * 100, height: (height / canvasHeight) * 100 },
+                    corner
+                )
+                : calculateResizeSnap(
+                    { x: (left / canvasWidth) * 100, y: (top / canvasHeight) * 100 },
+                    { width: (width / canvasWidth) * 100, height: (height / canvasHeight) * 100 },
+                    corner
+                );
+
+            if (snapResult.snappedEdges.length === 0) return;
+
+            const snappedLeft = (snapResult.position.x / 100) * canvasWidth;
+            const snappedTop = (snapResult.position.y / 100) * canvasHeight;
+            const snappedWidth = (snapResult.size.width / 100) * canvasWidth;
+            const snappedHeight = (snapResult.size.height / 100) * canvasHeight;
+
+            const baseWidth = obj.width || 1;
+            const baseHeight = obj.height || 1;
+
+            obj.set({
+                left: snappedLeft,
+                top: snappedTop,
+                scaleX: snappedWidth / baseWidth,
+                scaleY: snappedHeight / baseHeight,
+            });
+            obj.setCoords();
+
+            drawSnapLines(snapResult.snappedEdges);
+        };
+
         canvas.on('object:moving', handleObjectMoving);
+        canvas.on('object:scaling', handleObjectScaling);
 
         return () => {
             canvas.off('object:moving', handleObjectMoving);
+            canvas.off('object:scaling', handleObjectScaling);
         };
     }, [fabricCanvas, canvasWidth, canvasHeight, snapLinesRef]);
 };

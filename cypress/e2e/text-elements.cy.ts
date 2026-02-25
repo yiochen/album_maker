@@ -41,27 +41,27 @@ describe('Text Elements', () => {
             cy.contains('.properties-title', 'Text Properties', { timeout: 10000 }).should('be.visible');
         });
 
-        it('should display text style section', () => {
-            cy.contains('Text Style').should('be.visible');
+        it('should show text editing toolbar while a new text element is editing', () => {
+            cy.get('[data-testid="text-editing-toolbar"]').should('be.visible');
         });
 
-        it('should display font input', () => {
-            cy.get('[data-testid="text-font-input"]').should('be.visible');
-            cy.get('[data-testid="text-font-input"]').should('have.value', 'Inter, sans-serif');
+        it('should display font controls in editing toolbar', () => {
+            cy.get('[data-testid="text-font-trigger"]').should('be.visible');
+            cy.get('[data-testid="text-size-display"]').should('be.visible');
         });
 
-        it('should display color picker', () => {
-            cy.get('[data-testid="text-color-panel-input"]').should('be.visible');
+        it('should display color picker in editing toolbar', () => {
+            cy.get('[data-testid="text-color-input"]').should('be.visible');
         });
 
-        it('should display alignment buttons', () => {
-            cy.get('[data-testid="text-align-left"]').should('be.visible');
-            cy.get('[data-testid="text-align-center"]').should('be.visible');
-            cy.get('[data-testid="text-align-right"]').should('be.visible');
+        it('should display alignment buttons in editing toolbar', () => {
+            cy.get('[data-testid="text-align-left-btn"]').should('be.visible');
+            cy.get('[data-testid="text-align-center-btn"]').should('be.visible');
+            cy.get('[data-testid="text-align-right-btn"]').should('be.visible');
         });
 
         it('should have left alignment active by default', () => {
-            cy.get('[data-testid="text-align-left"]').should('have.class', 'active');
+            cy.get('[data-testid="text-align-left-btn"]').should('have.class', 'active');
         });
     });
 
@@ -73,9 +73,13 @@ describe('Text Elements', () => {
             cy.contains('.properties-title', 'Text Properties', { timeout: 10000 }).should('be.visible');
         });
 
-        it('should delete the text element when pressing Delete', () => {
-            cy.get('[data-testid="canvas-container"]').should('have.attr', 'data-has-selection', 'true');
+        it('should not delete the element when pressing Delete during text editing', () => {
             cy.get('body').type('{del}');
+            cy.contains('.properties-title', 'Text Properties', { timeout: 10000 }).should('be.visible');
+        });
+
+        it('should delete the text element from the properties action', () => {
+            cy.contains('button', 'Delete').click({ force: true });
             cy.contains('.properties-title', 'Spread Properties', { timeout: 10000 }).should('be.visible');
         });
     });
