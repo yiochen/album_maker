@@ -8,6 +8,7 @@ import {
 
 export class CanvasImageElement extends fabric.Group {
     public pageElement: ImagePageElement;
+    public data?: { id: string };
     private innerImage: fabric.Image;
     private clipRect: fabric.Rect;
     private placeholderFrame: fabric.Rect;
@@ -78,7 +79,6 @@ export class CanvasImageElement extends fabric.Group {
             originY: 'top',
             subTargetCheck: false, // Don't allow selecting the inner image directly
             interactive: true,
-            // @ts-expect-error - data is available on FabricObject but missing in GroupProps interface
             data: { id: element.id },
             lockRotation: true,
             uniformScaling: options.uniformScaling !== undefined ? options.uniformScaling : true,
