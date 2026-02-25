@@ -6,7 +6,7 @@
  *
  * Uses Tiptap editor commands instead of Fabric.js APIs.
  */
-import React, { useCallback, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import type { Editor } from '@tiptap/react';
 import type { TextContent } from '../../types';
 
@@ -102,8 +102,10 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
     onTextAlignChange,
     textAlign,
 }) => {
+    const toolbarRef = useRef<HTMLDivElement>(null);
     const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
     const fontMenuRef = useRef<HTMLDivElement>(null);
+    const [resolvedLeft, setResolvedLeft] = useState(position.left);
 
     // Reactive state from editor
     const [fontSizePt, setFontSizePt] = useState(Math.round(defaultFontSizePt));
@@ -139,6 +141,27 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
         return () => document.removeEventListener('mousedown', handlePointerDown);
     }, [isFontMenuOpen]);
 
+    useLayoutEffect(() => {
+        const el = toolbarRef.current;
+        if (!el) return;
+
+        const updateLeft = () => {
+            const parent = el.offsetParent as HTMLElement | null;
+            if (!parent) {
+                setResolvedLeft(position.left);
+                return;
+            }
+
+            const maxLeft = Math.max(0, parent.clientWidth - el.offsetWidth);
+            const clampedLeft = Math.min(Math.max(0, position.left), maxLeft);
+            setResolvedLeft(clampedLeft);
+        };
+
+        updateLeft();
+        window.addEventListener('resize', updateLeft);
+        return () => window.removeEventListener('resize', updateLeft);
+    }, [position.left, isFontMenuOpen, fontSizePt, activeFontFamily]);
+
     const handleFontChange = useCallback((fontFamily: string) => {
         editor.chain().focus().setFontFamily(fontFamily).run();
         setIsFontMenuOpen(false);
@@ -162,12 +185,13 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
 
     return (
         <div
+            ref={toolbarRef}
             className="text-editing-toolbar"
             data-testid="text-editing-toolbar"
             style={{
                 position: 'absolute',
                 top: Math.max(0, position.top - TOOLBAR_HEIGHT - TOOLBAR_GAP),
-                left: position.left,
+                left: resolvedLeft,
                 minWidth: Math.min(position.width, 280),
                 zIndex: 1000,
             }}

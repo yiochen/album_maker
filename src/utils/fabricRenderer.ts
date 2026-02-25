@@ -6,6 +6,14 @@ import { CustomFabricObject, ExtendedFabricObject } from '../hooks/fabricTypes';
 import { APP_CONFIG } from '../config';
 import { FabricRenderOptions } from './rendererTypes';
 
+const SHARED_SELECTION_STYLE: Partial<fabric.FabricObjectProps> = {
+    cornerStyle: 'circle',
+    cornerColor: 'white',
+    cornerStrokeColor: '#333',
+    borderColor: '#333',
+    transparentCorners: false,
+};
+
 /**
  * Calculates UI sizes (corners, borders, seam) compensated for zoom.
  */
@@ -74,6 +82,7 @@ export async function renderSpread(
                 existingImage.pageElement = element;
 
                 existingImage.set({
+                    ...SHARED_SELECTION_STYLE,
                     selectable: isInteractive,
                     hasControls: isInteractive,
                     evented: isInteractive,
@@ -106,11 +115,7 @@ export async function renderSpread(
                 if (existingObj) canvas.remove(existingObj);
 
                 const canvasEl = new CanvasImageElement(element, {
-                    cornerStyle: 'circle',
-                    cornerColor: 'white',
-                    cornerStrokeColor: '#333',
-                    borderColor: '#333',
-                    transparentCorners: false,
+                    ...SHARED_SELECTION_STYLE,
                     cornerSize: uiSizes.cornerSize,
                     borderScaleFactor: uiSizes.borderScaleFactor,
                     selectable: isInteractive,
@@ -130,14 +135,15 @@ export async function renderSpread(
             // ── Text element sync ──
             const existingText = existingObj instanceof CanvasTextElement ? existingObj : null;
 
-            if (existingText) {
-                existingText.pageElement = element;
-                existingText.updateControlVisibility();
+                if (existingText) {
+                    existingText.pageElement = element;
+                    existingText.updateControlVisibility();
 
-                existingText.set({
-                    selectable: isInteractive,
-                    hasControls: isInteractive,
-                    evented: isInteractive,
+                    existingText.set({
+                        ...SHARED_SELECTION_STYLE,
+                        selectable: isInteractive,
+                        hasControls: isInteractive,
+                        evented: isInteractive,
                     cornerSize: uiSizes.cornerSize,
                     borderScaleFactor: uiSizes.borderScaleFactor,
                 });
@@ -146,13 +152,14 @@ export async function renderSpread(
                     existingText.syncFromRuns();
                     existingText.applyLayout(canvas.width, canvas.height);
                 }
-            } else {
+                } else {
                 // Remove stale object of a different type
                 if (existingObj) canvas.remove(existingObj);
 
-                const canvasEl = new CanvasTextElement(element, options.ppi, {
-                    interactive: isInteractive,
-                });
+                    const canvasEl = new CanvasTextElement(element, options.ppi, {
+                        ...SHARED_SELECTION_STYLE,
+                        interactive: isInteractive,
+                    });
 
 
                 canvas.add(canvasEl);

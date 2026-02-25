@@ -116,7 +116,12 @@ export function extractLayoutFromDOM(
     paragraphs.forEach((para, paraIdx) => {
         const nodes = para.content ?? [];
         if (nodes.length === 0) {
-            runs.push({ text: '\n' });
+            // Match serializer behavior: only non-last empty paragraphs represent
+            // an actual line break in the runs model. A trailing empty paragraph
+            // should not keep appending newlines on each edit roundtrip.
+            if (paraIdx < paragraphs.length - 1) {
+                runs.push({ text: '\n' });
+            }
             domParaIdx++;
             return;
         }

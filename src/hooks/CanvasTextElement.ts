@@ -8,7 +8,7 @@ export class CanvasTextElement extends fabric.FabricObject {
     constructor(
         element: PageElement,
         ppi: number,
-        options: {
+        options: Partial<fabric.FabricObjectProps> & {
             interactive?: boolean;
             opacity?: number;
         } = {}

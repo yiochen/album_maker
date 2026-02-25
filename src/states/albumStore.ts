@@ -45,6 +45,7 @@ interface AlbumState {
     updateSpread: (spreadId: string, updates: Partial<Spread>) => void;
     addElement: (spreadId: string, element: PageElement) => void;
     updateElement: (spreadId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => void;
+    updateElementTransient: (spreadId: string, elementId: string, updates: Partial<PageElement>) => void;
     deleteElement: (spreadId: string, elementId: string) => void;
     addToPool: (images: PoolImage[]) => void;
     removeFromPool: (imageId: string) => void;
@@ -204,6 +205,43 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
             syncState();
         },
 
+        updateElementTransient: (spreadId: string, elementId: string, updates: Partial<PageElement>) => {
+            const album = get().album;
+            if (!album) return;
+
+            const spread = album.spreads.find(s => s.id === spreadId);
+            if (!spread) return;
+            const element = spread.elements.find(e => e.id === elementId);
+            if (!element) return;
+
+            const newAlbum: Album = {
+                ...album,
+                spreads: album.spreads.map(s =>
+                    s.id === spreadId
+                        ? {
+                            ...s,
+                            versionId: crypto.randomUUID(),
+                            elements: s.elements.map(e =>
+                                e.id === elementId
+                                    ? ({
+                                        ...e,
+                                        ...updates,
+                                        content: updates.content
+                                            ? { ...e.content, ...updates.content }
+                                            : e.content,
+                                    } as PageElement)
+                                    : e
+                            ),
+                        }
+                        : s
+                ),
+                updatedAt: Date.now(),
+            };
+
+            commandManager.updatePresent(newAlbum);
+            syncState();
+        },
+
         deleteElement: (spreadId: string, elementId: string) => {
             const album = get().album;
             if (!album) return;
@@ -354,6 +392,9 @@ export const useAddElement = () => useAlbumStore(state => state.addElement);
 
 /** Select updateElement action */
 export const useUpdateElement = () => useAlbumStore(state => state.updateElement);
+
+/** Select updateElementTransient action (no history entry) */
+export const useUpdateElementTransient = () => useAlbumStore(state => state.updateElementTransient);
 
 /** Select deleteElement action */
 export const useDeleteElement = () => useAlbumStore(state => state.deleteElement);

@@ -16,6 +16,11 @@ export const useKeyboardShortcuts = () => {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as Element | null;
+            if (target?.closest('.ProseMirror')) {
+                return;
+            }
+
             // Undo: Ctrl+Z or Meta+Z
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
                 e.preventDefault();

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import * as fabric from 'fabric';
 import { CanvasTextElement } from './CanvasTextElement';
-import { useSetEditingTextElementId } from '../states/uiStore';
+import { useEditingTextElementId, useSetEditingTextElementId } from '../states/uiStore';
 
 /**
  * Props for useTextEditingSelection.
@@ -12,16 +12,18 @@ interface UseTextEditingSelectionProps {
 }
 
 /**
- * Hook to synchronize Fabric selection with the editingTextElementId store.
- * 
- * It listens for selection events and:
- * - Sets editingTextElementId if a text element is selected.
- * - Clears editingTextElementId if selection is cleared or moved to a non-text element.
+ * Hook to manage text editing entry/exit against Fabric selection events.
+ *
+ * Behavior:
+ * - Enter text editing only on double-click of a text object.
+ * - Keep single-click selection for move/select interactions.
+ * - Exit text editing when selection moves away from the active text object.
  */
 export const useTextEditingSelection = ({
     fabricCanvas,
 }: UseTextEditingSelectionProps) => {
     const setEditingTextElementId = useSetEditingTextElementId();
+    const editingTextElementId = useEditingTextElementId();
 
     useEffect(() => {
         const canvas = fabricCanvas;
@@ -29,30 +31,51 @@ export const useTextEditingSelection = ({
 
         const handleSelection = (e: { selected: fabric.Object[] }) => {
             const selected = e.selected || [];
-            if (selected.length === 1) {
-                const obj = selected[0];
-                if (obj instanceof CanvasTextElement) {
-                    setEditingTextElementId(obj.pageElement.id);
-                } else {
+            if (selected.length !== 1) {
+                if (editingTextElementId) {
                     setEditingTextElementId(null);
                 }
-            } else {
+                return;
+            }
+
+            const obj = selected[0];
+            if (!(obj instanceof CanvasTextElement)) {
+                if (editingTextElementId) {
+                    setEditingTextElementId(null);
+                }
+                return;
+            }
+
+            // Single selection should not auto-enter editing. It only keeps/clears
+            // existing edit mode when switching targets.
+            if (editingTextElementId && obj.pageElement.id !== editingTextElementId) {
                 setEditingTextElementId(null);
             }
         };
 
         const handleSelectionCleared = () => {
-            setEditingTextElementId(null);
+            if (editingTextElementId) {
+                setEditingTextElementId(null);
+            }
+        };
+
+        const handleDoubleClick = (e: { target?: fabric.Object }) => {
+            const target = e.target;
+            if (target instanceof CanvasTextElement) {
+                setEditingTextElementId(target.pageElement.id);
+            }
         };
 
         canvas.on('selection:created', handleSelection);
         canvas.on('selection:updated', handleSelection);
         canvas.on('selection:cleared', handleSelectionCleared);
+        canvas.on('mouse:dblclick', handleDoubleClick);
 
         return () => {
             canvas.off('selection:created', handleSelection);
             canvas.off('selection:updated', handleSelection);
             canvas.off('selection:cleared', handleSelectionCleared);
+            canvas.off('mouse:dblclick', handleDoubleClick);
         };
-    }, [fabricCanvas, setEditingTextElementId]);
+    }, [fabricCanvas, editingTextElementId, setEditingTextElementId]);
 };

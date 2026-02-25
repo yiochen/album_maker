@@ -77,6 +77,8 @@ export const useTextEditing = ({
     canvasWidth,
     canvasHeight,
 }: UseTextEditingProps): TextEditingState => {
+    const EDITOR_PADDING_SCREEN_PX = 8;
+
     const setEditingTextElementId = useSetEditingTextElementId();
     const editingTextElementId = useEditingTextElementId();
     const updateElement = useUpdateElement();
@@ -163,9 +165,9 @@ export const useTextEditing = ({
         const screenWidth = bound.width * (canvasRect.width / (fabricCanvas.width || 1));
 
         setToolbarPosition({
-            top: screenTop - containerRect.top,
-            left: screenLeft - containerRect.left,
-            width: screenWidth,
+            top: screenTop - containerRect.top - EDITOR_PADDING_SCREEN_PX,
+            left: screenLeft - containerRect.left - EDITOR_PADDING_SCREEN_PX,
+            width: screenWidth + EDITOR_PADDING_SCREEN_PX * 2,
         });
     }, [fabricCanvas, containerRef]);
 
