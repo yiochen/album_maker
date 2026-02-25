@@ -7,7 +7,7 @@
     "dev": "npm run generate-schema && vite",
     "build": "npm run generate-schema && tsc -b && vite build",
     "generate-schema": "ts-json-schema-generator --path 'src/types/index.ts' --type 'Album' --out 'src/schemas/albumSchema.json' --tsconfig 'tsconfig.app.json'",
-    "lint": "eslint .",
+    "lint": "eslint . && tsc -b --noEmit",
     "preview": "vite preview",
     "cy:open": "cypress open",
     "cy:run": "cypress run",

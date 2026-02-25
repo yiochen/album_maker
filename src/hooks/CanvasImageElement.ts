@@ -79,24 +79,24 @@ export class CanvasImageElement extends fabric.Group {
             originY: 'top',
             subTargetCheck: false, // Don't allow selecting the inner image directly
             interactive: true,
-            data: { id: element.id },
             lockRotation: true,
-            uniformScaling: options.uniformScaling !== undefined ? options.uniformScaling : true,
-            lockUniScaling: options.uniformScaling !== undefined ? options.uniformScaling : true,
             selectable: options.interactive !== false,
             evented: options.interactive !== false,
         });
 
         this.pageElement = element;
+        this.data = { id: element.id };
         this.innerImage = innerImage;
         this.placeholderFrame = placeholderFrame;
         this.placeholderPlusH = placeholderPlusH;
         this.placeholderPlusV = placeholderPlusV;
         this.onContentTransformChange = options.onContentTransformChange;
         this.panControlSize = options.panControlSize ?? 22;
+        const isUniformScaling = options.uniformScaling !== undefined ? options.uniformScaling : true;
+        (this as unknown as { lockUniScaling?: boolean }).lockUniScaling = isUniformScaling;
 
         if (options.interactive !== false) {
-            this.updateControlVisibility(options.uniformScaling !== undefined ? options.uniformScaling : true);
+            this.updateControlVisibility(isUniformScaling);
             this.addPanControl();
         }
 
