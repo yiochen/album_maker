@@ -1,10 +1,10 @@
-import React, { useRef, useEffect, useMemo, useState, useLayoutEffect, useCallback } from 'react';
-import type { Editor } from '@tiptap/react';
+import React, { useRef, useEffect, useMemo, useState, useLayoutEffect } from 'react';
 import type { PoolImage, TextContent } from '../types';
 import { isTextElement } from '../types';
 import { useCanvasRender } from '../hooks/useCanvasRender';
 import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
 import { useTextEditing } from '../hooks/useTextEditing';
+import { useTextEditingSelection } from '../hooks/useTextEditingSelection';
 import { DroppableCanvas } from './DroppableCanvas';
 import { TiptapTextEditor } from './canvas/TiptapTextEditor';
 import { TextEditingToolbar } from './canvas/TextEditingToolbar';
@@ -65,13 +65,12 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     // Text editing lifecycle — Tiptap-based overlay
     const {
+        editor,
+        editingTextElementId,
         editingElement,
         toolbarPosition,
-        handleSave,
-        handleCancel,
         handleTextAlignChange,
         currentTextAlign,
-        registerSave,
     } = useTextEditing({
         fabricCanvas,
         containerRef,
@@ -80,30 +79,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         canvasHeight,
     });
 
-    // Track the Tiptap editor instance for the toolbar
-    const [tiptapEditor, setTiptapEditor] = useState<Editor | null>(null);
+    // Synchronize Fabric selection with editingTextElementId in store
+    useTextEditingSelection({ fabricCanvas });
 
-    /**
-     * When the Tiptap editor mounts, register its save function with useTextEditing
-     * so that canvas-level events (clicking blank space, clicking another element)
-     * can trigger a proper save through the editor's own code path.
-     */
-    const handleEditorReady = useCallback((editor: Editor) => {
-        setTiptapEditor(editor);
-        registerSave(() => {
-            // Programmatically blur the editor — TiptapTextEditor's blur handler
-            // will detect this is not a properties-panel/toolbar focus change and
-            // will call its own handleSave (which has access to content, DOM, etc.)
-            editor.commands.blur();
-        });
-    }, [registerSave]);
-
-    const handleEditorDestroy = useCallback(() => {
-        setTiptapEditor(null);
-        registerSave(null);
-    }, [registerSave]);
-
-    // Register this canvas as a drop target for dnd-kit
     useEffect(() => {
         if (!currentSpread) return;
 
@@ -280,18 +258,15 @@ export const Canvas: React.FC<CanvasProps> = ({
                                 </div>
                             )}
                             {/* Tiptap text editor overlay — inside canvas wrapper for zoom scaling */}
-                            {editingElement && editingContent && (
+                            {editingTextElementId && (
                                 <TiptapTextEditor
-                                    content={editingContent}
-                                    box={editingElement.box}
+                                    key={editingTextElementId}
+                                    editor={editor}
+                                    elementId={editingTextElementId}
                                     canvasWidth={canvasWidth}
                                     canvasHeight={canvasHeight}
-                                    canvasZoom={zoom}
-                                    onSave={handleSave}
-                                    onCancel={handleCancel}
-                                    onEditorReady={handleEditorReady}
-                                    onEditorDestroy={handleEditorDestroy}
                                     textAlign={currentTextAlign}
+                                    canvasZoom={zoom}
                                 />
                             )}
                         </div>
@@ -300,10 +275,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             </div>
 
             {/* Text editing toolbar — outside zoom container to prevent scaling */}
-            {toolbarPosition && tiptapEditor && editingContent && (
+            {toolbarPosition && editor && editingContent && (
                 <TextEditingToolbar
                     position={toolbarPosition}
-                    editor={tiptapEditor}
+                    editor={editor}
                     defaultFontSizePt={editingContent.defaultStyle.fontSize}
                     onTextAlignChange={handleTextAlignChange}
                     textAlign={currentTextAlign}

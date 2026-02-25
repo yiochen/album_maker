@@ -34,3 +34,4 @@ src/schemas/
 
 # Compiled Service Worker (source is src/sw.ts)
 sw.js
+.aider*

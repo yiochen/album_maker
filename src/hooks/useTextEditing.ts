@@ -2,19 +2,29 @@
  * useTextEditing — Hook for managing the Tiptap text editing lifecycle.
  *
  * Responsibilities:
- * - Detects single-click on text elements via Fabric canvas events
- * - Manages editing state (which element is being edited)
+ * - Owns the Tiptap Editor singleton instance
  * - Computes overlay position for the Tiptap editor and toolbar
- * - Provides save/cancel callbacks that persist TextContent to the store
- * - Exposes registerSave so Canvas can wire up external save triggers
+ * - Provides live alignment syncing for the toolbar
+ * - Manages toolbar positioning relative to the canvas
+ * - Synchronizes editor content with the selected element
  */
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import * as fabric from 'fabric';
+import { useEditor } from '@tiptap/react';
+import type { Editor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import { TextStyle } from '@tiptap/extension-text-style';
+import Color from '@tiptap/extension-color';
+import FontFamily from '@tiptap/extension-font-family';
+import { FontSize } from '../extensions/tiptapFontSize';
+import { textContentToTiptapDoc } from '../utils/tiptapSerializer';
+
 import { CanvasTextElement } from './CanvasTextElement';
 import { useSetEditingTextElementId, useEditingTextElementId } from '../states/uiStore';
-import { useUpdateElement } from '../states/albumStore';
+import { useUpdateElement, useAlbumSpreads } from '../states/albumStore';
 import { useCurrentSpreadIndex } from '../states/uiStore';
-import { useAlbumSpreads } from '../states/albumStore';
+import { isTextElement } from '../types';
 import type { TextContent, PageElement } from '../types';
 
 /** Position rectangle for the floating toolbar, in viewport-relative pixels. */
@@ -26,6 +36,8 @@ export interface TextToolbarPosition {
 
 /** State exposed by this hook for the Canvas component to render the Tiptap overlay. */
 export interface TextEditingState {
+    /** The singleton Tiptap editor instance. */
+    editor: Editor | null;
     /** Currently editing element ID (null if not editing). */
     editingTextElementId: string | null;
     /** The PageElement being edited (null if not editing). */
@@ -37,19 +49,13 @@ export interface TextEditingState {
     /** Canvas height in px (for overlay positioning). */
     canvasHeight: number;
     /** Save edited content and exit editing. */
-    handleSave: (content: TextContent) => void;
+    handleSave: () => void;
     /** Cancel editing without saving. */
     handleCancel: () => void;
     /** Update text alignment during editing (persists immediately). */
     handleTextAlignChange: (align: TextContent['textAlign']) => void;
     /** Current text alignment of the editing element. */
     currentTextAlign: TextContent['textAlign'];
-    /**
-     * Register an external save function.
-     * Canvas wires this up so that clicking blank space or another element
-     * triggers the Tiptap editor's own save path (which has access to content/DOM).
-     */
-    registerSave: (fn: (() => void) | null) => void;
 }
 
 interface UseTextEditingProps {
@@ -77,35 +83,6 @@ export const useTextEditing = ({
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
 
-    // Stable refs
-    const updateElementRef = useRef(updateElement);
-    const spreadsRef = useRef(spreads);
-    const currentSpreadIndexRef = useRef(currentSpreadIndex);
-
-    useEffect(() => {
-        updateElementRef.current = updateElement;
-        spreadsRef.current = spreads;
-        currentSpreadIndexRef.current = currentSpreadIndex;
-    }, [updateElement, spreads, currentSpreadIndex]);
-
-    // Ref that always holds the current editingTextElementId for use inside event handlers
-    const editingTextElementIdRef = useRef(editingTextElementId);
-    useEffect(() => {
-        editingTextElementIdRef.current = editingTextElementId;
-    }, [editingTextElementId]);
-
-    // Ref for the external save function registered by Canvas/TiptapTextEditor
-    const externalSaveRef = useRef<(() => void) | null>(null);
-
-    /** Register (or clear) the external save callback. */
-    const registerSave = useCallback((fn: (() => void) | null) => {
-        externalSaveRef.current = fn;
-    }, []);
-
-    // Toolbar position state
-    const [toolbarPosition, setToolbarPosition] = useState<TextToolbarPosition | null>(null);
-    // Text align state (live during editing, synced to store)
-    const [currentTextAlign, setCurrentTextAlign] = useState<TextContent['textAlign']>('left');
 
     // Find the element being edited
     const editingElement = useMemo(() => {
@@ -113,6 +90,64 @@ export const useTextEditing = ({
         const spread = spreads[currentSpreadIndex];
         return spread?.elements.find(e => e.id === editingTextElementId) ?? null;
     }, [editingTextElementId, spreads, currentSpreadIndex]);
+
+    // Initialize the singleton Editor
+    const editor = useEditor({
+        extensions: [
+            StarterKit.configure({
+                heading: false,
+                blockquote: false,
+                codeBlock: false,
+                code: false,
+                bulletList: false,
+                orderedList: false,
+                listItem: false,
+                horizontalRule: false,
+            }),
+            Underline,
+            TextStyle,
+            Color,
+            FontFamily,
+            FontSize,
+        ],
+    });
+
+    // Content sync effect: When the selected element changes, update the editor content.
+    // This is done here in the hook so it only happens once when the ID switches.
+    const lastLoadedIdRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (editor && editingTextElementId && editingElement && isTextElement(editingElement)) {
+            if (lastLoadedIdRef.current !== editingTextElementId) {
+                const doc = textContentToTiptapDoc(editingElement.content as TextContent);
+                editor.commands.setContent(doc, { emitUpdate: false }); // Do not emit update immediately
+                editor.commands.focus('end');
+                lastLoadedIdRef.current = editingTextElementId;
+            }
+        } else if (!editingTextElementId) {
+            lastLoadedIdRef.current = null;
+        }
+    }, [editor, editingTextElementId, editingElement]);
+
+    // Toolbar position state
+    const [toolbarPosition, setToolbarPosition] = useState<TextToolbarPosition | null>(null);
+
+    // Deriving current alignment directly from the editing element
+    const currentTextAlign = useMemo(() => {
+        if (editingElement && isTextElement(editingElement)) {
+            return (editingElement.content as TextContent).textAlign;
+        }
+        return 'left';
+    }, [editingElement]);
+
+    // Clear toolbar position when text editing exits.
+    useEffect(() => {
+        if (!editingTextElementId) {
+            const frameId = requestAnimationFrame(() => {
+                setToolbarPosition(null);
+            });
+            return () => cancelAnimationFrame(frameId);
+        }
+    }, [editingTextElementId]);
 
     // Compute toolbar position from the Fabric canvas object
     const updateToolbarPosition = useCallback((textObj: CanvasTextElement) => {
@@ -134,44 +169,11 @@ export const useTextEditing = ({
         });
     }, [fabricCanvas, containerRef]);
 
-    // Enter editing on mouse:down; save current editing session if one is active
-    useEffect(() => {
-        if (!fabricCanvas) return;
-
-        const handleMouseDown = (e: fabric.TPointerEventInfo) => {
-            // If we're currently editing, save and close on any canvas mouse:down
-            if (editingTextElementIdRef.current) {
-                externalSaveRef.current?.();
-                return;
-            }
-
-            // Not editing — check if clicking a text element to enter editing
-            if (e.target instanceof CanvasTextElement) {
-                const id = e.target.pageElement.id;
-                const content = e.target.pageElement.content as TextContent;
-
-                setEditingTextElementId(id);
-                setCurrentTextAlign(content.textAlign);
-                updateToolbarPosition(e.target);
-
-                fabricCanvas.discardActiveObject();
-                fabricCanvas.requestRenderAll();
-            }
-        };
-
-        fabricCanvas.on('mouse:down', handleMouseDown);
-
-        return () => {
-            fabricCanvas.off('mouse:down', handleMouseDown);
-        };
-    }, [fabricCanvas, setEditingTextElementId, updateToolbarPosition]);
 
     // Helper to restore Fabric selection back to the text element after editing
     const restoreSelection = useCallback((id: string) => {
         if (!fabricCanvas) return;
 
-        // Small delay to ensure any concurrent Fabric selection events (from clicking another object)
-        // have already processed.
         setTimeout(() => {
             if (!fabricCanvas.getActiveObject()) {
                 const textObj = (fabricCanvas.getObjects() as fabric.FabricObject[])
@@ -185,76 +187,31 @@ export const useTextEditing = ({
         }, 50);
     }, [fabricCanvas]);
 
-    // Save handler — called by TiptapTextEditor with the final TextContent
-    const handleSave = useCallback((newContent: TextContent, newWidthPx?: number, newHeightPx?: number) => {
-        const spread = spreadsRef.current[currentSpreadIndexRef.current];
-        if (spread && editingTextElementId) {
-            const element = spread.elements.find(e => e.id === editingTextElementId);
-            if (element) {
-                const updates: Partial<PageElement> = { content: newContent };
-
-                // Update the box with both width and height if provided
-                if (canvasWidth > 0 && canvasHeight > 0) {
-                    const newBox = { ...element.box };
-                    let changed = false;
-
-                    if (newWidthPx !== undefined && newWidthPx > 0) {
-                        newBox.x2 = element.box.x1 + newWidthPx / canvasWidth;
-                        changed = true;
-                    }
-
-                    if (newHeightPx !== undefined && newHeightPx > 0) {
-                        newBox.y2 = element.box.y1 + newHeightPx / canvasHeight;
-                        changed = true;
-                    }
-
-                    if (changed) {
-                        updates.box = newBox;
-                    }
-                }
-
-                updateElementRef.current(spread.id, editingTextElementId, updates);
-            }
-        }
-
-        // Capture ID for restoration before clearing
+    const handleSave = useCallback(() => {
         const idToRestore = editingTextElementId;
         setEditingTextElementId(null);
-        setToolbarPosition(null);
-        externalSaveRef.current = null;
+        if (idToRestore) restoreSelection(idToRestore);
+    }, [editingTextElementId, setEditingTextElementId, restoreSelection]);
 
-        if (idToRestore) {
-            restoreSelection(idToRestore);
-        }
-    }, [editingTextElementId, setEditingTextElementId, canvasWidth, canvasHeight, restoreSelection]);
-
-    // Cancel handler
     const handleCancel = useCallback(() => {
         const idToRestore = editingTextElementId;
         setEditingTextElementId(null);
-        setToolbarPosition(null);
-        externalSaveRef.current = null;
-
-        if (idToRestore) {
-            restoreSelection(idToRestore);
-        }
+        if (idToRestore) restoreSelection(idToRestore);
     }, [editingTextElementId, setEditingTextElementId, restoreSelection]);
 
     // Text align change handler (persists immediately so Fabric re-renders)
     const handleTextAlignChange = useCallback((align: TextContent['textAlign']) => {
-        setCurrentTextAlign(align);
-
-        const spread = spreadsRef.current[currentSpreadIndexRef.current];
+        const spread = spreads[currentSpreadIndex];
         if (spread && editingTextElementId) {
             const element = spread.elements.find(e => e.id === editingTextElementId);
             if (element) {
                 const content = element.content as TextContent;
-                updateElementRef.current(spread.id, editingTextElementId, {
+                updateElement(spread.id, editingTextElementId, {
                     content: { ...content, textAlign: align },
                 });
             }
         }
-    }, [editingTextElementId]);
+    }, [editingTextElementId, spreads, currentSpreadIndex, updateElement]);
 
     // Reposition toolbar on zoom or scroll changes
     useEffect(() => {
@@ -271,7 +228,6 @@ export const useTextEditing = ({
         };
 
         if (!findAndPosition()) {
-            // If not found (e.g. just added), try again in next tick
             const timeout = setTimeout(findAndPosition, 50);
             return () => clearTimeout(timeout);
         }
@@ -296,6 +252,7 @@ export const useTextEditing = ({
     }, [containerRef, editingTextElementId, fabricCanvas, updateToolbarPosition]);
 
     return {
+        editor,
         editingTextElementId,
         editingElement,
         toolbarPosition,
@@ -305,6 +262,5 @@ export const useTextEditing = ({
         handleCancel,
         handleTextAlignChange,
         currentTextAlign,
-        registerSave,
     };
 };

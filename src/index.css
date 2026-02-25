@@ -1535,6 +1535,21 @@ body {
   animation: slideUp 0.15s ease-out;
 }
 
+.tiptap-text-editor-overlay .ProseMirror {
+  margin: 0;
+  padding: 0;
+  white-space: pre-wrap;
+}
+
+.tiptap-text-editor-overlay .ProseMirror p {
+  margin: 0;
+}
+
+.tiptap-text-editor-overlay .ProseMirror:focus,
+.tiptap-text-editor-overlay .ProseMirror:focus-visible {
+  outline: none;
+}
+
 .text-toolbar-btn {
   display: flex;
   align-items: center;

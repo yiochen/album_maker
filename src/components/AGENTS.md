@@ -15,6 +15,7 @@ Contains all React UI components for the application, including the main Canvas,
   - Delegates rendering logic to `useCanvasRender`.
   - Delegates interaction logic to `useCanvasInteraction`.
   - Uses `APP_CONFIG` for global configuration (PPI, sizes, etc.).
+  - For text elements, Fabric is selection/display only; text editing and resizing are handled by the Tiptap overlay. Do not re-enable Fabric text transform handles as the primary UX.
 
 ### Navigation
 - **PageNavigator (`PageNavigator.tsx`)**: The sidebar for navigating spreads.

@@ -1,46 +1,35 @@
 /**
  * TiptapTextEditor — Overlay rich text editor that replaces Fabric's inline editing.
  *
- * Rendered as an absolute-positioned contenteditable div within the canvas wrapper,
+ * Rendered as an absolute-positioned div within the canvas wrapper,
  * positioned directly over the text element. The canvas CSS zoom transform handles
  * scaling automatically.
  *
  * ## Lifecycle
- * 1. Double-click text element → component mounts with Tiptap editor
- * 2. User edits with rich text capabilities
- * 3. On blur/Escape → persist TextRun[], unmount
+ * 1. Element is selected in Fabric → Store updates editingTextElementId
+ * 2. Canvas renders TiptapTextEditor with elementId as key
+ * 3. User edits with rich text capabilities
+ * 4. User clicks away → Fabric selection cleared → Store editingTextElementId becomes null
+ * 5. TiptapTextEditor unmounts → runs cleanup code to persist final content to store
  */
-import React, { useEffect, useCallback, useMemo } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import React, { useEffect, useCallback, useMemo, useRef, useLayoutEffect, useState } from 'react';
 import type { Editor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import { TextStyle } from '@tiptap/extension-text-style';
-import Color from '@tiptap/extension-color';
-import FontFamily from '@tiptap/extension-font-family';
-import { FontSize } from '../../extensions/tiptapFontSize';
-import { textContentToTiptapDoc } from '../../utils/tiptapSerializer';
 import { extractLayoutFromDOM } from '../../utils/domLayoutExtractor';
-import type { TextContent, NormalizedRect } from '../../types';
+import { useAlbumSpreads, useUpdateElement } from '../../states/albumStore';
+import { useCurrentSpreadIndex } from '../../states/uiStore';
+import { isTextElement } from '../../types';
+import type { TextContent, PageElement } from '../../types';
 
 /** Props for the overlay position and styling. */
 interface TiptapTextEditorProps {
-    /** The TextContent to edit. */
-    content: TextContent;
-    /** Normalized box (0-1) of the text element. */
-    box: NormalizedRect;
+    /** The singleton Tiptap editor instance. */
+    editor: Editor | null;
+    /** The ID of the element being edited. */
+    elementId: string;
     /** Canvas width in px (at canvas PPI). */
     canvasWidth: number;
     /** Canvas height in px (at canvas PPI). */
     canvasHeight: number;
-    /** Called when editing is complete with updated content. Optional width/height update for resizing. */
-    onSave: (content: TextContent, newWidthPx?: number, newHeightPx?: number) => void;
-    /** Called when the user cancels editing (Escape). */
-    onCancel: () => void;
-    /** Called with the editor instance once it's ready (for toolbar integration). */
-    onEditorReady?: (editor: Editor) => void;
-    /** Called when the editor is about to be destroyed. */
-    onEditorDestroy?: () => void;
     /** Current text alignment (controlled externally so toolbar can update it). */
     textAlign: TextContent['textAlign'];
     /** Current canvas zoom percentage to scale layout values properly */
@@ -48,140 +37,114 @@ interface TiptapTextEditorProps {
 }
 
 export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
-    content,
-    box,
+    editor,
+    elementId,
     canvasWidth,
     canvasHeight,
-    onSave,
-    onCancel,
-    onEditorReady,
-    onEditorDestroy,
     textAlign,
     canvasZoom,
 }) => {
-    const { defaultStyle } = content;
+    const spreads = useAlbumSpreads();
+    const currentSpreadIndex = useCurrentSpreadIndex();
+    const updateElement = useUpdateElement();
+    const editorHostRef = useRef<HTMLDivElement | null>(null);
 
-    // Convert normalized box to pixel position
-    const left = box.x1 * canvasWidth;
-    const top = box.y1 * canvasHeight;
-    const width = (box.x2 - box.x1) * canvasWidth;
-    const height = (box.y2 - box.y1) * canvasHeight;
+    // Find the element being edited
+    const element = useMemo(() => {
+        const spread = spreads[currentSpreadIndex];
+        return spread?.elements.find(e => e.id === elementId) ?? null;
+    }, [elementId, spreads, currentSpreadIndex]);
 
-    // Convert pt font size to px for CSS rendering (screen PPI = 96, 1pt = 96/72 px)
-    const defaultFontSizePx = defaultStyle.fontSize * (96 / 72);
+    // Keep refs for unmount logic
+    const updateElementRef = useRef(updateElement);
+    const elementRef = useRef(element);
+    const textAlignRef = useRef(textAlign);
+    const canvasWidthRef = useRef(canvasWidth);
+    const canvasHeightRef = useRef(canvasHeight);
+    const canvasZoomRef = useRef(canvasZoom);
+    const spreadIdRef = useRef(spreads[currentSpreadIndex]?.id);
 
-    // Initialize Tiptap doc from TextContent
-    const initialDoc = useMemo(
-        () => textContentToTiptapDoc(content),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [] // Only compute once on mount
-    );
-
-    const editor = useEditor({
-        extensions: [
-            StarterKit.configure({
-                heading: false,
-                blockquote: false,
-                codeBlock: false,
-                code: false,
-                bulletList: false,
-                orderedList: false,
-                listItem: false,
-                horizontalRule: false,
-            }),
-            Underline,
-            TextStyle,
-            Color,
-            FontFamily,
-            FontSize,
-        ],
-        content: initialDoc,
-        autofocus: 'end',
-        editorProps: {
-            attributes: {
-                style: [
-                    `font-family: ${defaultStyle.fontFamily}`,
-                    `font-size: ${defaultFontSizePx}px`,
-                    `font-weight: ${defaultStyle.fontWeight}`,
-                    `font-style: ${defaultStyle.fontStyle}`,
-                    `color: ${defaultStyle.fill}`,
-                    `line-height: ${content.lineHeight}`,
-                    `text-align: ${textAlign}`,
-                    'outline: none',
-                    'white-space: pre-wrap',
-                    'word-break: break-word',
-                    'caret-color: currentColor',
-                ].join('; '),
-            },
-        },
-    });
-
-    // Notify parent when editor is ready/destroyed
     useEffect(() => {
-        if (editor) {
-            onEditorReady?.(editor);
-        }
+        updateElementRef.current = updateElement;
+        elementRef.current = element;
+        textAlignRef.current = textAlign;
+        canvasWidthRef.current = canvasWidth;
+        canvasHeightRef.current = canvasHeight;
+        canvasZoomRef.current = canvasZoom;
+        spreadIdRef.current = spreads[currentSpreadIndex]?.id;
+    }, [updateElement, element, textAlign, canvasWidth, canvasHeight, canvasZoom, spreads, currentSpreadIndex]);
+
+    // FINAL SAVE ON UNMOUNT
+    // We utilize an empty dependency array to ensure the cleanup runs exactly once
+    // when this component instance (keyed by elementId) unmounts.
+    useEffect(() => {
         return () => {
-            onEditorDestroy?.();
-        };
-    }, [editor, onEditorReady, onEditorDestroy]);
+            if (!editor) return;
 
-    // Update text-align when it changes externally (from toolbar)
-    useEffect(() => {
-        if (!editor) return;
-        const el = editor.view.dom as HTMLElement;
-        el.style.textAlign = textAlign;
-    }, [editor, textAlign]);
+            const doc = editor.getJSON();
+            const editorEl = editor.view.dom as HTMLElement;
+            const containerEl = editorEl.closest('.tiptap-text-editor-overlay') as HTMLElement;
+            const finalWidthPx = containerEl?.offsetWidth;
+            const finalHeightPx = containerEl?.offsetHeight;
 
-    const handleSave = useCallback(() => {
-        if (!editor) return;
+            const currentElement = elementRef.current;
+            if (!currentElement || !isTextElement(currentElement)) return;
 
-        const doc = editor.getJSON();
-        const editorEl = editor.view.dom as HTMLElement;
-        const containerEl = editorEl.closest('.tiptap-text-editor-overlay') as HTMLElement;
-        const finalWidthPx = containerEl?.offsetWidth;
-        const finalHeightPx = containerEl?.offsetHeight;
+            // Extract layout using the refs to have the most "stable" values at unmount time
+            const runs = extractLayoutFromDOM(
+                editorEl,
+                doc,
+                (currentElement.content as TextContent).defaultStyle as Required<import('../../types').TextStyle>,
+                canvasWidthRef.current,
+                canvasZoomRef.current
+            );
 
-        // Extract pixel-perfect layout from the DOM directly!
-        const runs = extractLayoutFromDOM(
-            editorEl,
-            doc,
-            defaultStyle as Required<import('../../types').TextStyle>,
-            canvasWidth,
-            canvasZoom
-        );
+            const spreadId = spreadIdRef.current;
+            if (spreadId && elementId) {
+                const updates: Partial<PageElement> = {
+                    content: {
+                        ...(currentElement.content as TextContent),
+                        runs,
+                        textAlign: textAlignRef.current,
+                    }
+                };
 
-        onSave({
-            ...content,
-            runs,
-            textAlign,
-        }, finalWidthPx, finalHeightPx);
-    }, [editor, defaultStyle, content, textAlign, canvasWidth, canvasZoom, onSave]);
+                // Update box if dimensions changed during editing
+                if (canvasWidthRef.current > 0 && canvasHeightRef.current > 0) {
+                    const newBox = { ...currentElement.box };
+                    let changed = false;
 
-    // Handle Escape key
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                e.stopPropagation();
-                onCancel();
+                    if (finalWidthPx !== undefined && finalWidthPx > 0) {
+                        newBox.x2 = currentElement.box.x1 + finalWidthPx / canvasWidthRef.current;
+                        changed = true;
+                    }
+
+                    if (finalHeightPx !== undefined && finalHeightPx > 0) {
+                        newBox.y2 = currentElement.box.y1 + finalHeightPx / canvasHeightRef.current;
+                        changed = true;
+                    }
+
+                    if (changed) {
+                        updates.box = newBox;
+                    }
+                }
+
+                updateElementRef.current(spreadId, elementId, updates);
             }
         };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [onCancel]);
+    }, [editor, elementId]);
 
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
         const startX = e.clientX;
-        const startWidth = width;
+        const currentElement = elementRef.current;
+        if (!currentElement) return;
+
+        const startWidth = (currentElement.box.x2 - currentElement.box.x1) * canvasWidth;
         const overlay = e.currentTarget.closest('.tiptap-text-editor-overlay') as HTMLElement;
         if (!overlay) return;
 
         const handlePointerMove = (moveEvent: PointerEvent) => {
-            // Horizontal change in screen pixels
             const dx = moveEvent.clientX - startX;
-            // Convert screen change to canvas-equivalent change
             const dxCanvas = dx / (canvasZoom / 100);
             const newWidth = Math.max(50, startWidth + dxCanvas);
             overlay.style.width = `${newWidth}px`;
@@ -197,17 +160,68 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
 
         e.preventDefault();
         e.stopPropagation();
-    }, [width, canvasZoom]);
+    }, [canvasWidth, canvasZoom]);
 
+    const content = element && isTextElement(element)
+        ? element.content as TextContent
+        : null;
+    const [overlayHeight, setOverlayHeight] = useState<number | null>(null);
+    const minimumEditorHeight = useMemo(() => {
+        if (!content) return 0;
+        const fontSizePt = content.defaultStyle.fontSize || 24;
+        const lineHeight = content.lineHeight || 1.2;
+        return Math.ceil((fontSizePt * lineHeight * 96) / 72);
+    }, [content]);
+
+    useLayoutEffect(() => {
+        if (!editor || !content) return;
+
+        const editorEl = editor.view.dom as HTMLElement;
+        const syncHeight = () => {
+            const measured = Math.ceil(editorEl.scrollHeight || 0);
+            const nextHeight = Math.max(minimumEditorHeight, measured);
+            setOverlayHeight(nextHeight > 0 ? nextHeight : null);
+        };
+
+        syncHeight();
+        const observer = new ResizeObserver(syncHeight);
+        observer.observe(editorEl);
+        if (editorHostRef.current) {
+            observer.observe(editorHostRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, [editor, content, minimumEditorHeight]);
+    const editorContainerStyle = useMemo(() => {
+        if (!content) return undefined;
+        return {
+            textAlign,
+            fontFamily: content.defaultStyle.fontFamily,
+            fontSize: `${content.defaultStyle.fontSize}pt`,
+            fontWeight: content.defaultStyle.fontWeight,
+            fontStyle: content.defaultStyle.fontStyle,
+            color: content.defaultStyle.fill,
+            lineHeight: String(content.lineHeight),
+            margin: 0,
+        };
+    }, [content, textAlign]);
+
+    if (!element || !isTextElement(element)) return null;
     if (!editor) return null;
 
-    // UI elements (border, handles) are inside the scaled wrapper,
-    // so we must inversely scale them to keep them a constant physical size.
+    const { box } = element;
+    const left = box.x1 * canvasWidth;
+    const top = box.y1 * canvasHeight;
+    const width = (box.x2 - box.x1) * canvasWidth;
+    const height = (box.y2 - box.y1) * canvasHeight;
+
     const zoomScale = 100 / canvasZoom;
     const borderWidth = 2 * zoomScale;
-    const handleWidth = 4 * zoomScale; // The visual bar
-    const handleTouchArea = 24 * zoomScale; // Easy to grab
+    const handleWidth = 4 * zoomScale;
+    const handleTouchArea = 24 * zoomScale;
 
+    // The singleton editor's DOM node (editor.view.dom) is moved into this local 
+    // container whenever a text element enters edit mode.
     return (
         <div
             className="tiptap-text-editor-overlay"
@@ -217,23 +231,29 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
                 left,
                 top,
                 width,
-                minHeight: height,
+                height: overlayHeight ?? height,
                 zIndex: 100,
                 boxSizing: 'border-box',
                 background: 'rgba(255, 255, 255, 0.98)',
                 border: `${borderWidth}px solid var(--color-accent, #4A90D9)`,
                 borderRadius: `${2 * zoomScale}px`,
-                overflow: 'visible', // Allow handle to stick out slightly if needed
+                overflow: 'visible',
                 paddingRight: handleWidth + 2 * zoomScale,
                 transition: 'border-color 0.2s',
             }}
-            // Prevent clicks from propagating to the canvas
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
         >
-            <EditorContent editor={editor} />
+            <div
+                style={editorContainerStyle}
+                ref={(node) => {
+                    editorHostRef.current = node;
+                    if (node && editor && editor.view.dom.parentNode !== node) {
+                        node.appendChild(editor.view.dom);
+                    }
+                }}
+            />
 
-            {/* Custom Resize Handle (Corner Style) */}
             <div
                 className="resize-handle"
                 onPointerDown={handlePointerDown}

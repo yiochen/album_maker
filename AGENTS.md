@@ -33,6 +33,13 @@ The application is structured into modular layers. Please refer to the `AGENTS.m
 ### Spread Model
 The application operates on **Spreads** (typically 2 pages side-by-side) as the fundamental unit of design. While previously using "Pages", the datamodel and UI now focus on Spreads to enable seamless cross-page designing.
 
+### Text Editing Model (Product Rules)
+- Text elements enter editing mode when selected (`editingTextElementId` is set from Fabric selection state).
+- While editing text, resizing/transformation is **owned by the Tiptap overlay UI**, not Fabric transform handles.
+- Fabric remains the display/selection layer for text boxes; rich text interaction happens in the DOM overlay editor.
+- On editor close/unmount, the overlay's final dimensions are treated as the source of truth for the text element box (`box.x2/y2` updates).
+- This is intentional product behavior: edited content and the overlay's resulting size should determine final text element dimensions.
+
 ### Gapless Layout Engine (Normalized Coordinates)
 Elements are positioned using **Normalized Coordinates** (0.0 to 1.0) stored in a `box` object (`x1, y1, x2, y2`). This allows for seamless resizing of spreads and resolution-independent layouts.
 -   **Storage**: Database stores the normalized `box` model.
