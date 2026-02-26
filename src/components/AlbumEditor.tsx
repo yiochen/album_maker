@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { PageElement } from '../types';
 import {
   useAlbum,
@@ -15,6 +15,7 @@ import {
   useCurrentSpreadIndex,
   useSelectedElementId,
   useSelectedPageId,
+  useSelectedPageSide,
   useIsImagePoolOpen,
   useIsSettingsOpen,
   useIsSnappingEnabled,
@@ -40,6 +41,7 @@ import { Modal } from './Modal';
 import { LoadingScreen } from './LoadingScreen';
 import { Toolbar } from './Toolbar';
 import { Tabs, TabPane } from './Tabs';
+import { templates } from '../templates';
 
 export const AlbumEditor: React.FC = () => {
   // Global State (Album)
@@ -57,6 +59,7 @@ export const AlbumEditor: React.FC = () => {
   const currentSpreadIndex = useCurrentSpreadIndex();
   const selectedElementId = useSelectedElementId();
   const selectedPageId = useSelectedPageId();
+  const selectedPageSide = useSelectedPageSide();
   const isImagePoolOpen = useIsImagePoolOpen();
   const isSettingsOpen = useIsSettingsOpen();
   const isSnappingEnabled = useIsSnappingEnabled();
@@ -65,6 +68,7 @@ export const AlbumEditor: React.FC = () => {
   const setSettingsOpen = useSetSettingsOpen();
   const setSnappingEnabled = useSetSnappingEnabled();
   const editingTextElementId = useEditingTextElementId();
+  const [isLayoutPickerOpen, setLayoutPickerOpen] = useState(false);
 
   // Auto-save
   useAutoSave();
@@ -105,6 +109,9 @@ export const AlbumEditor: React.FC = () => {
     return <LoadingScreen message="No spreads in album" showSpinner={false} />;
   }
 
+  const selectedPageNumber = currentSpreadIndex * 2 + (selectedPageSide === 'left' ? 1 : 2);
+  const selectedPageLabel = selectedPageSide === 'left' ? 'Left Page' : 'Right Page';
+
   return (
     <div className="app-container" data-testid="album-editor">
       <Headerbar
@@ -136,6 +143,7 @@ export const AlbumEditor: React.FC = () => {
         onAddText={() => {
           if (currentSpread) handleAddText(currentSpread.id);
         }}
+        onLayoutClick={() => setLayoutPickerOpen(true)}
       />
 
       <DndWrapper className="main-content">
@@ -187,6 +195,32 @@ export const AlbumEditor: React.FC = () => {
             onSettingsChange={setSettings}
             currentPageCount={album.spreads.length * 2}
           />
+        </Modal>
+      )}
+
+      {isLayoutPickerOpen && (
+        <Modal
+          title={`Apply Layout (${selectedPageLabel} - Page ${selectedPageNumber})`}
+          onClose={() => setLayoutPickerOpen(false)}
+          titleTestId="layout-picker-title"
+        >
+          <div className="template-grid" data-testid="layout-picker-grid">
+            {templates.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                className="template-option"
+                data-testid={`layout-option-${template.id}`}
+                onClick={() => {
+                  // Step 2 scope: button + picker UI. Template application logic follows in the next step.
+                  setLayoutPickerOpen(false);
+                }}
+              >
+                <div className="template-preview" />
+                <span className="template-name">{template.name}</span>
+              </button>
+            ))}
+          </div>
         </Modal>
       )}
     </div>

@@ -4,6 +4,7 @@ import { RedoIcon } from './icons/RedoIcon';
 import { SnappingIcon } from './icons/SnappingIcon';
 import { TextIcon } from './icons/TextIcon';
 import { AddImageIcon } from './icons/AddImageIcon';
+import { LayoutIcon } from './icons/LayoutIcon';
 
 /**
  * Props for the Toolbar component.
@@ -25,6 +26,8 @@ interface ToolbarProps {
     onAddText: () => void;
     /** Callback fired when the "Add Image" button is clicked. */
     onAddImage: () => void;
+    /** Callback fired when the layout picker button is clicked. */
+    onLayoutClick: () => void;
 }
 
 /**
@@ -39,6 +42,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     canRedo,
     onAddText,
     onAddImage,
+    onLayoutClick,
 }) => {
     return (
         <div className="toolbar-secondary" data-testid="toolbar-secondary">
@@ -89,6 +93,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 >
                     <TextIcon width="16" height="16" />
                     <span>Text</span>
+                </button>
+
+                <button
+                    className="btn btn-ghost"
+                    onClick={onLayoutClick}
+                    title="Choose layout template"
+                    data-testid="layout-btn"
+                >
+                    <LayoutIcon width="16" height="16" />
+                    <span>Layout</span>
                 </button>
             </div>
 
