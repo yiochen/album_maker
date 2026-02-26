@@ -119,6 +119,11 @@ export const AlbumEditor: React.FC = () => {
   const selectedPageNumber = currentSpreadIndex * 2 + (selectedPageSide === 'left' ? 1 : 2);
   const selectedPageLabel = selectedPageSide === 'left' ? 'Left Page' : 'Right Page';
   const pageAspectRatio = album.settings.pageWidth / album.settings.pageHeight;
+  const selectedPageElementCount = currentSpread.elements.filter((element) => (
+    selectedPageSide === 'left'
+      ? element.box.x1 >= 0 && element.box.x2 <= 0.5
+      : element.box.x1 >= 0.5 && element.box.x2 <= 1
+  )).length;
 
   return (
     <div className="app-container" data-testid="album-editor">
@@ -212,6 +217,11 @@ export const AlbumEditor: React.FC = () => {
           onClose={() => setLayoutPickerOpen(false)}
           titleTestId="layout-picker-title"
         >
+          {selectedPageElementCount > 0 && (
+            <p className="layout-warning-text" data-testid="layout-warning-text">
+              Warning: This page already has {selectedPageElementCount} element{selectedPageElementCount > 1 ? 's' : ''}. Applying a layout will replace them.
+            </p>
+          )}
           <div className="template-grid" data-testid="layout-picker-grid">
             {templates.map((template) => {
               const isCompatible = isTemplateAspectRatioValid(template, pageAspectRatio);
