@@ -4,6 +4,7 @@ interface UIState {
   currentSpreadIndex: number;
   selectedElementId: string | null;
   selectedPageId: string | null;
+  selectedPageSide: 'left' | 'right';
   isImagePoolOpen: boolean;
   isSettingsOpen: boolean;
   isSnappingEnabled: boolean;
@@ -14,6 +15,7 @@ interface UIState {
   setCurrentSpreadIndex: (index: number) => void;
   setSelectedElementId: (id: string | null) => void;
   setSelectedPageId: (id: string | null) => void;
+  setSelectedPageSide: (side: 'left' | 'right') => void;
   toggleImagePool: () => void;
   setImagePoolOpen: (isOpen: boolean) => void;
   toggleSettings: () => void;
@@ -28,6 +30,7 @@ export const useUIStore = create<UIState>((set) => ({
   currentSpreadIndex: 0,
   selectedElementId: null,
   selectedPageId: null,
+  selectedPageSide: 'left',
   isImagePoolOpen: true,
   isSettingsOpen: false,
   isSnappingEnabled: true,
@@ -38,6 +41,8 @@ export const useUIStore = create<UIState>((set) => ({
   setSelectedElementId: (id) => set({ selectedElementId: id }),
 
   setSelectedPageId: (id) => set({ selectedPageId: id }),
+
+  setSelectedPageSide: (side) => set({ selectedPageSide: side }),
 
   toggleImagePool: () => set((state) => ({ isImagePoolOpen: !state.isImagePoolOpen })),
 
@@ -76,6 +81,12 @@ export const useSelectedPageId = () => useUIStore(state => state.selectedPageId)
 
 /** Select the setSelectedPageId action */
 export const useSetSelectedPageId = () => useUIStore(state => state.setSelectedPageId);
+
+/** Select the currently selected page side within the current spread */
+export const useSelectedPageSide = () => useUIStore(state => state.selectedPageSide);
+
+/** Select the setSelectedPageSide action */
+export const useSetSelectedPageSide = () => useUIStore(state => state.setSelectedPageSide);
 
 /** Select whether the image pool is open */
 export const useIsImagePoolOpen = () => useUIStore(state => state.isImagePoolOpen);

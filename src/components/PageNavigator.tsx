@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { useAlbumSpreads, useAlbumSettings, useAlbumId, useAddSpreads, useDeleteSpread } from '../states/albumStore';
-import { useCurrentSpreadIndex, useSetCurrentSpreadIndex } from '../states/uiStore';
+import { useCurrentSpreadIndex, useSelectedPageSide, useSetCurrentSpreadIndex, useSetSelectedPageSide } from '../states/uiStore';
 import { SpreadThumbnail } from './SpreadThumbnail';
 import { Spread } from '../types';
 import { PlusIcon } from './icons/PlusIcon';
@@ -12,29 +12,27 @@ export const PageNavigator: React.FC = () => {
     const addSpreads = useAddSpreads();
     const deleteSpread = useDeleteSpread();
     const currentSpreadIndex = useCurrentSpreadIndex();
+    const selectedPageSide = useSelectedPageSide();
     const setCurrentSpreadIndex = useSetCurrentSpreadIndex();
-    const [selectedSpreadIndex, setSelectedSpreadIndex] = useState(currentSpreadIndex);
-    const [selectedPageSide, setSelectedPageSide] = useState<'left' | 'right'>('left');
+    const setSelectedPageSide = useSetSelectedPageSide();
 
     const maxSpreads = settings ? settings.maxPages / 2 : 20;
     const canAddMore = spreads.length < maxSpreads;
     const pageAspectRatio = settings ? settings.pageWidth / settings.pageHeight : 1;
-    const selectedSpreadIndexSafe = Math.max(0, Math.min(selectedSpreadIndex, spreads.length - 1));
+    const selectedSpreadIndexSafe = Math.max(0, Math.min(currentSpreadIndex, spreads.length - 1));
 
     const handleAddSpread = () => {
         const insertIndex = currentSpreadIndex + 1;
         addSpreads(1, insertIndex);
         // Select the newly added spread
         setCurrentSpreadIndex(insertIndex);
-        setSelectedSpreadIndex(insertIndex);
         setSelectedPageSide('left');
     };
 
     const handlePageClick = useCallback((spreadIndex: number, side: 'left' | 'right') => {
         setCurrentSpreadIndex(spreadIndex);
-        setSelectedSpreadIndex(spreadIndex);
         setSelectedPageSide(side);
-    }, [setCurrentSpreadIndex]);
+    }, [setCurrentSpreadIndex, setSelectedPageSide]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {

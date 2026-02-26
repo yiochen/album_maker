@@ -11,7 +11,7 @@ import { DroppableCanvas } from './DroppableCanvas';
 import { TiptapTextEditor } from './canvas/TiptapTextEditor';
 import { TextEditingToolbar } from './canvas/TextEditingToolbar';
 import { useAlbumSpreads } from '../states/albumStore';
-import { useCurrentSpreadIndex } from '../states/uiStore';
+import { useCurrentSpreadIndex, useSelectedPageSide } from '../states/uiStore';
 import { useDndDropContext } from '../contexts/DndDropContext';
 
 /**
@@ -36,6 +36,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 }) => {
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
+    const selectedPageSide = useSelectedPageSide();
     const currentSpread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
 
     const { registerCanvasDropTarget } = useDndDropContext();
@@ -265,6 +266,18 @@ export const Canvas: React.FC<CanvasProps> = ({
                     >
                         <div ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
                             <canvas ref={canvasElRef} data-testid="canvas-layer" />
+                            <div
+                                className="canvas-page-targets"
+                                data-testid="canvas-page-targets"
+                                data-selected-page-side={selectedPageSide}
+                            >
+                                <div
+                                    className={`canvas-page-target canvas-page-target-left ${selectedPageSide === 'left' ? 'active' : 'inactive'}`}
+                                />
+                                <div
+                                    className={`canvas-page-target canvas-page-target-right ${selectedPageSide === 'right' ? 'active' : 'inactive'}`}
+                                />
+                            </div>
                             {currentSpread.elements.length === 0 && (
                                 <div
                                     className="canvas-placeholder"
