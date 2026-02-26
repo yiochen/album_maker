@@ -1823,59 +1823,86 @@ body {
 /* Spread Thumbnails */
 .spread-thumbnail {
   position: relative;
-  aspect-ratio: 8 / 5;
-  background: var(--color-surface);
-  border: 2px solid transparent;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  overflow: hidden;
-  transition: all var(--transition-base);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  cursor: default;
+  overflow: visible;
+  transition: background var(--transition-base);
   flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1);
 }
 
 .spread-thumbnail:hover {
-  border-color: var(--color-border);
-  transform: scale(1.02);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.spread-thumbnail.active {
-  border-color: var(--color-accent);
+.spread-thumbnail.showing {
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: var(--radius-md);
+}
+
+.spread-thumbnail.showing .page-half-thumbnail {
+  outline: 1px solid var(--color-accent-dark);
+  outline-offset: 1px;
+}
+
+.spread-thumbnail-pages {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  gap: var(--space-3);
+}
+
+.spread-page-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.spread-page-button:hover .page-half-thumbnail {
+  outline: 2px solid var(--color-border);
+  outline-offset: 1px;
+}
+
+.spread-page-button.active .page-half-thumbnail {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
   box-shadow: var(--shadow-glow);
 }
 
-.spread-thumbnail.selected {
-  border-color: var(--color-info);
-  background: rgba(59, 130, 246, 0.1);
-}
-
-.spread-thumbnail-checkbox {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
-  z-index: 10;
-  cursor: pointer;
-}
-
-.spread-thumbnail-checkbox input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--color-accent);
-  cursor: pointer;
-}
-
-
-.spread-thumbnail-content {
-  width: 100%;
-  height: 100%;
+.page-half-thumbnail {
   position: relative;
+  overflow: hidden;
   background: white;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
 }
 
-.spread-thumbnail-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.page-half-thumbnail-image {
+  position: absolute;
   display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+.spread-page-number {
+  position: static;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
 
 .spread-thumbnail-loading {

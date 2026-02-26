@@ -1,6 +1,6 @@
 import React from 'react';
-import type { Spread, AlbumSettings } from '../types';
-import { TrashIcon } from './icons/TrashIcon';
+import type { Spread } from '../types';
+import { PageHalfThumbnail } from './PageHalfThumbnail';
 
 /**
  * Props for the SpreadThumbnail component.
@@ -12,22 +12,16 @@ interface SpreadThumbnailProps {
     spreadIndex: number;
     /** The ID of the album the spread belongs to. */
     albumId: string;
-    /** The global album settings. */
-    settings: AlbumSettings;
-    /** Whether this spread is currently active (being edited). */
-    isActive: boolean;
-    /** Whether this spread is selected (for multi-select actions). */
-    isSelected: boolean;
-    /** Whether the spread can be deleted (must have at least one spread remaining). */
-    canDelete: boolean;
-    /** Whether to show the selection checkbox. */
-    showCheckbox: boolean;
-    /** Callback fired when the thumbnail is clicked. */
-    onClick: (e: React.MouseEvent) => void;
-    /** Callback fired when the selection checkbox is toggled. */
-    onCheckboxChange: (checked: boolean) => void;
-    /** Callback fired when the delete button is clicked. */
-    onDelete: () => void;
+    /** Page aspect ratio (width / height). */
+    pageAspectRatio: number;
+    /** Whether this spread is currently shown on canvas. */
+    isShowing: boolean;
+    /** Whether left page is selected. */
+    isLeftSelected: boolean;
+    /** Whether right page is selected. */
+    isRightSelected: boolean;
+    /** Callback fired when a page is clicked. */
+    onPageClick: (side: 'left' | 'right') => void;
 }
 
 /**
@@ -38,79 +32,66 @@ export const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
     spread,
     spreadIndex,
     albumId,
-    isActive,
-    isSelected,
-    canDelete,
-    showCheckbox,
-    onClick,
-    onCheckboxChange,
-    onDelete,
+    pageAspectRatio,
+    isShowing,
+    isLeftSelected,
+    isRightSelected,
+    onPageClick,
 }) => {
     // Virtual URL for the Service Worker to intercept
     const thumbnailUrl = `/__local__/spreadThumbnails/${albumId}/${spread.id}/${spread.versionId}`;
-
-    const handleDelete = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (window.confirm('Delete this spread?')) {
-            onDelete();
-        }
-    };
-
-    const handleCheckboxClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-    };
-
-    const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onCheckboxChange(e.target.checked);
-    };
+    const safeAspectRatio = pageAspectRatio > 0 ? pageAspectRatio : 1;
+    const maxThumbnailWidth = 96;
+    const maxThumbnailHeight = 128;
+    const pageThumbnailWidth = Math.round(
+        Math.min(maxThumbnailWidth, maxThumbnailHeight * safeAspectRatio)
+    );
+    const pageThumbnailHeight = Math.round(
+        Math.min(maxThumbnailHeight, maxThumbnailWidth / safeAspectRatio)
+    );
 
     return (
         <div
-            className={`spread-thumbnail ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''}`}
-            onClick={onClick}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onClick(e as unknown as React.MouseEvent)}
+            className={`spread-thumbnail ${isShowing ? 'showing' : ''}`}
             data-testid="spread-thumbnail"
         >
-            {showCheckbox && (
-                <label
-                    className="spread-thumbnail-checkbox"
-                    onClick={handleCheckboxClick}
-                    data-testid="spread-checkbox-label"
-                >
-                    <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={handleCheckboxChange}
-                        data-testid="spread-checkbox"
-                    />
-                </label>
-            )}
-
-            <div className="spread-thumbnail-content">
-                <img
-                    src={thumbnailUrl}
-                    alt={`Spread ${spreadIndex + 1}`}
-                    className="spread-thumbnail-image"
-                    loading="lazy"
-                />
-            </div>
-
-            <span className="page-thumbnail-number" data-testid="page-number">
-                {spreadIndex * 2 + 1}-{spreadIndex * 2 + 2}
-            </span>
-
-            {canDelete && (
+            <div className="spread-thumbnail-pages" data-testid="spread-thumbnail-pages">
                 <button
-                    className="page-thumbnail-delete"
-                    onClick={handleDelete}
-                    title="Delete spread"
-                    data-testid="delete-spread-button"
+                    type="button"
+                    className={`spread-page-button ${isLeftSelected ? 'active' : ''}`}
+                    onClick={() => onPageClick('left')}
+                    data-testid="page-thumbnail-left"
                 >
-                    <TrashIcon width="14" height="14" />
+                    <PageHalfThumbnail
+                        imageUrl={thumbnailUrl}
+                        side="left"
+                        width={pageThumbnailWidth}
+                        height={pageThumbnailHeight}
+                        alt={`Page ${spreadIndex * 2 + 1}`}
+                    />
+                    <span className="spread-page-number" data-testid="page-number">
+                        {spreadIndex * 2 + 1}
+                    </span>
                 </button>
-            )}
+
+                <button
+                    type="button"
+                    className={`spread-page-button ${isRightSelected ? 'active' : ''}`}
+                    onClick={() => onPageClick('right')}
+                    data-testid="page-thumbnail-right"
+                >
+                    <PageHalfThumbnail
+                        imageUrl={thumbnailUrl}
+                        side="right"
+                        width={pageThumbnailWidth}
+                        height={pageThumbnailHeight}
+                        alt={`Page ${spreadIndex * 2 + 2}`}
+                    />
+                    <span className="spread-page-number" data-testid="page-number">
+                        {spreadIndex * 2 + 2}
+                    </span>
+                </button>
+            </div>
         </div>
     );
 };
