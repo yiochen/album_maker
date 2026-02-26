@@ -5,6 +5,7 @@ import {
   useSetName,
   useSetSettings,
   useAddToPool,
+  useUpdateSpread,
   useUndo,
   useRedo,
   useCanUndo,
@@ -16,6 +17,8 @@ import {
   useSelectedElementId,
   useSelectedPageId,
   useSelectedPageSide,
+  useSetSelectedPageId,
+  useSetSelectedElementId,
   useIsImagePoolOpen,
   useIsSettingsOpen,
   useIsSnappingEnabled,
@@ -42,6 +45,7 @@ import { LoadingScreen } from './LoadingScreen';
 import { Toolbar } from './Toolbar';
 import { Tabs, TabPane } from './Tabs';
 import { templates } from '../templates';
+import { applyTemplateToSpreadSide, isTemplateAspectRatioValid } from '../services/templateLayout';
 
 export const AlbumEditor: React.FC = () => {
   // Global State (Album)
@@ -50,6 +54,7 @@ export const AlbumEditor: React.FC = () => {
   const setSettings = useSetSettings();
   const addToPool = useAddToPool();
   const navigate = useNavigate();
+  const updateSpread = useUpdateSpread();
   const undo = useUndo();
   const redo = useRedo();
   const canUndo = useCanUndo();
@@ -60,6 +65,8 @@ export const AlbumEditor: React.FC = () => {
   const selectedElementId = useSelectedElementId();
   const selectedPageId = useSelectedPageId();
   const selectedPageSide = useSelectedPageSide();
+  const setSelectedPageId = useSetSelectedPageId();
+  const setSelectedElementId = useSetSelectedElementId();
   const isImagePoolOpen = useIsImagePoolOpen();
   const isSettingsOpen = useIsSettingsOpen();
   const isSnappingEnabled = useIsSnappingEnabled();
@@ -111,6 +118,7 @@ export const AlbumEditor: React.FC = () => {
 
   const selectedPageNumber = currentSpreadIndex * 2 + (selectedPageSide === 'left' ? 1 : 2);
   const selectedPageLabel = selectedPageSide === 'left' ? 'Left Page' : 'Right Page';
+  const pageAspectRatio = album.settings.pageWidth / album.settings.pageHeight;
 
   return (
     <div className="app-container" data-testid="album-editor">
@@ -205,21 +213,33 @@ export const AlbumEditor: React.FC = () => {
           titleTestId="layout-picker-title"
         >
           <div className="template-grid" data-testid="layout-picker-grid">
-            {templates.map((template) => (
+            {templates.map((template) => {
+              const isCompatible = isTemplateAspectRatioValid(template, pageAspectRatio);
+              return (
               <button
                 key={template.id}
                 type="button"
                 className="template-option"
                 data-testid={`layout-option-${template.id}`}
+                disabled={!isCompatible}
                 onClick={() => {
-                  // Step 2 scope: button + picker UI. Template application logic follows in the next step.
+                  const nextElements = applyTemplateToSpreadSide(
+                    currentSpread.elements,
+                    template,
+                    album.settings,
+                    selectedPageSide
+                  );
+                  updateSpread(currentSpread.id, { elements: nextElements });
+                  setSelectedPageId(currentSpread.id);
+                  setSelectedElementId(null);
                   setLayoutPickerOpen(false);
                 }}
               >
                 <div className="template-preview" />
                 <span className="template-name">{template.name}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
         </Modal>
       )}

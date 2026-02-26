@@ -882,6 +882,11 @@ body {
   background: rgba(99, 102, 241, 0.1);
 }
 
+.template-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .template-preview {
   width: 60%;
   height: 50%;
