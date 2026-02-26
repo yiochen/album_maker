@@ -264,20 +264,12 @@ export const Canvas: React.FC<CanvasProps> = ({
                         style={canvasStyle}
                         data-testid="interaction-layer"
                     >
-                        <div ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-                            <canvas ref={canvasElRef} data-testid="canvas-layer" />
-                            <div
-                                className="canvas-page-targets"
-                                data-testid="canvas-page-targets"
-                                data-selected-page-side={selectedPageSide}
-                            >
-                                <div
-                                    className={`canvas-page-target canvas-page-target-left ${selectedPageSide === 'left' ? 'active' : 'inactive'}`}
-                                />
-                                <div
-                                    className={`canvas-page-target canvas-page-target-right ${selectedPageSide === 'right' ? 'active' : 'inactive'}`}
-                                />
-                            </div>
+                        <div
+                            ref={wrapperRef}
+                            className={`canvas-page-highlight canvas-page-highlight-${selectedPageSide}`}
+                            style={{ width: '100%', height: '100%', position: 'relative', overflow: 'visible' }}
+                        >
+                            <canvas ref={canvasElRef} data-testid="canvas-layer" style={{ position: 'relative', zIndex: 1 }} />
                             {currentSpread.elements.length === 0 && (
                                 <div
                                     className="canvas-placeholder"

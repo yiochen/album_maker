@@ -547,36 +547,30 @@ body {
   z-index: 2;
 }
 
-.canvas-page-targets {
+.canvas-page-highlight::before {
+  content: '';
   position: absolute;
-  inset: 0;
+  background: var(--color-accent);
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
 
-.canvas-page-target {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 50%;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+.canvas-page-highlight-left::before {
+  left: -4px;
+  top: -4px;
+  bottom: -4px;
+  width: calc(50% + 4px);
+  border-top-left-radius: var(--radius-sm);
+  border-bottom-left-radius: var(--radius-sm);
 }
 
-.canvas-page-target-left {
-  left: 0;
-}
-
-.canvas-page-target-right {
+.canvas-page-highlight-right::before {
   left: 50%;
-}
-
-.canvas-page-target.active {
-  background: rgba(99, 102, 241, 0.09);
-  box-shadow: inset 0 0 0 2px var(--color-accent);
-}
-
-.canvas-page-target.inactive {
-  background: rgba(0, 0, 0, 0.08);
+  top: -4px;
+  bottom: -4px;
+  width: calc(50% + 4px);
+  border-top-right-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
 }
 
 .canvas-placeholder svg {
