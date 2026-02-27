@@ -135,6 +135,8 @@ export interface TextContent {
   textAlign: 'left' | 'center' | 'right';
   /** Line height multiplier, e.g. 1.2 */
   lineHeight: number;
+  /** Optional editor-only placeholder shown when runs contain no visible text. */
+  placeholderText?: string;
 }
 
 /**

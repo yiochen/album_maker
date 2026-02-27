@@ -63,13 +63,13 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
     const updateElementRef = useRef(updateElement);
     const updateElementTransientRef = useRef(updateElementTransient);
     const elementRef = useRef(element);
-    const textAlignRef = useRef(textAlign);
     const canvasWidthRef = useRef(canvasWidth);
     const canvasHeightRef = useRef(canvasHeight);
     const canvasZoomRef = useRef(canvasZoom);
     const sessionSpreadIdRef = useRef<string | null>(null);
     const sessionGroupIdRef = useRef(crypto.randomUUID());
     const captureTimerRef = useRef<number | null>(null);
+    const alignCaptureRafRef = useRef<number | null>(null);
     const lastMeasuredHeightRef = useRef<number>(0);
     const latestSnapshotRef = useRef<{
         spreadId: string;
@@ -81,11 +81,10 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         updateElementRef.current = updateElement;
         updateElementTransientRef.current = updateElementTransient;
         elementRef.current = element;
-        textAlignRef.current = textAlign;
         canvasWidthRef.current = canvasWidth;
         canvasHeightRef.current = canvasHeight;
         canvasZoomRef.current = canvasZoom;
-    }, [updateElement, updateElementTransient, element, textAlign, canvasWidth, canvasHeight, canvasZoom]);
+    }, [updateElement, updateElementTransient, element, canvasWidth, canvasHeight, canvasZoom]);
 
     const sessionSpreadId = useMemo(() => {
         const currentSpread = spreads[currentSpreadIndex];
@@ -120,13 +119,9 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
             canvasZoomRef.current
         );
 
-        const updates: Partial<PageElement> = {
-            content: {
-                ...(currentElement.content as TextContent),
-                runs,
-                textAlign: textAlignRef.current,
-            },
-        };
+        const updates = {
+            content: { runs },
+        } as unknown as Partial<PageElement>;
 
         const overlayEl = overlayRef.current;
         const finalWidthPx = overlayEl?.offsetWidth;
@@ -200,6 +195,24 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
             editor.off('update', handleUpdate);
         };
     }, [editor, scheduleSnapshotCapture]);
+
+    // Alignment changes affect DOM layout even without text content edits.
+    // Capture a fresh snapshot after layout settles so Canvas picks up new run x-positions.
+    useEffect(() => {
+        if (!editor) return;
+        const raf1 = window.requestAnimationFrame(() => {
+            alignCaptureRafRef.current = window.requestAnimationFrame(() => {
+                captureSnapshot(true);
+            });
+        });
+        return () => {
+            window.cancelAnimationFrame(raf1);
+            if (alignCaptureRafRef.current !== null) {
+                window.cancelAnimationFrame(alignCaptureRafRef.current);
+                alignCaptureRafRef.current = null;
+            }
+        };
+    }, [textAlign, editor, captureSnapshot]);
 
     // Capture an initial mounted snapshot so unmount has a safe fallback.
     useEffect(() => {

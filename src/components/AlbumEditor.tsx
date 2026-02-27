@@ -44,6 +44,7 @@ import { Modal } from './Modal';
 import { LoadingScreen } from './LoadingScreen';
 import { Toolbar } from './Toolbar';
 import { Tabs, TabPane } from './Tabs';
+import { TemplatePreview } from './TemplatePreview';
 import { templates } from '../templates';
 import { applyTemplateToSpreadSide, isTemplateAspectRatioValid } from '../services/templateLayout';
 
@@ -245,7 +246,15 @@ export const AlbumEditor: React.FC = () => {
                   setLayoutPickerOpen(false);
                 }}
               >
-                <div className="template-preview" />
+                <TemplatePreview
+                  template={template}
+                  pageAspectRatio={pageAspectRatio}
+                  pageWidth={album.settings.pageWidth}
+                  pageHeight={album.settings.pageHeight}
+                  pageUnit={album.settings.unit}
+                  maxWidth={180}
+                  maxHeight={110}
+                />
                 <span className="template-name">{template.name}</span>
               </button>
               );

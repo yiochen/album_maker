@@ -96,6 +96,35 @@ export class CanvasTextElement extends fabric.FabricObject {
         // We translate to top-left to use box-relative run coordinates.
         ctx.translate(-w / 2, -h / 2);
 
+        const hasRenderableText = content.runs.some((run) => {
+            const text = run.text ?? '';
+            return text.replace(/\n/g, '').length > 0;
+        });
+
+        if (!hasRenderableText && content.placeholderText) {
+            const style = content.defaultStyle;
+            const fontSizePx = style.fontSize * pxPerPt;
+            const paddingPx = 8 * pxPerPt;
+
+            ctx.font = `${style.fontStyle || 'normal'} ${style.fontWeight || 'normal'} ${fontSizePx}px ${style.fontFamily}`;
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.9)';
+            ctx.textBaseline = 'alphabetic';
+
+            if (content.textAlign === 'center') {
+                ctx.textAlign = 'center';
+                ctx.fillText(content.placeholderText, w / 2, Math.min(h - paddingPx, fontSizePx + paddingPx));
+            } else if (content.textAlign === 'right') {
+                ctx.textAlign = 'right';
+                ctx.fillText(content.placeholderText, Math.max(0, w - paddingPx), Math.min(h - paddingPx, fontSizePx + paddingPx));
+            } else {
+                ctx.textAlign = 'left';
+                ctx.fillText(content.placeholderText, paddingPx, Math.min(h - paddingPx, fontSizePx + paddingPx));
+            }
+
+            ctx.restore();
+            return;
+        }
+
         ctx.textBaseline = 'alphabetic';
 
         for (const run of content.runs) {

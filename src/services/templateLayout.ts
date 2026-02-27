@@ -172,7 +172,7 @@ function templateContentToElement(
     id: crypto.randomUUID(),
     type: 'text',
     content: {
-      runs: [{ text: content.text ?? '' }],
+      runs: [{ text: '' }],
       defaultStyle: {
         fontFamily: content.style?.fontFamily ?? 'Inter, sans-serif',
         fontSize: toPt(content.style),
@@ -181,6 +181,7 @@ function templateContentToElement(
         fill: content.style?.color ?? '#000000',
         underline: content.style?.underline ?? false,
       },
+      placeholderText: content.text ?? 'Text',
       textAlign: content.horizontalAlign,
       lineHeight: 1.2,
     },

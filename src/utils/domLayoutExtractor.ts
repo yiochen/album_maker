@@ -59,9 +59,14 @@ export function extractLayoutFromDOM(
         startMarker.className = markerClass;
         startMarker.style.display = 'inline-block';
         startMarker.style.width = '0px';
+        startMarker.style.height = '0px';
+        startMarker.style.lineHeight = '0';
+        startMarker.style.fontSize = '0';
+        startMarker.style.overflow = 'hidden';
         startMarker.style.verticalAlign = 'baseline';
-        // Needs some content to register a baseline
-        startMarker.innerHTML = '&#8203;'; // zero width space
+        // Use a zero-sized marker so marker top aligns to the baseline.
+        // This avoids treating line-bottom as baseline (which clips descenders).
+        startMarker.textContent = '';
         p.insertBefore(startMarker, p.firstChild);
 
         // We also need markers whenever a line wraps.
@@ -87,7 +92,7 @@ export function extractLayoutFromDOM(
     markers.forEach(m => {
         const rect = m.getBoundingClientRect();
         const topPx = rect.top - editorRect.top;
-        const baselineYPx = rect.bottom - editorRect.top;
+        const baselineYPx = rect.top - editorRect.top;
         baselines.push({ topPx, baselineYPx });
     });
 
