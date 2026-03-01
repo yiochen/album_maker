@@ -11,6 +11,9 @@ import { initializeSources } from '../sources';
 import { useAlbumStore } from '../states/albumStore';
 import { db } from '../db';
 
+const SOURCE_INIT_TIMEOUT_MS = 8000;
+const STORAGE_LOAD_TIMEOUT_MS = 8000;
+
 const withTimeout = <T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
   return Promise.race([
     promise,
@@ -39,7 +42,11 @@ export const useAppInitialization = () => {
     const init = async () => {
       try {
         // Initialize photo sources
-        await initializeSources();
+        await withTimeout(
+          initializeSources(),
+          SOURCE_INIT_TIMEOUT_MS,
+          `Source initialization timed out after ${SOURCE_INIT_TIMEOUT_MS}ms`
+        );
 
         let albumToSet: Album;
 
@@ -54,13 +61,25 @@ export const useAppInitialization = () => {
             createdAt: Date.now(),
             updatedAt: Date.now(),
           };
-          await albumStorage.saveAlbum(migrated);
-          await albumStorage.setCurrentAlbumId(migrated.id);
+          await withTimeout(
+            albumStorage.saveAlbum(migrated),
+            STORAGE_LOAD_TIMEOUT_MS,
+            `Saving migrated album timed out after ${STORAGE_LOAD_TIMEOUT_MS}ms`
+          );
+          await withTimeout(
+            albumStorage.setCurrentAlbumId(migrated.id),
+            STORAGE_LOAD_TIMEOUT_MS,
+            `Persisting current album id timed out after ${STORAGE_LOAD_TIMEOUT_MS}ms`
+          );
           clearLocalStorage();
           albumToSet = migrated;
         } else {
           // Load from IndexedDB
-          const album = await albumStorage.loadCurrentAlbum();
+          const album = await withTimeout(
+            albumStorage.loadCurrentAlbum(),
+            STORAGE_LOAD_TIMEOUT_MS,
+            `Loading current album timed out after ${STORAGE_LOAD_TIMEOUT_MS}ms`
+          );
           // Ensure settings exist
           if (!album.settings) {
             album.settings = { ...APP_CONFIG.DEFAULT_ALBUM_SETTINGS };

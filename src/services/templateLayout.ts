@@ -182,6 +182,7 @@ function templateContentToElement(
         underline: content.style?.underline ?? false,
       },
       placeholderText: content.text ?? 'Text',
+      placeholderVerticalAlign: content.verticalAlign,
       textAlign: content.horizontalAlign,
       lineHeight: 1.2,
     },

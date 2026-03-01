@@ -206,10 +206,12 @@ export function extractLayoutFromDOM(
                     // Let's just use the `findBaselineForTop(charTopPx)` but add a fallback if it fails.
                     // Actually, the simplest fix is to consider characters on a new line if their `top` drastically changes!
 
-                    const markerBaseline = findBaselineForTop(charTopPx);
-                    // Standard fonts have a descent of ~10-20% of their size.
-                    // We can estimate it as 3px for standard display sizes if the marker is missing.
-                    const baselineYPx = markerBaseline !== null ? markerBaseline : charBottomPx - 3;
+                    const effectiveFontSizePt = style.fontSize ?? defaultStyle.fontSize;
+                    const effectiveFontSizePx = (effectiveFontSizePt * 96) / 72;
+                    const estimatedDescentPx = Math.max(2, effectiveFontSizePx * 0.2);
+                    // Derive baseline directly from the character box bottom.
+                    // This avoids line-baseline ambiguity when marker matching misses wrapped lines.
+                    const baselineYPx = charBottomPx - estimatedDescentPx;
                     const baselineYPt = pxToPt(baselineYPx);
 
                     // A new line is detected if the current character's TOP is significantly lower than the last character's TOP
@@ -221,7 +223,9 @@ export function extractLayoutFromDOM(
                         // We need to inject `_lastTopPx` loosely onto the run just for this loop to track lines
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const runLastTopPx = (lastRun as any)._lastTopPx ?? charTopPx;
-                        sameLine = Math.abs(runLastTopPx - charTopPx) < 5; // 5px tolerance for same line
+                        // Keep this tight. A large threshold can merge adjacent wrapped lines
+                        // at lower zoom levels, causing stacked render after close.
+                        sameLine = Math.abs(runLastTopPx - charTopPx) < 1.5;
                     }
 
                     if (lastRun && sameLine && isStyleEqualValues && lastRun.text !== '\n') {

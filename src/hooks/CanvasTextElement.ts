@@ -109,16 +109,25 @@ export class CanvasTextElement extends fabric.FabricObject {
             ctx.font = `${style.fontStyle || 'normal'} ${style.fontWeight || 'normal'} ${fontSizePx}px ${style.fontFamily}`;
             ctx.fillStyle = 'rgba(148, 163, 184, 0.9)';
             ctx.textBaseline = 'alphabetic';
+            const metrics = ctx.measureText(content.placeholderText);
+            const ascent = metrics.actualBoundingBoxAscent || fontSizePx * 0.8;
+            const descent = metrics.actualBoundingBoxDescent || fontSizePx * 0.2;
+            const verticalAlign = content.placeholderVerticalAlign ?? 'top';
+            const baselineY = verticalAlign === 'center'
+                ? (h + ascent - descent) / 2
+                : verticalAlign === 'bottom'
+                    ? Math.max(ascent, h - paddingPx - descent)
+                    : Math.min(h - paddingPx - descent, ascent + paddingPx);
 
             if (content.textAlign === 'center') {
                 ctx.textAlign = 'center';
-                ctx.fillText(content.placeholderText, w / 2, Math.min(h - paddingPx, fontSizePx + paddingPx));
+                ctx.fillText(content.placeholderText, w / 2, baselineY);
             } else if (content.textAlign === 'right') {
                 ctx.textAlign = 'right';
-                ctx.fillText(content.placeholderText, Math.max(0, w - paddingPx), Math.min(h - paddingPx, fontSizePx + paddingPx));
+                ctx.fillText(content.placeholderText, Math.max(0, w - paddingPx), baselineY);
             } else {
                 ctx.textAlign = 'left';
-                ctx.fillText(content.placeholderText, paddingPx, Math.min(h - paddingPx, fontSizePx + paddingPx));
+                ctx.fillText(content.placeholderText, paddingPx, baselineY);
             }
 
             ctx.restore();

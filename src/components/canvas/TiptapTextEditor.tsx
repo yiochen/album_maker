@@ -15,7 +15,7 @@
 import React, { useEffect, useCallback, useMemo, useRef, useLayoutEffect, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { extractLayoutFromDOM } from '../../utils/domLayoutExtractor';
-import { useAlbumSpreads, useUpdateElement, useUpdateElementTransient } from '../../states/albumStore';
+import { useAlbumSpreads, useUpdateElement } from '../../states/albumStore';
 import { useCurrentSpreadIndex } from '../../states/uiStore';
 import { isTextElement } from '../../types';
 import type { TextContent, PageElement, TextRun } from '../../types';
@@ -32,8 +32,14 @@ interface TiptapTextEditorProps {
     canvasHeight: number;
     /** Current text alignment (controlled externally so toolbar can update it). */
     textAlign: TextContent['textAlign'];
+    /** Current text vertical alignment for the editor box. */
+    verticalAlign: NonNullable<TextContent['placeholderVerticalAlign']>;
     /** Current canvas zoom percentage to scale layout values properly */
     canvasZoom: number;
+    /** Monotonic nonce; increment means parent requests close+commit before unmount. */
+    closeRequestNonce?: number;
+    /** Called after close-request commit sequence finishes. */
+    onRequestCloseCommitted?: () => void;
 }
 
 export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
@@ -42,14 +48,16 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
     canvasWidth,
     canvasHeight,
     textAlign,
+    verticalAlign,
     canvasZoom,
+    closeRequestNonce = 0,
+    onRequestCloseCommitted,
 }) => {
     const BASE_EDITOR_PADDING_PX = 8;
 
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const updateElement = useUpdateElement();
-    const updateElementTransient = useUpdateElementTransient();
     const overlayRef = useRef<HTMLDivElement | null>(null);
     const editorHostRef = useRef<HTMLDivElement | null>(null);
 
@@ -61,30 +69,26 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
 
     // Keep refs for save logic
     const updateElementRef = useRef(updateElement);
-    const updateElementTransientRef = useRef(updateElementTransient);
     const elementRef = useRef(element);
     const canvasWidthRef = useRef(canvasWidth);
     const canvasHeightRef = useRef(canvasHeight);
     const canvasZoomRef = useRef(canvasZoom);
+    const textAlignRef = useRef(textAlign);
+    const verticalAlignRef = useRef(verticalAlign);
     const sessionSpreadIdRef = useRef<string | null>(null);
     const sessionGroupIdRef = useRef(crypto.randomUUID());
-    const captureTimerRef = useRef<number | null>(null);
-    const alignCaptureRafRef = useRef<number | null>(null);
-    const lastMeasuredHeightRef = useRef<number>(0);
-    const latestSnapshotRef = useRef<{
-        spreadId: string;
-        elementId: string;
-        updates: Partial<PageElement>;
-    } | null>(null);
+    const didManualCloseCommitRef = useRef(false);
+    const lastCloseRequestNonceRef = useRef(closeRequestNonce);
 
     useEffect(() => {
         updateElementRef.current = updateElement;
-        updateElementTransientRef.current = updateElementTransient;
         elementRef.current = element;
         canvasWidthRef.current = canvasWidth;
         canvasHeightRef.current = canvasHeight;
         canvasZoomRef.current = canvasZoom;
-    }, [updateElement, updateElementTransient, element, canvasWidth, canvasHeight, canvasZoom]);
+        textAlignRef.current = textAlign;
+        verticalAlignRef.current = verticalAlign;
+    }, [updateElement, element, canvasWidth, canvasHeight, canvasZoom, textAlign, verticalAlign]);
 
     const sessionSpreadId = useMemo(() => {
         const currentSpread = spreads[currentSpreadIndex];
@@ -119,8 +123,34 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
             canvasZoomRef.current
         );
 
+        // The editor content can be vertically aligned via flex on the host container.
+        // extractLayoutFromDOM returns coordinates relative to the ProseMirror root,
+        // so we need to add host->editor offsets to preserve final run positions.
+        const hostEl = editorHostRef.current;
+        if (hostEl) {
+            const hostRect = hostEl.getBoundingClientRect();
+            const editorRect = editorEl.getBoundingClientRect();
+            const hostStyle = window.getComputedStyle(hostEl);
+            const hostPaddingLeft = Number.parseFloat(hostStyle.paddingLeft) || 0;
+            const hostPaddingTop = Number.parseFloat(hostStyle.paddingTop) || 0;
+            const pxToPt = (px: number) => (px / (canvasZoomRef.current / 100)) * (72 / 96);
+            const hostContentLeft = hostRect.left + hostEl.clientLeft + hostPaddingLeft;
+            const hostContentTop = hostRect.top + hostEl.clientTop + hostPaddingTop;
+            const offsetXPt = pxToPt(editorRect.left - hostContentLeft);
+            const offsetYPt = pxToPt(editorRect.top - hostContentTop);
+
+            for (const run of runs) {
+                if (run.x !== undefined) run.x += offsetXPt;
+                if (run.baselineY !== undefined) run.baselineY += offsetYPt;
+            }
+        }
+
         const updates = {
-            content: { runs },
+            content: {
+                runs,
+                textAlign: textAlignRef.current,
+                placeholderVerticalAlign: verticalAlignRef.current,
+            },
         } as unknown as Partial<PageElement>;
 
         const overlayEl = overlayRef.current;
@@ -152,28 +182,8 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         return { spreadId, elementId, updates };
     }, [editor, elementId]);
 
-    const captureSnapshot = useCallback((persistTransient: boolean) => {
-        const snapshot = buildSnapshot();
-        if (!snapshot) return;
-
-        latestSnapshotRef.current = snapshot;
-        if (persistTransient) {
-            updateElementTransientRef.current(snapshot.spreadId, snapshot.elementId, snapshot.updates);
-        }
-    }, [buildSnapshot]);
-
-    const scheduleSnapshotCapture = useCallback((persistTransient: boolean) => {
-        if (captureTimerRef.current !== null) {
-            window.clearTimeout(captureTimerRef.current);
-        }
-        captureTimerRef.current = window.setTimeout(() => {
-            captureSnapshot(persistTransient);
-            captureTimerRef.current = null;
-        }, 300);
-    }, [captureSnapshot]);
-
     const commitFinalSnapshot = useCallback(() => {
-        const snapshot = latestSnapshotRef.current ?? buildSnapshot();
+        const snapshot = buildSnapshot();
         if (!snapshot) return;
         updateElementRef.current(
             snapshot.spreadId,
@@ -183,58 +193,35 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         );
     }, [buildSnapshot]);
 
-    // Frequent transient save while editing (no history entries).
-    useEffect(() => {
-        if (!editor) return;
-
-        const handleUpdate = () => {
-            scheduleSnapshotCapture(true);
-        };
-        editor.on('update', handleUpdate);
-        return () => {
-            editor.off('update', handleUpdate);
-        };
-    }, [editor, scheduleSnapshotCapture]);
-
-    // Alignment changes affect DOM layout even without text content edits.
-    // Capture a fresh snapshot after layout settles so Canvas picks up new run x-positions.
-    useEffect(() => {
-        if (!editor) return;
-        const raf1 = window.requestAnimationFrame(() => {
-            alignCaptureRafRef.current = window.requestAnimationFrame(() => {
-                captureSnapshot(true);
+    const commitAfterStableLayout = useCallback(() => {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                commitFinalSnapshot();
+                didManualCloseCommitRef.current = true;
+                onRequestCloseCommitted?.();
             });
         });
-        return () => {
-            window.cancelAnimationFrame(raf1);
-            if (alignCaptureRafRef.current !== null) {
-                window.cancelAnimationFrame(alignCaptureRafRef.current);
-                alignCaptureRafRef.current = null;
-            }
-        };
-    }, [textAlign, editor, captureSnapshot]);
+    }, [commitFinalSnapshot, onRequestCloseCommitted]);
 
-    // Capture an initial mounted snapshot so unmount has a safe fallback.
+    // Parent-requested close/commit handshake (used by transition hook).
     useEffect(() => {
-        const timer = window.setTimeout(() => {
-            captureSnapshot(false);
-        }, 0);
-        return () => window.clearTimeout(timer);
-    }, [captureSnapshot]);
+        if (closeRequestNonce === lastCloseRequestNonceRef.current) return;
+        lastCloseRequestNonceRef.current = closeRequestNonce;
+        commitAfterStableLayout();
+    }, [closeRequestNonce, commitAfterStableLayout]);
 
     // Final commit on close/unmount (single history entry).
     useEffect(() => {
         return () => {
-            if (captureTimerRef.current !== null) {
-                window.clearTimeout(captureTimerRef.current);
-                captureTimerRef.current = null;
+            if (!didManualCloseCommitRef.current) {
+                commitFinalSnapshot();
             }
-            commitFinalSnapshot();
         };
     }, [commitFinalSnapshot]);
 
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
         const startX = e.clientX;
+        const startY = e.clientY;
         const currentElement = elementRef.current;
         if (!currentElement) return;
 
@@ -243,18 +230,22 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         if (!overlay) return;
         const editorPadding = BASE_EDITOR_PADDING_PX * (100 / canvasZoom);
         const handleReservePadding = 4 * (100 / canvasZoom) + 2 * (100 / canvasZoom);
+        const startOverlayHeight = overlay.offsetHeight;
+        const minOverlayHeight = editorPadding * 2 + 24;
 
         const handlePointerMove = (moveEvent: PointerEvent) => {
             const dx = moveEvent.clientX - startX;
+            const dy = moveEvent.clientY - startY;
             const dxCanvas = dx / (canvasZoom / 100);
+            const dyCanvas = dy / (canvasZoom / 100);
             const newWidth = Math.max(50, startWidth + dxCanvas);
             overlay.style.width = `${newWidth + editorPadding * 2 + handleReservePadding}px`;
+            overlay.style.height = `${Math.max(minOverlayHeight, startOverlayHeight + dyCanvas)}px`;
         };
 
         const handlePointerUp = () => {
             document.removeEventListener('pointermove', handlePointerMove);
             document.removeEventListener('pointerup', handlePointerUp);
-            captureSnapshot(true);
         };
 
         document.addEventListener('pointermove', handlePointerMove);
@@ -262,18 +253,20 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
 
         e.preventDefault();
         e.stopPropagation();
-    }, [canvasWidth, canvasZoom, captureSnapshot]);
+    }, [canvasWidth, canvasZoom]);
 
     const content = element && isTextElement(element)
         ? element.content as TextContent
         : null;
     const [overlayHeight, setOverlayHeight] = useState<number | null>(null);
     const minimumEditorHeight = useMemo(() => {
-        if (!content) return 0;
+        if (!content || !element) return 0;
         const fontSizePt = content.defaultStyle.fontSize || 24;
         const lineHeight = content.lineHeight || 1.2;
-        return Math.ceil((fontSizePt * lineHeight * 96) / 72);
-    }, [content]);
+        const oneLineHeight = Math.ceil((fontSizePt * lineHeight * 96) / 72);
+        const boxHeight = Math.ceil((element.box.y2 - element.box.y1) * canvasHeight);
+        return Math.max(oneLineHeight, boxHeight);
+    }, [content, element, canvasHeight]);
 
     useLayoutEffect(() => {
         if (!editor || !content) return;
@@ -284,10 +277,6 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
             const nextHeight = Math.max(minimumEditorHeight, measured);
             const safeHeight = nextHeight > 0 ? nextHeight : null;
             setOverlayHeight(safeHeight);
-            if (safeHeight !== null && safeHeight !== lastMeasuredHeightRef.current) {
-                lastMeasuredHeightRef.current = safeHeight;
-                scheduleSnapshotCapture(true);
-            }
         };
 
         syncHeight();
@@ -298,9 +287,14 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         }
 
         return () => observer.disconnect();
-    }, [editor, content, minimumEditorHeight, scheduleSnapshotCapture]);
+    }, [editor, content, minimumEditorHeight]);
     const editorContainerStyle = useMemo(() => {
         if (!content) return undefined;
+        const justifyContent = verticalAlign === 'center'
+            ? 'center'
+            : verticalAlign === 'bottom'
+                ? 'flex-end'
+                : 'flex-start';
         return {
             textAlign,
             fontFamily: content.defaultStyle.fontFamily,
@@ -310,8 +304,12 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
             color: content.defaultStyle.fill,
             lineHeight: String(content.lineHeight),
             margin: 0,
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column' as const,
+            justifyContent,
         };
-    }, [content, textAlign]);
+    }, [content, textAlign, verticalAlign]);
 
     if (!element || !isTextElement(element)) return null;
     if (!editor) return null;

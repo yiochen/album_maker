@@ -24,6 +24,7 @@ const FONT_OPTIONS = [
 ];
 
 type TextAlign = TextContent['textAlign'];
+type VerticalAlign = NonNullable<TextContent['placeholderVerticalAlign']>;
 
 const AlignIcon: React.FC<{ align: TextAlign }> = ({ align }) => {
     const linesByAlign: Record<TextAlign, Array<[number, number, number]>> = {
@@ -65,6 +66,36 @@ const AlignIcon: React.FC<{ align: TextAlign }> = ({ align }) => {
     );
 };
 
+const VerticalAlignIcon: React.FC<{ align: VerticalAlign }> = ({ align }) => {
+    if (align === 'top') {
+        return (
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <line x1="2" y1="2.5" x2="14" y2="2.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M8 12V5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M5.8 7.7L8 5.5L10.2 7.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        );
+    }
+    if (align === 'center') {
+        return (
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M8 12.5V10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M6.2 10.7L8 12.5L9.8 10.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M8 3.5V6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M6.2 5.3L8 3.5L9.8 5.3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        );
+    }
+    return (
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <line x1="2" y1="13.5" x2="14" y2="13.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M8 4V10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M5.8 8.3L8 10.5L10.2 8.3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+};
+
 /** Position rectangle for the floating toolbar, in viewport-relative pixels. */
 export interface TextToolbarPosition {
     top: number;
@@ -83,6 +114,10 @@ interface TextEditingToolbarProps {
     onTextAlignChange: (align: TextAlign) => void;
     /** Current text alignment. */
     textAlign: TextAlign;
+    /** Callback to update vertical alignment in text content. */
+    onVerticalAlignChange: (align: VerticalAlign) => void;
+    /** Current vertical alignment. */
+    verticalAlign: VerticalAlign;
 }
 
 /** Parse the font size from the editor's current textStyle mark attributes. */
@@ -101,6 +136,8 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
     defaultFontSizePt,
     onTextAlignChange,
     textAlign,
+    onVerticalAlignChange,
+    verticalAlign,
 }) => {
     const toolbarRef = useRef<HTMLDivElement>(null);
     const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
@@ -277,6 +314,33 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
                 data-testid="text-align-right-btn"
             >
                 <AlignIcon align="right" />
+            </button>
+
+            <span className="text-toolbar-separator" />
+
+            <button
+                className={`text-toolbar-btn ${verticalAlign === 'top' ? 'active' : ''}`}
+                onClick={() => onVerticalAlignChange('top')}
+                title="Align top"
+                data-testid="text-valign-top-btn"
+            >
+                <VerticalAlignIcon align="top" />
+            </button>
+            <button
+                className={`text-toolbar-btn ${verticalAlign === 'center' ? 'active' : ''}`}
+                onClick={() => onVerticalAlignChange('center')}
+                title="Align middle"
+                data-testid="text-valign-center-btn"
+            >
+                <VerticalAlignIcon align="center" />
+            </button>
+            <button
+                className={`text-toolbar-btn ${verticalAlign === 'bottom' ? 'active' : ''}`}
+                onClick={() => onVerticalAlignChange('bottom')}
+                title="Align bottom"
+                data-testid="text-valign-bottom-btn"
+            >
+                <VerticalAlignIcon align="bottom" />
             </button>
 
             <span className="text-toolbar-separator" />

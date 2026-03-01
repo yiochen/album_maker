@@ -137,6 +137,8 @@ export interface TextContent {
   lineHeight: number;
   /** Optional editor-only placeholder shown when runs contain no visible text. */
   placeholderText?: string;
+  /** Optional editor-only placeholder vertical alignment within the text box. */
+  placeholderVerticalAlign?: 'top' | 'center' | 'bottom';
 }
 
 /**

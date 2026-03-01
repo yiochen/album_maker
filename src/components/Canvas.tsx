@@ -13,6 +13,7 @@ import { TextEditingToolbar } from './canvas/TextEditingToolbar';
 import { useAlbumSpreads } from '../states/albumStore';
 import { useCurrentSpreadIndex, useSelectedPageSide } from '../states/uiStore';
 import { useDndDropContext } from '../contexts/DndDropContext';
+import { useTextEditorTransition } from '../hooks/useTextEditorTransition';
 
 /**
  * Props for the Canvas component.
@@ -37,6 +38,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const selectedPageSide = useSelectedPageSide();
+    const {
+        currentActiveEditorId,
+        isCommitting,
+        closeRequestNonce,
+        handleCommitDone,
+    } = useTextEditorTransition();
     const currentSpread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
 
     const { registerCanvasDropTarget } = useDndDropContext();
@@ -74,14 +81,16 @@ export const Canvas: React.FC<CanvasProps> = ({
     // Text editing lifecycle — Tiptap-based overlay
     const {
         editor,
-        editingTextElementId,
         editingElement,
         toolbarPosition,
         handleTextAlignChange,
+        handleVerticalAlignChange,
         currentTextAlign,
+        currentVerticalAlign,
     } = useTextEditing({
         fabricCanvas,
         containerRef,
+        activeEditorId: currentActiveEditorId,
         zoom,
         canvasWidth,
         canvasHeight,
@@ -289,15 +298,18 @@ export const Canvas: React.FC<CanvasProps> = ({
                                 </div>
                             )}
                             {/* Tiptap text editor overlay — inside canvas wrapper for zoom scaling */}
-                            {editingTextElementId && (
+                            {currentActiveEditorId && (
                                 <TiptapTextEditor
-                                    key={editingTextElementId}
+                                    key={currentActiveEditorId}
                                     editor={editor}
-                                    elementId={editingTextElementId}
+                                    elementId={currentActiveEditorId}
                                     canvasWidth={canvasWidth}
                                     canvasHeight={canvasHeight}
                                     textAlign={currentTextAlign}
+                                    verticalAlign={currentVerticalAlign}
                                     canvasZoom={zoom}
+                                    closeRequestNonce={closeRequestNonce}
+                                    onRequestCloseCommitted={handleCommitDone}
                                 />
                             )}
                         </div>
@@ -306,13 +318,15 @@ export const Canvas: React.FC<CanvasProps> = ({
             </div>
 
             {/* Text editing toolbar — outside zoom container to prevent scaling */}
-            {toolbarPosition && editor && editingContent && (
+            {toolbarPosition && editor && editingContent && !isCommitting && (
                 <TextEditingToolbar
                     position={toolbarPosition}
                     editor={editor}
                     defaultFontSizePt={editingContent.defaultStyle.fontSize}
                     onTextAlignChange={handleTextAlignChange}
+                    onVerticalAlignChange={handleVerticalAlignChange}
                     textAlign={currentTextAlign}
+                    verticalAlign={currentVerticalAlign}
                 />
             )}
 

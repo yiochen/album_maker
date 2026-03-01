@@ -22,7 +22,7 @@ import { textContentToTiptapDoc } from '../utils/tiptapSerializer';
 
 import { CanvasTextElement } from './CanvasTextElement';
 import { useSetEditingTextElementId, useEditingTextElementId } from '../states/uiStore';
-import { useUpdateElement, useAlbumSpreads } from '../states/albumStore';
+import { useAlbumSpreads } from '../states/albumStore';
 import { useCurrentSpreadIndex } from '../states/uiStore';
 import { isTextElement } from '../types';
 import type { TextContent, PageElement } from '../types';
@@ -38,8 +38,6 @@ export interface TextToolbarPosition {
 export interface TextEditingState {
     /** The singleton Tiptap editor instance. */
     editor: Editor | null;
-    /** Currently editing element ID (null if not editing). */
-    editingTextElementId: string | null;
     /** The PageElement being edited (null if not editing). */
     editingElement: PageElement | null;
     /** Toolbar position in container-relative pixels. */
@@ -54,14 +52,20 @@ export interface TextEditingState {
     handleCancel: () => void;
     /** Update text alignment during editing (persists immediately). */
     handleTextAlignChange: (align: TextContent['textAlign']) => void;
+    /** Update text vertical alignment during editing (persists immediately). */
+    handleVerticalAlignChange: (align: NonNullable<TextContent['placeholderVerticalAlign']>) => void;
     /** Current text alignment of the editing element. */
     currentTextAlign: TextContent['textAlign'];
+    /** Current text vertical alignment of the editing element. */
+    currentVerticalAlign: NonNullable<TextContent['placeholderVerticalAlign']>;
 }
 
 interface UseTextEditingProps {
     fabricCanvas: fabric.Canvas | null;
     /** Ref to the canvas container element (used for toolbar coordinate conversion). */
     containerRef: React.RefObject<HTMLDivElement | null>;
+    /** Active editor ID controlled by transition manager. */
+    activeEditorId?: string | null;
     /** Current zoom level for toolbar repositioning. */
     zoom: number;
     /** Canvas width in px. */
@@ -73,6 +77,7 @@ interface UseTextEditingProps {
 export const useTextEditing = ({
     fabricCanvas,
     containerRef,
+    activeEditorId,
     zoom,
     canvasWidth,
     canvasHeight,
@@ -80,8 +85,8 @@ export const useTextEditing = ({
     const EDITOR_PADDING_SCREEN_PX = 8;
 
     const setEditingTextElementId = useSetEditingTextElementId();
-    const editingTextElementId = useEditingTextElementId();
-    const updateElement = useUpdateElement();
+    const requestedEditingTextElementId = useEditingTextElementId();
+    const editingTextElementId = activeEditorId ?? requestedEditingTextElementId;
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
 
@@ -133,12 +138,19 @@ export const useTextEditing = ({
     // Toolbar position state
     const [toolbarPosition, setToolbarPosition] = useState<TextToolbarPosition | null>(null);
 
-    // Deriving current alignment directly from the editing element
-    const currentTextAlign = useMemo(() => {
+    // Keep alignments local during an editing session; persist once on final commit.
+    const [currentTextAlign, setCurrentTextAlign] = useState<TextContent['textAlign']>('left');
+    const [currentVerticalAlign, setCurrentVerticalAlign] = useState<NonNullable<TextContent['placeholderVerticalAlign']>>('top');
+
+    useEffect(() => {
         if (editingElement && isTextElement(editingElement)) {
-            return (editingElement.content as TextContent).textAlign;
+            const content = editingElement.content as TextContent;
+            setCurrentTextAlign(content.textAlign);
+            setCurrentVerticalAlign(content.placeholderVerticalAlign ?? 'top');
+        } else {
+            setCurrentTextAlign('left');
+            setCurrentVerticalAlign('top');
         }
-        return 'left';
     }, [editingElement]);
 
     // Clear toolbar position when text editing exits.
@@ -201,19 +213,14 @@ export const useTextEditing = ({
         if (idToRestore) restoreSelection(idToRestore);
     }, [editingTextElementId, setEditingTextElementId, restoreSelection]);
 
-    // Text align change handler (persists immediately so Fabric re-renders)
+    // Text align change handler (local editor-session state).
     const handleTextAlignChange = useCallback((align: TextContent['textAlign']) => {
-        const spread = spreads[currentSpreadIndex];
-        if (spread && editingTextElementId) {
-            const element = spread.elements.find(e => e.id === editingTextElementId);
-            if (element) {
-                const content = element.content as TextContent;
-                updateElement(spread.id, editingTextElementId, {
-                    content: { ...content, textAlign: align },
-                });
-            }
-        }
-    }, [editingTextElementId, spreads, currentSpreadIndex, updateElement]);
+        setCurrentTextAlign(align);
+    }, []);
+
+    const handleVerticalAlignChange = useCallback((align: NonNullable<TextContent['placeholderVerticalAlign']>) => {
+        setCurrentVerticalAlign(align);
+    }, []);
 
     // Reposition toolbar on zoom or scroll changes
     useEffect(() => {
@@ -255,7 +262,6 @@ export const useTextEditing = ({
 
     return {
         editor,
-        editingTextElementId,
         editingElement,
         toolbarPosition,
         canvasWidth,
@@ -264,5 +270,7 @@ export const useTextEditing = ({
         handleCancel,
         handleTextAlignChange,
         currentTextAlign,
+        handleVerticalAlignChange,
+        currentVerticalAlign,
     };
 };
