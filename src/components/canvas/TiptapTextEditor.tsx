@@ -14,12 +14,15 @@
  */
 import React, { useEffect, useCallback, useMemo, useRef, useLayoutEffect, useState } from 'react';
 import type { Editor } from '@tiptap/react';
-import { extractLayoutFromDOM } from '../../utils/domLayoutExtractor';
-import { normalizeRunsTopOverflow } from '../../utils/textRunNormalization';
 import { useAlbumSpreads, useUpdateElement } from '../../states/albumStore';
 import { useCurrentSpreadIndex } from '../../states/uiStore';
+import { buildTextRunsFromEditorDOM } from '../../services/textSnapshot';
+import {
+    buildTextBoxFromOverlaySize,
+    getTextEditorLayoutMetrics,
+} from '../../services/textEditorLayout';
 import { isTextElement } from '../../types';
-import type { TextContent, PageElement, TextRun } from '../../types';
+import type { TextContent, PageElement } from '../../types';
 
 /** Props for the overlay position and styling. */
 interface TiptapTextEditorProps {
@@ -54,8 +57,6 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
     closeRequestNonce = 0,
     onRequestCloseCommitted,
 }) => {
-    const BASE_EDITOR_PADDING_PX = 8;
-
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const updateElement = useUpdateElement();
@@ -116,39 +117,14 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         if (!editorEl || !editorEl.isConnected) return null;
 
         const doc = editor.getJSON();
-        const runs: TextRun[] = extractLayoutFromDOM(
+        const normalizedRuns = buildTextRunsFromEditorDOM({
             editorEl,
+            hostEl: editorHostRef.current,
             doc,
-            (currentElement.content as TextContent).defaultStyle as Required<import('../../types').TextStyle>,
-            canvasWidthRef.current,
-            canvasZoomRef.current
-        );
-
-        // The editor content can be vertically aligned via flex on the host container.
-        // extractLayoutFromDOM returns coordinates relative to the ProseMirror root,
-        // so we need to add host->editor offsets to preserve final run positions.
-        const hostEl = editorHostRef.current;
-        if (hostEl) {
-            const hostRect = hostEl.getBoundingClientRect();
-            const editorRect = editorEl.getBoundingClientRect();
-            const hostStyle = window.getComputedStyle(hostEl);
-            const hostPaddingLeft = Number.parseFloat(hostStyle.paddingLeft) || 0;
-            const hostPaddingTop = Number.parseFloat(hostStyle.paddingTop) || 0;
-            const pxToPt = (px: number) => (px / (canvasZoomRef.current / 100)) * (72 / 96);
-            const hostContentLeft = hostRect.left + hostEl.clientLeft + hostPaddingLeft;
-            const hostContentTop = hostRect.top + hostEl.clientTop + hostPaddingTop;
-            const offsetXPt = pxToPt(editorRect.left - hostContentLeft);
-            const offsetYPt = pxToPt(editorRect.top - hostContentTop);
-
-            for (const run of runs) {
-                if (run.x !== undefined) run.x += offsetXPt;
-                if (run.baselineY !== undefined) run.baselineY += offsetYPt;
-            }
-        }
-        const normalizedRuns = normalizeRunsTopOverflow(
-            runs,
-            (currentElement.content as TextContent).defaultStyle as Required<import('../../types').TextStyle>
-        );
+            defaultStyle: (currentElement.content as TextContent).defaultStyle as Required<import('../../types').TextStyle>,
+            canvasWidth: canvasWidthRef.current,
+            canvasZoom: canvasZoomRef.current,
+        });
 
         const updates = {
             content: {
@@ -161,9 +137,6 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         const overlayEl = overlayRef.current;
         const finalWidthPx = overlayEl?.offsetWidth;
         const finalHeightPx = overlayEl?.offsetHeight;
-        const zoomScaleAtSave = 100 / Math.max(1, canvasZoomRef.current);
-        const editorPaddingAtSave = BASE_EDITOR_PADDING_PX * zoomScaleAtSave;
-        const handleReservePaddingAtSave = 4 * zoomScaleAtSave + 2 * zoomScaleAtSave;
         if (
             canvasWidthRef.current > 0 &&
             canvasHeightRef.current > 0 &&
@@ -172,16 +145,14 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
             finalWidthPx > 0 &&
             finalHeightPx > 0
         ) {
-            const contentWidthPx = Math.max(
-                1,
-                finalWidthPx - (editorPaddingAtSave * 2 + handleReservePaddingAtSave)
+            updates.box = buildTextBoxFromOverlaySize(
+                currentElement.box,
+                finalWidthPx,
+                finalHeightPx,
+                canvasWidthRef.current,
+                canvasHeightRef.current,
+                canvasZoomRef.current
             );
-            const contentHeightPx = Math.max(1, finalHeightPx - editorPaddingAtSave * 2);
-            updates.box = {
-                ...currentElement.box,
-                x2: currentElement.box.x1 + contentWidthPx / canvasWidthRef.current,
-                y2: currentElement.box.y1 + contentHeightPx / canvasHeightRef.current,
-            };
         }
 
         return { spreadId, elementId, updates };
@@ -233,8 +204,7 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         const startWidth = (currentElement.box.x2 - currentElement.box.x1) * canvasWidth;
         const overlay = overlayRef.current;
         if (!overlay) return;
-        const editorPadding = BASE_EDITOR_PADDING_PX * (100 / canvasZoom);
-        const handleReservePadding = 4 * (100 / canvasZoom) + 2 * (100 / canvasZoom);
+        const { editorPadding, handleReservePadding } = getTextEditorLayoutMetrics(canvasZoom);
         const startOverlayHeight = overlay.offsetHeight;
         const minOverlayHeight = editorPadding * 2 + 24;
 
@@ -325,12 +295,13 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
     const width = (box.x2 - box.x1) * canvasWidth;
     const height = (box.y2 - box.y1) * canvasHeight;
 
-    const zoomScale = 100 / canvasZoom;
-    const editorPadding = BASE_EDITOR_PADDING_PX * zoomScale;
-    const borderWidth = 2 * zoomScale;
-    const handleWidth = 4 * zoomScale;
-    const handleTouchArea = 24 * zoomScale;
-    const handleReservePadding = handleWidth + 2 * zoomScale;
+    const {
+        zoomScale,
+        editorPadding,
+        borderWidth,
+        handleTouchArea,
+        handleReservePadding,
+    } = getTextEditorLayoutMetrics(canvasZoom);
 
     // The singleton editor's DOM node (editor.view.dom) is moved into this local 
     // container whenever a text element enters edit mode.

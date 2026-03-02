@@ -150,6 +150,7 @@ export async function renderSpread(
                         selectable: isInteractive,
                         hasControls: isInteractive,
                         evented: isInteractive,
+                        uniformScaling: false,
                     cornerSize: uiSizes.cornerSize,
                     borderScaleFactor: uiSizes.borderScaleFactor,
                 });
@@ -165,6 +166,7 @@ export async function renderSpread(
                     const canvasEl = new CanvasTextElement(element, options.ppi, {
                         ...SHARED_SELECTION_STYLE,
                         interactive: isInteractive,
+                        uniformScaling: false,
                     });
 
 

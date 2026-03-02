@@ -14,6 +14,7 @@ import { calculateSnap, calculateResizeSnap, calculateAspectLockedResizeSnap, ge
 import type { SnapEdge } from '../types';
 import { CustomFabricObject } from './fabricTypes';
 import { CanvasImageElement } from './CanvasImageElement';
+import { CanvasTextElement } from './CanvasTextElement';
 import { getZoomCompensatedSizes } from '../utils/fabricRenderer';
 import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
@@ -108,8 +109,8 @@ export const useCanvasSnapping = ({
             if (!obj || !obj.data) return;
 
             // Cache scaled dimensions - only compute once per move event
-            const scaledWidth = obj.getScaledWidth();
-            const scaledHeight = obj.getScaledHeight();
+            const scaledWidth = (obj.width ?? 0) * (obj.scaleX ?? 1);
+            const scaledHeight = (obj.height ?? 0) * (obj.scaleY ?? 1);
             let newLeft = obj.left!;
             let newTop = obj.top!;
 
@@ -157,7 +158,9 @@ export const useCanvasSnapping = ({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const handleObjectScaling = (e: { target?: fabric.Object; transform?: any }) => {
             const obj = e.target;
-            if (!(obj instanceof CanvasImageElement) || !obj.data) return;
+            const isImage = obj instanceof CanvasImageElement;
+            const isText = obj instanceof CanvasTextElement;
+            if ((!isImage && !isText) || !obj.data) return;
 
             clearSnapLines();
             if (!isSnappingEnabledRef.current) return;
@@ -167,20 +170,14 @@ export const useCanvasSnapping = ({
 
             const left = obj.left ?? 0;
             const top = obj.top ?? 0;
-            const width = obj.getScaledWidth();
-            const height = obj.getScaledHeight();
+            const width = (obj.width ?? 0) * (obj.scaleX ?? 1);
+            const height = (obj.height ?? 0) * (obj.scaleY ?? 1);
 
-            const snapResult = (obj.pageElement.content.lockAspectRatio ?? true)
-                ? calculateAspectLockedResizeSnap(
-                    { x: (left / canvasWidth) * 100, y: (top / canvasHeight) * 100 },
-                    { width: (width / canvasWidth) * 100, height: (height / canvasHeight) * 100 },
-                    corner
-                )
-                : calculateResizeSnap(
-                    { x: (left / canvasWidth) * 100, y: (top / canvasHeight) * 100 },
-                    { width: (width / canvasWidth) * 100, height: (height / canvasHeight) * 100 },
-                    corner
-                );
+            const position = { x: (left / canvasWidth) * 100, y: (top / canvasHeight) * 100 };
+            const size = { width: (width / canvasWidth) * 100, height: (height / canvasHeight) * 100 };
+            const snapResult = isImage && (obj.pageElement.content.lockAspectRatio ?? true)
+                ? calculateAspectLockedResizeSnap(position, size, corner)
+                : calculateResizeSnap(position, size, corner);
 
             if (snapResult.snappedEdges.length === 0) return;
 

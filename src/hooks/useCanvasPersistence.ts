@@ -6,11 +6,12 @@
  */
 import { useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
-import type { ImageContent } from '../types';
+import type { ImageContent, TextContent } from '../types';
 import { CanvasImageElement } from './CanvasImageElement';
 import { CanvasTextElement } from './CanvasTextElement';
 import { useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads, useUpdateElement } from '../states/albumStore';
+import { useTextResizeReflow } from './useTextResizeReflow';
 
 interface UseCanvasPersistenceProps {
     /** The Fabric.js canvas instance. */
@@ -29,6 +30,7 @@ export const useCanvasPersistence = ({
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const onElementUpdate = useUpdateElement();
+    const { requestReflowAfterResize } = useTextResizeReflow();
 
     const onElementUpdateRef = useRef(onElementUpdate);
     const spreadRef = useRef(spreads[currentSpreadIndex]);
@@ -62,11 +64,35 @@ export const useCanvasPersistence = ({
                     }
                 });
             } else if (obj instanceof CanvasTextElement) {
-                // For text, updateLayoutFromPixels handles coordinate conversion
-                obj.updateLayoutFromPixels(canvasWidth, canvasHeight);
+                const previousBox = obj.pageElement.box;
+                const previousWidth = previousBox.x2 - previousBox.x1;
+                const previousHeight = previousBox.y2 - previousBox.y1;
+
+                // For text, updateLayoutFromPixels handles coordinate conversion.
+                obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
+                const nextBox = obj.pageElement.box;
+                const nextWidth = nextBox.x2 - nextBox.x1;
+                const nextHeight = nextBox.y2 - nextBox.y1;
+
+                const groupId = crypto.randomUUID();
                 onElementUpdateRef.current(spread.id, obj.pageElement.id, {
                     box: obj.pageElement.box,
-                });
+                }, groupId);
+
+                const widthChanged = Math.abs(nextWidth - previousWidth) > 1e-7;
+                const heightChanged = Math.abs(nextHeight - previousHeight) > 1e-7;
+                if (widthChanged || heightChanged) {
+                    const textContent = obj.pageElement.content as TextContent;
+                    requestReflowAfterResize({
+                        spreadId: spread.id,
+                        elementId: obj.pageElement.id,
+                        content: textContent,
+                        boxWidthPx: nextWidth * canvasWidth,
+                        boxHeightPx: nextHeight * canvasHeight,
+                        canvasWidth,
+                        groupId,
+                    });
+                }
             }
         };
 
@@ -75,5 +101,5 @@ export const useCanvasPersistence = ({
         return () => {
             canvas.off('object:modified', handleObjectModified);
         };
-    }, [fabricCanvas, canvasWidth, canvasHeight]);
+    }, [fabricCanvas, canvasWidth, canvasHeight, requestReflowAfterResize]);
 };

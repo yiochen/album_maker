@@ -1,6 +1,7 @@
 import * as fabric from 'fabric';
 import type { ImageContent, ImagePageElement } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from '../utils/imageUtils';
+import { computeNormalizedBoxFromPixels } from '../utils/boxLayout';
 import {
     type OrientationMatrix, IDENTITY,
     getOrientedDimensions, decomposeForRendering,
@@ -410,56 +411,17 @@ export class CanvasImageElement extends fabric.Group {
      * Implementation of "Anchor Locking"
      */
     updateLayoutFromPixels(activeCorner: string = '', canvasWidth: number = this.canvas?.width || 1, canvasHeight: number = this.canvas?.height || 1) {
-        const left = this.left;
-        const top = this.top;
-        const width = this.width * this.scaleX;
-        const height = this.height * this.scaleY;
-        const right = left + width;
-        const bottom = top + height;
-
-        const newX1 = left / canvasWidth;
-        const newY1 = top / canvasHeight;
-        const newX2 = right / canvasWidth;
-        const newY2 = bottom / canvasHeight;
-
-        const oldBox = this.pageElement.box;
-        const newBox = { ...oldBox };
-
-        // Anchor Locking: Restore old coordinates if they weren't supposed to change
-        // Corners: 'tl', 'tr', 'bl', 'br', 'mt', 'mb', 'ml', 'mr'
-
-        const isResizing = activeCorner !== '';
-
-        if (isResizing) {
-            // If dragging RIGHT handle ('mr', 'tr', 'br'), x1 (left) must not change
-            if (activeCorner.includes('r')) {
-                newBox.x1 = oldBox.x1;
-                newBox.x2 = newX2;
-            }
-            // If dragging LEFT handle ('ml', 'tl', 'bl'), x2 (right) must not change
-            if (activeCorner.includes('l')) {
-                newBox.x2 = oldBox.x2;
-                newBox.x1 = newX1;
-            }
-            // If dragging BOTTOM handle ('mb', 'bl', 'br'), y1 (top) must not change
-            if (activeCorner.includes('b')) {
-                newBox.y1 = oldBox.y1;
-                newBox.y2 = newY2;
-            }
-            // If dragging TOP handle ('mt', 'tl', 'tr'), y2 (bottom) must not change
-            if (activeCorner.includes('t')) {
-                newBox.y2 = oldBox.y2;
-                newBox.y1 = newY1;
-            }
-        } else {
-            // Dragging (moving) the whole element
-            newBox.x1 = newX1;
-            newBox.y1 = newY1;
-            newBox.x2 = newX2;
-            newBox.y2 = newY2;
-        }
-
-        this.pageElement.box = newBox;
+        const left = this.left ?? 0;
+        const top = this.top ?? 0;
+        const width = (this.width ?? 0) * (this.scaleX ?? 1);
+        const height = (this.height ?? 0) * (this.scaleY ?? 1);
+        this.pageElement.box = computeNormalizedBoxFromPixels(
+            this.pageElement.box,
+            { left, top, width, height },
+            canvasWidth,
+            canvasHeight,
+            activeCorner
+        );
     }
 
     /**

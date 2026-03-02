@@ -1,9 +1,11 @@
 import * as fabric from 'fabric';
 import { PageElement, TextContent } from '../types';
+import { computeNormalizedBoxFromPixels } from '../utils/boxLayout';
 
 export class CanvasTextElement extends fabric.FabricObject {
     public pageElement: PageElement;
     public ppi: number;
+    public data?: { id: string };
 
     constructor(
         element: PageElement,
@@ -11,6 +13,7 @@ export class CanvasTextElement extends fabric.FabricObject {
         options: Partial<fabric.FabricObjectProps> & {
             interactive?: boolean;
             opacity?: number;
+            uniformScaling?: boolean;
         } = {}
     ) {
         super({
@@ -24,11 +27,13 @@ export class CanvasTextElement extends fabric.FabricObject {
             opacity: options.opacity ?? 1,
             // Disable native Fabric text editing features
             interactive: false,
+            uniformScaling: false,
             objectCaching: false, // Ensure no clipping on manual renders
         });
 
         this.pageElement = element;
         this.ppi = ppi;
+        this.data = { id: element.id };
 
         // Note: applyLayout will set width/height from the box
         if (options.interactive !== false) {
@@ -51,6 +56,8 @@ export class CanvasTextElement extends fabric.FabricObject {
             top: targetTop,
             width: width,
             height: height,
+            scaleX: 1,
+            scaleY: 1,
         });
 
         this.setCoords();
@@ -60,23 +67,21 @@ export class CanvasTextElement extends fabric.FabricObject {
      * Read the pixel coordinates and save them back to the normalized box model.
      */
     updateLayoutFromPixels(
+        activeCorner: string = '',
         canvasWidth: number = this.canvas?.width || 1,
         canvasHeight: number = this.canvas?.height || 1
     ) {
-        const box = this.pageElement.box;
-
         const left = this.left ?? 0;
         const top = this.top ?? 0;
-        const width = this.getScaledWidth();
-        const height = this.getScaledHeight();
-
-        this.pageElement.box = {
-            ...box,
-            x1: left / canvasWidth,
-            y1: top / canvasHeight,
-            x2: (left + width) / canvasWidth,
-            y2: (top + height) / canvasHeight,
-        };
+        const width = (this.width ?? 0) * (this.scaleX ?? 1);
+        const height = (this.height ?? 0) * (this.scaleY ?? 1);
+        this.pageElement.box = computeNormalizedBoxFromPixels(
+            this.pageElement.box,
+            { left, top, width, height },
+            canvasWidth,
+            canvasHeight,
+            activeCorner
+        );
     }
 
     /**
@@ -176,14 +181,14 @@ export class CanvasTextElement extends fabric.FabricObject {
 
     updateControlVisibility() {
         this.setControlsVisibility({
-            bl: false,
-            br: false,
-            tl: false,
-            tr: false,
-            mb: false,
-            mt: false,
-            ml: false,
-            mr: false,
+            bl: true,
+            br: true,
+            tl: true,
+            tr: true,
+            mb: true,
+            mt: true,
+            ml: true,
+            mr: true,
             mtr: false,
         });
     }

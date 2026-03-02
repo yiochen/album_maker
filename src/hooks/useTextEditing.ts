@@ -12,13 +12,9 @@ import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import * as fabric from 'fabric';
 import { useEditor } from '@tiptap/react';
 import type { Editor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import { TextStyle } from '@tiptap/extension-text-style';
-import Color from '@tiptap/extension-color';
-import FontFamily from '@tiptap/extension-font-family';
-import { FontSize } from '../extensions/tiptapFontSize';
 import { textContentToTiptapDoc } from '../utils/tiptapSerializer';
+import { BASE_TEXT_EDITOR_PADDING_PX } from '../services/textEditorLayout';
+import { createTextEditorExtensions } from '../services/textEditorExtensions';
 
 import { CanvasTextElement } from './CanvasTextElement';
 import { useSetEditingTextElementId, useEditingTextElementId } from '../states/uiStore';
@@ -82,13 +78,12 @@ export const useTextEditing = ({
     canvasWidth,
     canvasHeight,
 }: UseTextEditingProps): TextEditingState => {
-    const EDITOR_PADDING_SCREEN_PX = 8;
-
     const setEditingTextElementId = useSetEditingTextElementId();
     const requestedEditingTextElementId = useEditingTextElementId();
     const editingTextElementId = activeEditorId ?? requestedEditingTextElementId;
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
+    const editorExtensions = useMemo(() => createTextEditorExtensions(), []);
 
 
     // Find the element being edited
@@ -100,23 +95,7 @@ export const useTextEditing = ({
 
     // Initialize the singleton Editor
     const editor = useEditor({
-        extensions: [
-            StarterKit.configure({
-                heading: false,
-                blockquote: false,
-                codeBlock: false,
-                code: false,
-                bulletList: false,
-                orderedList: false,
-                listItem: false,
-                horizontalRule: false,
-            }),
-            Underline,
-            TextStyle,
-            Color,
-            FontFamily,
-            FontSize,
-        ],
+        extensions: editorExtensions,
     });
 
     // Content sync effect: When the selected element changes, update the editor content.
@@ -177,9 +156,9 @@ export const useTextEditing = ({
         const screenWidth = bound.width * (canvasRect.width / (fabricCanvas.width || 1));
 
         setToolbarPosition({
-            top: screenTop - containerRect.top - EDITOR_PADDING_SCREEN_PX,
-            left: screenLeft - containerRect.left - EDITOR_PADDING_SCREEN_PX,
-            width: screenWidth + EDITOR_PADDING_SCREEN_PX * 2,
+            top: screenTop - containerRect.top - BASE_TEXT_EDITOR_PADDING_PX,
+            left: screenLeft - containerRect.left - BASE_TEXT_EDITOR_PADDING_PX,
+            width: screenWidth + BASE_TEXT_EDITOR_PADDING_PX * 2,
         });
     }, [fabricCanvas, containerRef]);
 
