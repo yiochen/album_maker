@@ -10,7 +10,6 @@ interface RequestTextResizeReflowOptions {
     content: TextContent;
     boxWidthPx: number;
     boxHeightPx: number;
-    canvasWidth: number;
     groupId?: string;
 }
 
@@ -34,7 +33,6 @@ export function useTextResizeReflow() {
                 content: options.content,
                 boxWidthPx: options.boxWidthPx,
                 boxHeightPx: options.boxHeightPx,
-                canvasWidth: options.canvasWidth,
             });
 
             // Ignore stale measurements for the same element.

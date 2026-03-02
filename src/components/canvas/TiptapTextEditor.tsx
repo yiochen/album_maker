@@ -122,7 +122,6 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
             hostEl: editorHostRef.current,
             doc,
             defaultStyle: (currentElement.content as TextContent).defaultStyle as Required<import('../../types').TextStyle>,
-            canvasWidth: canvasWidthRef.current,
             canvasZoom: canvasZoomRef.current,
         });
 

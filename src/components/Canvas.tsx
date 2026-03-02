@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useState, useLayoutEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import * as fabric from 'fabric';
 import type { PoolImage, TextContent } from '../types';
 import { isTextElement } from '../types';
@@ -7,6 +7,7 @@ import { useCanvasInteraction } from '../hooks/useCanvasInteraction';
 import { useTextEditing } from '../hooks/useTextEditing';
 import { useTextEditingSelection } from '../hooks/useTextEditingSelection';
 import { CanvasImageElement } from '../hooks/CanvasImageElement';
+import { useCanvasViewportLayout } from '../hooks/useCanvasViewportLayout';
 import { DroppableCanvas } from './DroppableCanvas';
 import { TiptapTextEditor } from './canvas/TiptapTextEditor';
 import { TextEditingToolbar } from './canvas/TextEditingToolbar';
@@ -133,95 +134,17 @@ export const Canvas: React.FC<CanvasProps> = ({
         };
     }, [registerCanvasDropTarget, wrapperRef, zoom, currentSpread?.id, onImageDrop, currentSpread, fabricCanvas]);
 
-    // Styles for scrollable content
-    const zoomedWidth = canvasWidth * (zoom / 100);
-    const zoomedHeight = canvasHeight * (zoom / 100);
-
-    const [viewportSize, setViewportSize] = useState({
-        innerWidth: 0,
-        innerHeight: 0,
-        paddingLeft: 0,
-        paddingTop: 0,
+    const {
+        zoomedWidth,
+        zoomedHeight,
+        marginLeft,
+        marginTop,
+    } = useCanvasViewportLayout({
+        containerRef,
+        canvasWidth,
+        canvasHeight,
+        zoom,
     });
-
-    const getViewportMetrics = (viewport: HTMLDivElement) => {
-        const styles = window.getComputedStyle(viewport);
-        const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
-        const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
-        const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
-        const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
-
-        return {
-            innerWidth: Math.max(0, viewport.clientWidth - paddingLeft - paddingRight),
-            innerHeight: Math.max(0, viewport.clientHeight - paddingTop - paddingBottom),
-            paddingLeft,
-            paddingTop,
-        };
-    };
-
-    // Track viewport size to calculate safe margins
-    useEffect(() => {
-        if (!containerRef.current) return;
-        const viewport = containerRef.current;
-
-        const updateSize = () => {
-            setViewportSize(getViewportMetrics(viewport));
-        };
-
-        const resizeObserver = new ResizeObserver(updateSize);
-        resizeObserver.observe(viewport);
-        updateSize();
-
-        return () => resizeObserver.disconnect();
-    }, []);
-
-    // Margins ensure the content is centered when smaller than viewport,
-    // but starts at (0,0) when larger to avoid clipping overflow.
-    const marginL = Math.max(0, (viewportSize.innerWidth - zoomedWidth) / 2);
-    const marginT = Math.max(0, (viewportSize.innerHeight - zoomedHeight) / 2);
-
-    // Keep current viewport position stable across zoom changes.
-    // This prevents "jump to center" and preserves where the user is looking.
-    const previousZoomRef = useRef(zoom);
-    useLayoutEffect(() => {
-        const viewport = containerRef.current;
-        if (!viewport) return;
-
-        const previousZoom = previousZoomRef.current;
-        if (previousZoom === zoom) return;
-
-        const viewportWidth = viewport.clientWidth;
-        const viewportHeight = viewport.clientHeight;
-        const {
-            innerWidth,
-            innerHeight,
-            paddingLeft,
-            paddingTop,
-        } = getViewportMetrics(viewport);
-
-        const previousZoomedWidth = canvasWidth * (previousZoom / 100);
-        const previousZoomedHeight = canvasHeight * (previousZoom / 100);
-        const previousMarginL = Math.max(0, (innerWidth - previousZoomedWidth) / 2);
-        const previousMarginT = Math.max(0, (innerHeight - previousZoomedHeight) / 2);
-
-        // Preserve the viewport's top-left point in canvas space.
-        const prevContentX = Math.max(0, viewport.scrollLeft - (paddingLeft + previousMarginL));
-        const prevContentY = Math.max(0, viewport.scrollTop - (paddingTop + previousMarginT));
-        const ratio = zoom / previousZoom;
-        const nextContentX = prevContentX * ratio;
-        const nextContentY = prevContentY * ratio;
-
-        const nextScrollLeft = nextContentX + paddingLeft + marginL;
-        const nextScrollTop = nextContentY + paddingTop + marginT;
-
-        const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewportWidth);
-        const maxScrollTop = Math.max(0, viewport.scrollHeight - viewportHeight);
-
-        viewport.scrollLeft = Math.min(maxScrollLeft, Math.max(0, nextScrollLeft));
-        viewport.scrollTop = Math.min(maxScrollTop, Math.max(0, nextScrollTop));
-
-        previousZoomRef.current = zoom;
-    }, [zoom, canvasWidth, canvasHeight, marginL, marginT, zoomedWidth, zoomedHeight]);
 
     const canvasStyle = {
         width: `${canvasWidth}px`,
@@ -262,8 +185,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                     style={{
                         width: zoomedWidth,
                         height: zoomedHeight,
-                        marginLeft: marginL,
-                        marginTop: marginT,
+                        marginLeft,
+                        marginTop,
                         position: 'relative',
                         flexShrink: 0,
                     }}

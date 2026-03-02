@@ -8,7 +8,6 @@ interface BuildTextRunsFromEditorDOMOptions {
     hostEl?: HTMLElement | null;
     doc: JSONContent;
     defaultStyle: Required<TextStyle>;
-    canvasWidth: number;
     canvasZoom: number;
 }
 
@@ -26,14 +25,12 @@ export function buildTextRunsFromEditorDOM({
     hostEl,
     doc,
     defaultStyle,
-    canvasWidth,
     canvasZoom,
 }: BuildTextRunsFromEditorDOMOptions): TextRun[] {
     const runs = extractLayoutFromDOM(
         editorEl,
         doc,
         defaultStyle,
-        canvasWidth,
         canvasZoom
     );
 

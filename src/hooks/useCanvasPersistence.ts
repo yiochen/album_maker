@@ -89,7 +89,6 @@ export const useCanvasPersistence = ({
                         content: textContent,
                         boxWidthPx: nextWidth * canvasWidth,
                         boxHeightPx: nextHeight * canvasHeight,
-                        canvasWidth,
                         groupId,
                     });
                 }

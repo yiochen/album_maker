@@ -22,12 +22,15 @@ class UploadPhotoSource implements PhotoSource {
         // No-op
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async fetchImages(options?: FetchImagesOptions): Promise<FetchImagesResult> {
         // Fetch everything from the uploadedImages table
         const records = await uploadedImageDB.getAll();
+        const pageSize = Math.max(1, options?.pageSize ?? records.length);
+        const startIndex = Number.parseInt(options?.pageToken ?? '0', 10);
+        const safeStartIndex = Number.isFinite(startIndex) ? Math.max(0, startIndex) : 0;
+        const paginatedRecords = records.slice(safeStartIndex, safeStartIndex + pageSize);
 
-        const images: SourceImage[] = records.map(record => ({
+        const images: SourceImage[] = paginatedRecords.map(record => ({
             id: record.sourceImageId, // Using the stable identifier instead of internal DB ID
             sourceId: this.id,
             filename: record.filename,
@@ -41,10 +44,13 @@ class UploadPhotoSource implements PhotoSource {
             metadata: { dbId: record.id }, // Keep DB ID in metadata for URL resolution
         }));
 
-        // Basic pagination (if ever needed, but for now we return all)
+        const nextPageIndex = safeStartIndex + paginatedRecords.length;
+        const hasMore = nextPageIndex < records.length;
+
         return {
             images,
-            hasMore: false,
+            hasMore,
+            nextPageToken: hasMore ? String(nextPageIndex) : undefined,
         };
     }
 
