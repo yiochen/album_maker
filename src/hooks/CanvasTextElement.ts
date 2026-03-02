@@ -95,6 +95,10 @@ export class CanvasTextElement extends fabric.FabricObject {
         // Fabric transforms ctx so 0,0 is the center. 
         // We translate to top-left to use box-relative run coordinates.
         ctx.translate(-w / 2, -h / 2);
+        // Keep all text paint inside the text box bounds.
+        ctx.beginPath();
+        ctx.rect(0, 0, w, h);
+        ctx.clip();
 
         const hasRenderableText = content.runs.some((run) => {
             const text = run.text ?? '';

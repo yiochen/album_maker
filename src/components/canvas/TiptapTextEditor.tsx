@@ -15,6 +15,7 @@
 import React, { useEffect, useCallback, useMemo, useRef, useLayoutEffect, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { extractLayoutFromDOM } from '../../utils/domLayoutExtractor';
+import { normalizeRunsTopOverflow } from '../../utils/textRunNormalization';
 import { useAlbumSpreads, useUpdateElement } from '../../states/albumStore';
 import { useCurrentSpreadIndex } from '../../states/uiStore';
 import { isTextElement } from '../../types';
@@ -144,10 +145,14 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
                 if (run.baselineY !== undefined) run.baselineY += offsetYPt;
             }
         }
+        const normalizedRuns = normalizeRunsTopOverflow(
+            runs,
+            (currentElement.content as TextContent).defaultStyle as Required<import('../../types').TextStyle>
+        );
 
         const updates = {
             content: {
-                runs,
+                runs: normalizedRuns,
                 textAlign: textAlignRef.current,
                 placeholderVerticalAlign: verticalAlignRef.current,
             },
