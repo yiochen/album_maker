@@ -8,7 +8,6 @@ interface MeasureTextRunsOptions {
     content: TextContent;
     boxWidthPx: number;
     boxHeightPx: number;
-    canvasWidth: number;
 }
 
 const waitNextFrame = (): Promise<void> =>
@@ -103,7 +102,6 @@ class TextLayoutMeasurementService {
             hostEl: this.hostEl,
             doc,
             defaultStyle: options.content.defaultStyle,
-            canvasWidth: options.canvasWidth,
             canvasZoom: 100,
         });
 
