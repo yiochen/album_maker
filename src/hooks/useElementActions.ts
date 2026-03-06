@@ -62,6 +62,8 @@ export const useElementActions = () => {
                             fullUrl: image.fullUrl,
                             previewUrl: image.previewUrl,
                             thumbnailUrl: image.thumbnailUrl,
+                            originalWidth: image.width,
+                            originalHeight: image.height,
                             sourceId: image.sourceId,
                             sourceImageId: image.sourceImageId,
                             contentTransform: {
@@ -111,6 +113,8 @@ export const useElementActions = () => {
                     fullUrl: image.fullUrl,
                     previewUrl: image.previewUrl,
                     thumbnailUrl: image.thumbnailUrl,
+                    originalWidth: image.width,
+                    originalHeight: image.height,
                     sourceId: image.sourceId,
                     sourceImageId: image.sourceImageId,
                     contentTransform: {

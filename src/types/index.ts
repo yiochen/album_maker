@@ -54,6 +54,10 @@ export interface ImageContent {
   fullUrl: string;
   previewUrl: string;
   thumbnailUrl: string;
+  /** Original source image width in pixels (full resolution). */
+  originalWidth?: number;
+  /** Original source image height in pixels (full resolution). */
+  originalHeight?: number;
   /** Editor-only frame placeholder state. Placeholder image elements are skipped during export rendering. */
   isPlaceholder?: boolean;
   /** Identifies which photo source/provider this image came from (e.g., "google-photos", "dummy-colors") */

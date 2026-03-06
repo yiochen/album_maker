@@ -1,4 +1,5 @@
 import * as fabric from 'fabric';
+import { APP_CONFIG } from '../config';
 import type { ImageContent, ImagePageElement } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from '../utils/imageUtils';
 import { computeNormalizedBoxFromPixels } from '../utils/boxLayout';
@@ -15,8 +16,14 @@ export class CanvasImageElement extends fabric.Group {
     private placeholderFrame: fabric.Rect;
     private placeholderPlusH: fabric.Rect;
     private placeholderPlusV: fabric.Rect;
+    private lowResBadgeBg: fabric.Rect;
+    private lowResBadgeText: fabric.Text;
     public onContentTransformChange?: (elementId: string, contentTransform: ImageContent['contentTransform']) => void;
     private panControlSize: number;
+    private lowResBadgeHeight: number;
+    private lowResBadgeFontSize: number;
+    private lowResBadgeMargin: number;
+    private canvasZoomPercent: number;
     public currentUrl: string = '';
 
     constructor(
@@ -72,9 +79,37 @@ export class CanvasImageElement extends fabric.Group {
             selectable: false,
             evented: false,
         });
+        const lowResBadgeBg = new fabric.Rect({
+            originX: 'left',
+            originY: 'top',
+            left: 0,
+            top: 0,
+            width: 56,
+            height: 20,
+            rx: 10,
+            ry: 10,
+            fill: 'rgba(185, 28, 28, 0.9)',
+            selectable: false,
+            evented: false,
+            visible: false,
+        });
+        const lowResBadgeText = new fabric.Text('Low Res', {
+            originX: 'left',
+            originY: 'top',
+            left: 0,
+            top: 0,
+            fontSize: 11,
+            fontWeight: 'bold',
+            fontFamily: 'Inter, sans-serif',
+            lineHeight: 1,
+            fill: '#ffffff',
+            selectable: false,
+            evented: false,
+            visible: false,
+        });
 
         // Initialize group with children and explicit left-top origin
-        super([placeholderFrame, placeholderPlusH, placeholderPlusV, innerImage], {
+        super([placeholderFrame, placeholderPlusH, placeholderPlusV, innerImage, lowResBadgeBg, lowResBadgeText], {
             ...options,
             originX: 'left',
             originY: 'top',
@@ -91,8 +126,14 @@ export class CanvasImageElement extends fabric.Group {
         this.placeholderFrame = placeholderFrame;
         this.placeholderPlusH = placeholderPlusH;
         this.placeholderPlusV = placeholderPlusV;
+        this.lowResBadgeBg = lowResBadgeBg;
+        this.lowResBadgeText = lowResBadgeText;
         this.onContentTransformChange = options.onContentTransformChange;
         this.panControlSize = options.panControlSize ?? 22;
+        this.lowResBadgeHeight = APP_CONFIG.BASE_UI_SIZES.lowResBadgeHeight;
+        this.lowResBadgeFontSize = APP_CONFIG.BASE_UI_SIZES.lowResBadgeFontSize;
+        this.lowResBadgeMargin = APP_CONFIG.BASE_UI_SIZES.lowResBadgeMargin;
+        this.canvasZoomPercent = 100;
         const isUniformScaling = options.uniformScaling !== undefined ? options.uniformScaling : true;
         (this as unknown as { lockUniScaling?: boolean }).lockUniScaling = isUniformScaling;
 
@@ -185,6 +226,8 @@ export class CanvasImageElement extends fabric.Group {
         this.updatePlaceholderLayout(rect.width, rect.height);
         this.updatePlaceholderVisibility();
         this.applyCover();
+        this.updateLowResBadgeLayout(rect.width, rect.height);
+        this.updateLowResBadgeVisibility();
         this.setCoords();
     }
 
@@ -235,6 +278,7 @@ export class CanvasImageElement extends fabric.Group {
             angle: angleDeg,
         });
         this.updatePlaceholderVisibility();
+        this.updateLowResBadgeVisibility();
     }
 
     updatePanFromDelta(deltaX: number, deltaY: number) {
@@ -318,6 +362,111 @@ export class CanvasImageElement extends fabric.Group {
         this.innerImage.set({ visible: !showPlaceholder });
     }
 
+    private updateLowResBadgeLayout(width: number, height: number) {
+        const zoomScale = Math.max(0.01, this.canvasZoomPercent / 100);
+        const frameWidthScreen = width * zoomScale;
+        const frameHeightScreen = height * zoomScale;
+
+        const label = frameWidthScreen < 86 ? 'LR' : 'Low Res';
+        if (this.lowResBadgeText.text !== label) {
+            this.lowResBadgeText.set({ text: label });
+        }
+
+        const maxBadgeHeightScreen = Math.max(10, frameHeightScreen * 0.28);
+        const badgeHeightScreen = Math.min(APP_CONFIG.BASE_UI_SIZES.lowResBadgeHeight, maxBadgeHeightScreen);
+        const badgeHeight = Math.max(8, badgeHeightScreen / zoomScale);
+
+        // Keep badge near the frame edge at small zoom:
+        // compute margin in screen px first, then convert back to canvas units.
+        const preferredMarginScreen = this.lowResBadgeMargin * zoomScale;
+        const marginScreen = Math.max(
+            1.5,
+            Math.min(
+                preferredMarginScreen,
+                Math.max(2, frameWidthScreen * 0.03),
+                Math.max(2, frameHeightScreen * 0.03),
+            )
+        );
+        const margin = marginScreen / zoomScale;
+
+        const badgeFontSizeScreen = Math.max(8, Math.min(this.lowResBadgeFontSize, badgeHeightScreen * 0.58));
+        const badgeFontSize = Math.max(6, badgeFontSizeScreen / zoomScale);
+
+        const approxTextWidthScreen = label.length * badgeFontSizeScreen * 0.62;
+        const horizontalPaddingScreen = Math.max(6, badgeHeightScreen * 0.42);
+        const badgeWidthScreenDesired = approxTextWidthScreen + horizontalPaddingScreen * 2;
+        const badgeWidthScreenMax = Math.max(24, frameWidthScreen - marginScreen * 2);
+        const badgeWidth = Math.max(22, Math.min(badgeWidthScreenDesired, badgeWidthScreenMax) / zoomScale);
+
+        const left = width / 2 - badgeWidth - margin;
+        const top = -height / 2 + margin;
+        const approxTextWidth = label.length * badgeFontSize * 0.62;
+        const textLeft = left + Math.max(0, (badgeWidth - approxTextWidth) / 2);
+        const textTop = top + Math.max(0, (badgeHeight - badgeFontSize) / 2);
+
+        this.lowResBadgeBg.set({
+            left,
+            top,
+            width: badgeWidth,
+            height: badgeHeight,
+            rx: badgeHeight / 2,
+            ry: badgeHeight / 2,
+        });
+        this.lowResBadgeText.set({
+            left: textLeft,
+            top: textTop,
+            fontSize: badgeFontSize,
+        });
+    }
+
+    private getEffectivePrintPpi(): number | null {
+        const content = this.pageElement.content as ImageContent;
+        const sourceWidth = content.originalWidth;
+        const sourceHeight = content.originalHeight;
+        if (!sourceWidth || !sourceHeight || sourceWidth <= 0 || sourceHeight <= 0) {
+            return null;
+        }
+
+        const frameWidthPx = this.width ?? 0;
+        const frameHeightPx = this.height ?? 0;
+        if (frameWidthPx <= 0 || frameHeightPx <= 0) {
+            return null;
+        }
+
+        const zoom = Math.max(0.01, content.contentTransform?.zoom ?? 1);
+        const orientation: OrientationMatrix = content.contentTransform?.orientation ?? IDENTITY;
+        const oriented = getOrientedDimensions(sourceWidth, sourceHeight, orientation);
+        const frameWidthInches = frameWidthPx / APP_CONFIG.SCREEN_PPI;
+        const frameHeightInches = frameHeightPx / APP_CONFIG.SCREEN_PPI;
+
+        const ppiX = oriented.width / frameWidthInches;
+        const ppiY = oriented.height / frameHeightInches;
+        return Math.min(ppiX, ppiY) / zoom;
+    }
+
+    private updateLowResBadgeVisibility() {
+        const content = this.pageElement.content as ImageContent;
+        if (content.isPlaceholder || !this.innerImage.getElement()) {
+            this.lowResBadgeBg.set({ visible: false });
+            this.lowResBadgeText.set({ visible: false });
+            return;
+        }
+
+        const zoomScale = Math.max(0.01, this.canvasZoomPercent / 100);
+        const frameWidthScreen = (this.width ?? 0) * zoomScale;
+        const frameHeightScreen = (this.height ?? 0) * zoomScale;
+        if (frameWidthScreen < 38 || frameHeightScreen < 24) {
+            this.lowResBadgeBg.set({ visible: false });
+            this.lowResBadgeText.set({ visible: false });
+            return;
+        }
+
+        const effectivePpi = this.getEffectivePrintPpi();
+        const isLowRes = effectivePpi !== null && effectivePpi < APP_CONFIG.PPI;
+        this.lowResBadgeBg.set({ visible: isLowRes });
+        this.lowResBadgeText.set({ visible: isLowRes });
+    }
+
     setPanControlSize(size: number) {
         this.panControlSize = size;
         const control = this.controls?.pan;
@@ -327,6 +476,19 @@ export class CanvasImageElement extends fabric.Group {
             control.touchSizeX = size * 1.4;
             control.touchSizeY = size * 1.4;
         }
+    }
+
+    setLowResBadgeSizes(height: number, fontSize: number, margin: number) {
+        this.lowResBadgeHeight = Math.max(8, height);
+        this.lowResBadgeFontSize = Math.max(6, fontSize);
+        this.lowResBadgeMargin = Math.max(2, margin);
+        this.updateLowResBadgeLayout(this.width ?? 0, this.height ?? 0);
+    }
+
+    setCanvasZoomPercent(zoomPercent: number) {
+        this.canvasZoomPercent = Math.max(10, zoomPercent);
+        this.updateLowResBadgeLayout(this.width ?? 0, this.height ?? 0);
+        this.updateLowResBadgeVisibility();
     }
 
     private addPanControl() {
