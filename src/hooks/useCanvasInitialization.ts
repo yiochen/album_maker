@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject, ExtendedFabricObject } from './fabricTypes';
+import { useSetFabricCanvas, useClearFabricCanvasIfMatch } from '../states/editorInfraStore';
 
 /**
  * Props for useCanvasInitialization.
@@ -36,6 +37,8 @@ export const useCanvasInitialization = ({
 }: UseCanvasInitializationProps) => {
     const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
     const seamRef = useRef<fabric.Line | null>(null);
+    const setSharedFabricCanvas = useSetFabricCanvas();
+    const clearSharedFabricCanvasIfMatch = useClearFabricCanvasIfMatch();
 
     useEffect(() => {
         if (!canvasElRef.current) return;
@@ -86,12 +89,23 @@ export const useCanvasInitialization = ({
         });
 
         setFabricCanvas(canvas);
+        setSharedFabricCanvas(canvas);
 
         return () => {
             canvas.dispose();
             setFabricCanvas(null);
+            clearSharedFabricCanvasIfMatch(canvas);
         };
-    }, [canvasElRef, containerRef, canvasWidth, canvasHeight, wrapperRef, snapLinesRef]);
+    }, [
+        canvasElRef,
+        containerRef,
+        canvasWidth,
+        canvasHeight,
+        wrapperRef,
+        snapLinesRef,
+        setSharedFabricCanvas,
+        clearSharedFabricCanvasIfMatch,
+    ]);
 
     return { fabricCanvas, seamRef };
 };
