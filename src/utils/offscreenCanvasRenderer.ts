@@ -1,7 +1,8 @@
-import { Spread, AlbumSettings, TextContent } from '../types';
+import { Spread, AlbumSettings, TextContent, ImagePageElement } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from './imageUtils';
 import { OffscreenRenderOptions } from './rendererTypes';
 import { decomposeForRendering, IDENTITY, getOrientedDimensions } from './orientationMatrix';
+import { getImageUrlForPpi } from './imageSourceSelection';
 
 /**
  * Helper to load an image as an ImageBitmap in a worker environment.
@@ -29,6 +30,39 @@ async function loadImage(url: string, fetcher: typeof fetch = fetch): Promise<Im
         const size = blob.size;
         throw new Error(`Failed to decode ${type} image (${size} bytes) from ${url}: ${e}`);
     }
+}
+
+async function loadImageBitmapsBounded(
+    imageElements: Spread['elements'],
+    ppi: number,
+    fetcher: typeof fetch = fetch,
+    maxConcurrency: number = 4,
+): Promise<Map<string, ImageBitmap>> {
+    const images = imageElements.filter(
+        (element): element is ImagePageElement => element.type === 'image' && !element.content.isPlaceholder
+    );
+    const results = new Map<string, ImageBitmap>();
+    const concurrency = Math.max(1, Math.min(maxConcurrency, images.length || 1));
+    let nextIndex = 0;
+
+    const worker = async () => {
+        while (true) {
+            const idx = nextIndex++;
+            if (idx >= images.length) return;
+            const element = images[idx];
+            const url = getImageUrlForPpi(element.content, ppi);
+            if (!url) continue;
+            try {
+                const bitmap = await loadImage(url, fetcher);
+                results.set(element.id, bitmap);
+            } catch (error) {
+                console.error(`Failed to preload image for element ${element.id}:`, error);
+            }
+        }
+    };
+
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    return results;
 }
 
 /**
@@ -124,8 +158,13 @@ export async function renderSpread(
         ctx.fillRect(0, 0, spreadWidthPx, pageHeightPx);
     }
 
-    // Render elements in Z-Order
-    // spread.elements are assumed to be ordered correctly in the store
+    const preloadedBitmaps = await loadImageBitmapsBounded(
+        spread.elements,
+        ppi,
+        options.customFetch as typeof fetch,
+    );
+
+    // Render elements in Z-Order. spread.elements are assumed ordered correctly in store.
     for (const element of spread.elements) {
         if (element.type === 'text') {
             // --- Text element rendering ---
@@ -139,17 +178,8 @@ export async function renderSpread(
         if (element.content.isPlaceholder) continue;
 
         try {
-            // Dynamic URL Selection based on PPI
-            let url: string;
-            if (ppi < 50) {
-                url = element.content.thumbnailUrl;
-            } else if (ppi < 200) {
-                url = element.content.previewUrl;
-            } else {
-                url = element.content.fullUrl;
-            }
-
-            const bitmap = await loadImage(url, options.customFetch as typeof fetch);
+            const bitmap = preloadedBitmaps.get(element.id);
+            if (!bitmap) continue;
 
             // Determine orientation
             const orientation = element.content.contentTransform?.orientation || IDENTITY;
@@ -207,8 +237,12 @@ export async function renderSpread(
 
             // Cleanup memory
             bitmap.close();
+            preloadedBitmaps.delete(element.id);
         } catch (error) {
             console.error(`Failed to load or render image for element ${element.id}:`, error);
         }
     }
+
+    // Ensure no leaked bitmaps on early exits/errors.
+    preloadedBitmaps.forEach((bitmap) => bitmap.close());
 }

@@ -5,6 +5,7 @@ import { CanvasTextElement } from '../hooks/CanvasTextElement';
 import { CustomFabricObject, ExtendedFabricObject } from '../hooks/fabricTypes';
 import { APP_CONFIG } from '../config';
 import { FabricRenderOptions } from './rendererTypes';
+import { getImageUrlForPpi } from './imageSourceSelection';
 
 const SHARED_SELECTION_STYLE: Partial<fabric.FabricObjectProps> = {
     cornerStyle: 'circle',
@@ -58,6 +59,17 @@ export async function renderSpread(
     const uiSizes = getZoomCompensatedSizes(zoom);
 
     const currentObjects = canvas.getObjects() as CustomFabricObject[];
+    const objectsById = new Map<string, CustomFabricObject>();
+    let seamObj: fabric.Line | null = null;
+    currentObjects.forEach((obj) => {
+        const id = (obj as CustomFabricObject).data?.id;
+        if (!id) return;
+        if (id === 'seam') {
+            seamObj = obj as fabric.Line;
+            return;
+        }
+        objectsById.set(id, obj);
+    });
     const validIds = new Set<string>();
     const loadPromises: Promise<void>[] = [];
 
@@ -65,21 +77,13 @@ export async function renderSpread(
     // 2. Sync elements — branch on element.type
     spread.elements.forEach(element => {
         validIds.add(element.id);
-        const existingObj = currentObjects.find(o => (o as CustomFabricObject).data?.id === element.id);
+        const existingObj = objectsById.get(element.id);
 
         if (isImageElement(element)) {
             // ── Image element sync ──
             const existingImage = existingObj instanceof CanvasImageElement ? existingObj : null;
 
-            // Dynamic URL Selection based on PPI
-            let targetUrl: string;
-            if (options.ppi < 50) {
-                targetUrl = element.content.thumbnailUrl;
-            } else if (options.ppi < 200) {
-                targetUrl = element.content.previewUrl;
-            } else {
-                targetUrl = element.content.fullUrl;
-            }
+            const targetUrl = getImageUrlForPpi(element.content, options.ppi);
 
             if (existingImage) {
                 existingImage.pageElement = element;
@@ -124,6 +128,9 @@ export async function renderSpread(
             } else {
                 // Remove stale object of a different type (e.g. was text, now image)
                 if (existingObj) canvas.remove(existingObj);
+                if (existingObj && existingObj.data?.id) {
+                    objectsById.delete(existingObj.data.id);
+                }
 
                 const canvasEl = new CanvasImageElement(element, {
                     ...SHARED_SELECTION_STYLE,
@@ -146,6 +153,7 @@ export async function renderSpread(
                 }
 
                 canvas.add(canvasEl);
+                objectsById.set(element.id, canvasEl as unknown as CustomFabricObject);
                 if (targetUrl) {
                     loadPromises.push(canvasEl.loadImage(targetUrl).then(() => {
                         canvasEl.applyLayout(canvas.width, canvas.height);
@@ -179,6 +187,9 @@ export async function renderSpread(
                 } else {
                 // Remove stale object of a different type
                 if (existingObj) canvas.remove(existingObj);
+                if (existingObj && existingObj.data?.id) {
+                    objectsById.delete(existingObj.data.id);
+                }
 
                     const canvasEl = new CanvasTextElement(element, options.ppi, {
                         ...SHARED_SELECTION_STYLE,
@@ -188,33 +199,35 @@ export async function renderSpread(
 
 
                 canvas.add(canvasEl);
+                objectsById.set(element.id, canvasEl as unknown as CustomFabricObject);
                 canvasEl.applyLayout(canvas.width, canvas.height);
             }
         }
     });
 
     // 3. Remove orphaned objects
-    currentObjects.forEach(obj => {
-        const id = (obj as CustomFabricObject).data?.id;
+    [...objectsById.values()].forEach(obj => {
+        const id = obj.data?.id;
         if (id && id !== 'seam' && !validIds.has(id)) {
             canvas.remove(obj);
+            objectsById.delete(id);
         }
     });
 
     // 4. Handle Seam Layer
-    let seam = (canvas.getObjects() as CustomFabricObject[]).find(o => o.data?.id === 'seam') as fabric.Line;
     if (showPageSeam) {
-        if (!seam) {
-            seam = new fabric.Line([canvasWidth / 2, 0, canvasWidth / 2, canvasHeight], {
+        if (!seamObj) {
+            seamObj = new fabric.Line([canvasWidth / 2, 0, canvasWidth / 2, canvasHeight], {
                 stroke: '#ddd',
                 strokeWidth: uiSizes.seamStrokeWidth,
                 selectable: false,
                 evented: false,
                 strokeDashArray: [uiSizes.seamDash, uiSizes.seamDash],
             });
-            (seam as CustomFabricObject).data = { id: 'seam' };
-            canvas.add(seam);
+            (seamObj as CustomFabricObject).data = { id: 'seam' };
+            canvas.add(seamObj);
         } else {
+            const seam = seamObj as fabric.Line;
             seam.set({
                 x1: canvasWidth / 2,
                 x2: canvasWidth / 2,
@@ -224,8 +237,9 @@ export async function renderSpread(
                 strokeDashArray: [uiSizes.seamDash, uiSizes.seamDash],
             });
         }
-    } else if (seam) {
-        canvas.remove(seam);
+    } else if (seamObj) {
+        canvas.remove(seamObj);
+        seamObj = null;
     }
 
     // 5. Wait for all content to be ready
@@ -234,16 +248,15 @@ export async function renderSpread(
     // 6. Finalize Z-Order
     // Elements start at index 0. We order them according to the elements array.
     spread.elements.forEach((element, index) => {
-        const obj = (canvas.getObjects() as CustomFabricObject[]).find(o => o.data?.id === element.id);
+        const obj = objectsById.get(element.id);
         if (obj) {
             canvas.moveObjectTo(obj, index);
         }
     });
 
     // Seam is placed on top of elements as a guide layer.
-    const finalSeam = (canvas.getObjects() as CustomFabricObject[]).find(o => o.data?.id === 'seam');
-    if (finalSeam) {
-        canvas.moveObjectTo(finalSeam, canvas.getObjects().length - 1);
+    if (seamObj) {
+        canvas.moveObjectTo(seamObj, canvas.getObjects().length - 1);
     }
 
     canvas.requestRenderAll();

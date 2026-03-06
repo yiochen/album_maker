@@ -10,12 +10,14 @@ import {
 
 export const useImageImport = (onImport: (images: PoolImage[]) => void) => {
     const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const pageWidth = usePageWidth();
     const pageHeight = usePageHeight();
 
     const importImages = useCallback(async (activeSourceId: string) => {
         const activeSource = getSource(activeSourceId);
-        if (!activeSource || !pageWidth || !pageHeight) return;
+        if (!activeSource || !pageWidth || !pageHeight) return false;
+        setErrorMessage(null);
 
         // Check if auth required
         if (activeSource.requiresAuth && !activeSource.isAuthenticated()) {
@@ -23,8 +25,8 @@ export const useImageImport = (onImport: (images: PoolImage[]) => void) => {
                 await activeSource.connect();
             } catch (error) {
                 console.error('Failed to connect to source:', error);
-                alert(`Failed to connect to ${activeSource.name}. Please try again.`);
-                return;
+                setErrorMessage(`Could not connect to ${activeSource.name}. Check your sign-in state and retry.`);
+                return false;
             }
         }
 
@@ -66,13 +68,17 @@ export const useImageImport = (onImport: (images: PoolImage[]) => void) => {
             });
 
             onImport(poolImages);
+            return true;
         } catch (error) {
             console.error('Failed to import from source:', error);
-            alert(`Failed to import from ${activeSource.name}. Please try again.`);
+            setErrorMessage(`Import from ${activeSource.name} failed. Please retry in a moment.`);
+            return false;
         } finally {
             setIsLoading(false);
         }
     }, [pageWidth, pageHeight, onImport]);
 
-    return { importImages, isLoading };
+    const clearError = useCallback(() => setErrorMessage(null), []);
+
+    return { importImages, isLoading, errorMessage, clearError };
 };

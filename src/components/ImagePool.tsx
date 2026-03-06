@@ -31,15 +31,21 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
     onClose,
 }) => {
     const [activeSourceId, setActiveSourceId] = useState<string>('dummy-colors');
+    const [uploadErrorMessage, setUploadErrorMessage] = useState<string | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const pageWidth = usePageWidth();
     const pageHeight = usePageHeight();
 
     const sources = getAllSources();
-    const { importImages, isLoading: isImporting } = useImageImport(onImport);
+    const { importImages, isLoading: isImporting, errorMessage: importErrorMessage, clearError } = useImageImport(onImport);
     const [isUploading, setIsUploading] = useState(false);
+    const errorMessage = uploadErrorMessage ?? importErrorMessage;
+    const hasUploadError = !!uploadErrorMessage;
+    const hasImportError = !!importErrorMessage;
 
     const handleImportClick = () => {
+        setUploadErrorMessage(null);
+        clearError();
         if (activeSourceId === 'uploaded') {
             fileInputRef.current?.click();
         } else {
@@ -51,6 +57,8 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
         const files = Array.from(e.target.files || []);
         if (files.length === 0 || !pageWidth || !pageHeight) return;
 
+        setUploadErrorMessage(null);
+        clearError();
         setIsUploading(true);
         const successful: PoolImage[] = [];
         const failed: { name: string; error: unknown }[] = [];
@@ -74,13 +82,10 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                 const others = failed.filter(f => !(f.error instanceof HeifUnsupportedError));
 
                 if (heifUnsupported.length > 0) {
-                    alert(
+                    setUploadErrorMessage(
                         `The following HEIC files are not supported by your browser (e.g. HDR or iOS 18 profiles):\n\n` +
                         `${heifUnsupported.map(f => f.name).join('\n')}\n\n` +
-                        `Workarounds:\n` +
-                        `1. Export as JPEG using the Mac Preview app.\n` +
-                        `2. Set iPhone Camera Formats to 'Most Compatible'.\n` +
-                        `3. Use an online converter.`
+                        `Workarounds: Export as JPEG in Preview, use iPhone "Most Compatible", or convert then retry.`
                     );
                 }
 
@@ -89,12 +94,15 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                         const message = f.error instanceof Error ? f.error.message : 'Unknown error';
                         return `${f.name}: ${message}`;
                     });
-                    alert(`Failed to upload the following images:\n\n${errorMessages.join('\n')}\n\nThis can happen with very large images or corrupted files.`);
+                    setUploadErrorMessage(
+                        `Failed to upload some files:\n\n${errorMessages.join('\n')}\n\n` +
+                        `This can happen with very large or corrupted files. Retry after reducing file size.`
+                    );
                 }
             }
         } catch (error) {
             console.error('Critical upload failure:', error);
-            alert('An unexpected error occurred during upload. Please try again.');
+            setUploadErrorMessage('An unexpected upload error occurred. Please retry.');
         } finally {
             setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -165,6 +173,38 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
             </div>
 
             <div className="image-pool-content">
+                {errorMessage && (
+                    <div className="inline-error-banner" role="alert" data-testid="image-pool-error">
+                        <span className="inline-error-banner-text">{errorMessage}</span>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {(hasImportError || hasUploadError) && (
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    onClick={() => {
+                                        if (hasImportError) {
+                                            importImages(activeSourceId);
+                                            return;
+                                        }
+                                        fileInputRef.current?.click();
+                                    }}
+                                >
+                                    Retry
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => {
+                                    setUploadErrorMessage(null);
+                                    clearError();
+                                }}
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                )}
                 {images.length === 0 ? (
                     <div className="pool-empty" data-testid="pool-empty">
                         <AddImageIcon />

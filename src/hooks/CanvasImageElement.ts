@@ -1,12 +1,16 @@
 import * as fabric from 'fabric';
 import { APP_CONFIG } from '../config';
 import type { ImageContent, ImagePageElement } from '../types';
-import { calculateGaplessRect, applyCoverTransform } from '../utils/imageUtils';
+import { applyCoverTransform } from '../utils/imageUtils';
 import { computeNormalizedBoxFromPixels } from '../utils/boxLayout';
 import {
     type OrientationMatrix, IDENTITY,
-    getOrientedDimensions, decomposeForRendering,
+    getOrientedDimensions,
 } from '../utils/orientationMatrix';
+import { createPanControl } from './canvasImage/controls';
+import { computeEffectivePrintPpi, isFrameTooSmallForBadge } from './canvasImage/quality';
+import { computeLowResBadgeLayout } from './canvasImage/badgeLayout';
+import { computeCoverPlacement, computeFrameRect } from './canvasImage/layout';
 
 export class CanvasImageElement extends fabric.Group {
     public pageElement: ImagePageElement;
@@ -203,7 +207,7 @@ export class CanvasImageElement extends fabric.Group {
      * Calculate position and size based on normalized box model
      */
     applyLayout(canvasWidth: number = this.canvas?.width || 1, canvasHeight: number = this.canvas?.height || 1) {
-        const rect = calculateGaplessRect(this.pageElement.box, canvasWidth, canvasHeight);
+        const rect = computeFrameRect(this.pageElement.box, canvasWidth, canvasHeight);
 
         this.set({
             left: rect.left,
@@ -241,34 +245,22 @@ export class CanvasImageElement extends fabric.Group {
         const imgHeight = this.innerImage.height || 1;
 
         const content = this.pageElement.content as ImageContent;
-        const transform = {
-            zoom: 1,
-            panX: 0.5,
-            panY: 0.5,
-            ...(content.contentTransform || {})
-        };
-
-        const orientation: OrientationMatrix = transform.orientation ?? IDENTITY;
-        const oriented = getOrientedDimensions(imgWidth, imgHeight, orientation);
-
-        const result = applyCoverTransform(
+        const { cover, decomposition } = computeCoverPlacement(
             this.width,
             this.height,
-            oriented.width,
-            oriented.height,
-            transform
+            imgWidth,
+            imgHeight,
+            content.contentTransform,
         );
-
-        // Decompose orientation for Fabric.js (which applies flip-then-rotate in local space)
-        const { angleDeg, flipX } = decomposeForRendering(orientation);
-        const baseScale = result.scale;
+        const { angleDeg, flipX } = decomposition;
+        const baseScale = cover.scale;
 
         // Position relative to group center
         // The inner image center should be at (cover.left + cover.width/2, cover.top + cover.height/2)
         // relative to the group's top-left, offset by -width/2, -height/2 for fabric group centering.
         this.innerImage.set({
-            left: result.left + result.width / 2 - this.width / 2,
-            top: result.top + result.height / 2 - this.height / 2,
+            left: cover.left + cover.width / 2 - this.width / 2,
+            top: cover.top + cover.height / 2 - this.height / 2,
             originX: 'center',
             originY: 'center',
             scaleX: baseScale,
@@ -363,85 +355,44 @@ export class CanvasImageElement extends fabric.Group {
     }
 
     private updateLowResBadgeLayout(width: number, height: number) {
-        const zoomScale = Math.max(0.01, this.canvasZoomPercent / 100);
-        const frameWidthScreen = width * zoomScale;
-        const frameHeightScreen = height * zoomScale;
-
-        const label = frameWidthScreen < 86 ? 'LR' : 'Low Res';
-        if (this.lowResBadgeText.text !== label) {
-            this.lowResBadgeText.set({ text: label });
+        const layout = computeLowResBadgeLayout({
+            frameWidthPx: width,
+            frameHeightPx: height,
+            zoomPercent: this.canvasZoomPercent,
+            baseBadgeHeight: this.lowResBadgeHeight,
+            baseBadgeFontSize: this.lowResBadgeFontSize,
+            baseBadgeMargin: this.lowResBadgeMargin,
+        });
+        if (this.lowResBadgeText.text !== layout.label) {
+            this.lowResBadgeText.set({ text: layout.label });
         }
 
-        const maxBadgeHeightScreen = Math.max(10, frameHeightScreen * 0.28);
-        const badgeHeightScreen = Math.min(APP_CONFIG.BASE_UI_SIZES.lowResBadgeHeight, maxBadgeHeightScreen);
-        const badgeHeight = Math.max(8, badgeHeightScreen / zoomScale);
-
-        // Keep badge near the frame edge at small zoom:
-        // compute margin in screen px first, then convert back to canvas units.
-        const preferredMarginScreen = this.lowResBadgeMargin * zoomScale;
-        const marginScreen = Math.max(
-            1.5,
-            Math.min(
-                preferredMarginScreen,
-                Math.max(2, frameWidthScreen * 0.03),
-                Math.max(2, frameHeightScreen * 0.03),
-            )
-        );
-        const margin = marginScreen / zoomScale;
-
-        const badgeFontSizeScreen = Math.max(8, Math.min(this.lowResBadgeFontSize, badgeHeightScreen * 0.58));
-        const badgeFontSize = Math.max(6, badgeFontSizeScreen / zoomScale);
-
-        const approxTextWidthScreen = label.length * badgeFontSizeScreen * 0.62;
-        const horizontalPaddingScreen = Math.max(6, badgeHeightScreen * 0.42);
-        const badgeWidthScreenDesired = approxTextWidthScreen + horizontalPaddingScreen * 2;
-        const badgeWidthScreenMax = Math.max(24, frameWidthScreen - marginScreen * 2);
-        const badgeWidth = Math.max(22, Math.min(badgeWidthScreenDesired, badgeWidthScreenMax) / zoomScale);
-
-        const left = width / 2 - badgeWidth - margin;
-        const top = -height / 2 + margin;
-        const approxTextWidth = label.length * badgeFontSize * 0.62;
-        const textLeft = left + Math.max(0, (badgeWidth - approxTextWidth) / 2);
-        const textTop = top + Math.max(0, (badgeHeight - badgeFontSize) / 2);
-
         this.lowResBadgeBg.set({
-            left,
-            top,
-            width: badgeWidth,
-            height: badgeHeight,
-            rx: badgeHeight / 2,
-            ry: badgeHeight / 2,
+            left: layout.badgeLeft,
+            top: layout.badgeTop,
+            width: layout.badgeWidth,
+            height: layout.badgeHeight,
+            rx: layout.badgeHeight / 2,
+            ry: layout.badgeHeight / 2,
         });
         this.lowResBadgeText.set({
-            left: textLeft,
-            top: textTop,
-            fontSize: badgeFontSize,
+            left: layout.textLeft,
+            top: layout.textTop,
+            fontSize: layout.fontSize,
         });
     }
 
     private getEffectivePrintPpi(): number | null {
         const content = this.pageElement.content as ImageContent;
-        const sourceWidth = content.originalWidth;
-        const sourceHeight = content.originalHeight;
-        if (!sourceWidth || !sourceHeight || sourceWidth <= 0 || sourceHeight <= 0) {
-            return null;
-        }
-
-        const frameWidthPx = this.width ?? 0;
-        const frameHeightPx = this.height ?? 0;
-        if (frameWidthPx <= 0 || frameHeightPx <= 0) {
-            return null;
-        }
-
-        const zoom = Math.max(0.01, content.contentTransform?.zoom ?? 1);
-        const orientation: OrientationMatrix = content.contentTransform?.orientation ?? IDENTITY;
-        const oriented = getOrientedDimensions(sourceWidth, sourceHeight, orientation);
-        const frameWidthInches = frameWidthPx / APP_CONFIG.SCREEN_PPI;
-        const frameHeightInches = frameHeightPx / APP_CONFIG.SCREEN_PPI;
-
-        const ppiX = oriented.width / frameWidthInches;
-        const ppiY = oriented.height / frameHeightInches;
-        return Math.min(ppiX, ppiY) / zoom;
+        return computeEffectivePrintPpi({
+            sourceWidth: content.originalWidth,
+            sourceHeight: content.originalHeight,
+            frameWidthPx: this.width ?? 0,
+            frameHeightPx: this.height ?? 0,
+            zoom: content.contentTransform?.zoom ?? 1,
+            orientation: content.contentTransform?.orientation ?? IDENTITY,
+            screenPpi: APP_CONFIG.SCREEN_PPI,
+        });
     }
 
     private updateLowResBadgeVisibility() {
@@ -455,7 +406,7 @@ export class CanvasImageElement extends fabric.Group {
         const zoomScale = Math.max(0.01, this.canvasZoomPercent / 100);
         const frameWidthScreen = (this.width ?? 0) * zoomScale;
         const frameHeightScreen = (this.height ?? 0) * zoomScale;
-        if (frameWidthScreen < 38 || frameHeightScreen < 24) {
+        if (isFrameTooSmallForBadge(frameWidthScreen, frameHeightScreen)) {
             this.lowResBadgeBg.set({ visible: false });
             this.lowResBadgeText.set({ visible: false });
             return;
@@ -492,79 +443,12 @@ export class CanvasImageElement extends fabric.Group {
     }
 
     private addPanControl() {
-        const size = this.panControlSize;
         this.controls = {
             ...this.controls,
-            pan: new fabric.Control({
-                x: 0,
-                y: 0,
-                cursorStyle: 'grab',
-                actionName: 'pan',
-                sizeX: size,
-                sizeY: size,
-                touchSizeX: size * 1.4,
-                touchSizeY: size * 1.4,
-                render: (ctx, left, top, _styleOverride, fabricObject) => {
-                    const target = fabricObject as CanvasImageElement;
-                    const size = target.panControlSize || 22;
-                    ctx.save();
-                    ctx.translate(left, top);
-                    const radius = size / 2 - 2;
-                    ctx.beginPath();
-                    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-                    ctx.fill();
-
-                    const line = radius * 0.55;
-                    const head = radius * 0.28;
-                    ctx.strokeStyle = 'white';
-                    ctx.lineWidth = Math.max(1.5, size * 0.08);
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    ctx.beginPath();
-                    // Up
-                    ctx.moveTo(0, -line);
-                    ctx.lineTo(0, -radius * 0.15);
-                    ctx.moveTo(0, -line);
-                    ctx.lineTo(-head, -line + head);
-                    ctx.moveTo(0, -line);
-                    ctx.lineTo(head, -line + head);
-                    // Down
-                    ctx.moveTo(0, line);
-                    ctx.lineTo(0, radius * 0.15);
-                    ctx.moveTo(0, line);
-                    ctx.lineTo(-head, line - head);
-                    ctx.moveTo(0, line);
-                    ctx.lineTo(head, line - head);
-                    // Left
-                    ctx.moveTo(-line, 0);
-                    ctx.lineTo(-radius * 0.15, 0);
-                    ctx.moveTo(-line, 0);
-                    ctx.lineTo(-line + head, -head);
-                    ctx.moveTo(-line, 0);
-                    ctx.lineTo(-line + head, head);
-                    // Right
-                    ctx.moveTo(line, 0);
-                    ctx.lineTo(radius * 0.15, 0);
-                    ctx.moveTo(line, 0);
-                    ctx.lineTo(line - head, -head);
-                    ctx.moveTo(line, 0);
-                    ctx.lineTo(line - head, head);
-                    ctx.stroke();
-                    ctx.restore();
-                },
-                actionHandler: (_eventData, transform, x, y) => {
-                    const target = transform.target;
-                    if (!(target instanceof CanvasImageElement)) {
-                        return false;
-                    }
-                    const deltaX = x - transform.lastX;
-                    const deltaY = y - transform.lastY;
-                    transform.lastX = x;
-                    transform.lastY = y;
-                    return target.updatePanFromDelta(deltaX, deltaY);
-                },
-            }),
+            pan: createPanControl(
+                () => this.panControlSize || 22,
+                (target, deltaX, deltaY) => target.updatePanFromDelta(deltaX, deltaY),
+            ),
         };
     }
 

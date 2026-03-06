@@ -26,6 +26,7 @@ export const ExportPage: React.FC = () => {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isGenerating, setIsGenerating] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     // Sync template default when unit or format changes, unless user edited it
     useEffect(() => {
@@ -82,6 +83,7 @@ export const ExportPage: React.FC = () => {
     const handleGenerate = async () => {
         if (!album || selectedIds.size === 0) return;
 
+        setErrorMessage(null);
         setIsGenerating(true);
         setProgress(0);
 
@@ -150,7 +152,7 @@ export const ExportPage: React.FC = () => {
 
         } catch (err) {
             console.error('Export failed:', err);
-            alert('Export failed. Please check the console for details.');
+            setErrorMessage('Export failed. Verify selected pages and image availability, then retry.');
         } finally {
             // Keep status at 100% for 1.5 seconds before resetting
             setTimeout(() => {
@@ -187,6 +189,32 @@ export const ExportPage: React.FC = () => {
             </header>
 
             <main className="export-main">
+                {errorMessage && (
+                    <div className="inline-error-banner" role="alert" data-testid="export-error-banner">
+                        <span className="inline-error-banner-text">{errorMessage}</span>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => {
+                                    setErrorMessage(null);
+                                    if (!isGenerating && selectedIds.size > 0) {
+                                        handleGenerate();
+                                    }
+                                }}
+                            >
+                                Retry
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => setErrorMessage(null)}
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                )}
                 {step === 'settings' ? (
                     <div className="export-card">
                         <section className="export-section">

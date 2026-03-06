@@ -2563,3 +2563,23 @@ body {
   background: var(--color-border);
   border-radius: 3px;
 }
+
+.inline-error-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-error) 50%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-error) 12%, var(--color-bg-secondary));
+}
+
+.inline-error-banner-text {
+  color: var(--color-text-primary);
+  white-space: pre-line;
+  font-size: var(--text-sm);
+  line-height: var(--line-height-normal);
+}
