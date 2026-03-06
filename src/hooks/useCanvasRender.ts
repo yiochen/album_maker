@@ -70,7 +70,6 @@ export const useCanvasRender = ({
     });
 
     return {
-        fabricCanvas,
         canvasWidth,
         canvasHeight,
         zoom,

@@ -3,13 +3,14 @@ import { useCanvasSelection } from './useCanvasSelection';
 import { useCanvasSnapping } from './useCanvasSnapping';
 import { useCanvasPersistence } from './useCanvasPersistence';
 import { useCanvasKeyboardEvents } from './useCanvasKeyboardEvents';
+import { useFabricCanvas } from '../states/editorInfraStore';
 
 /**
  * Props for useCanvasInteraction.
  */
 interface UseCanvasInteractionProps {
-    /** The Fabric.js canvas instance. */
-    fabricCanvas: fabric.Canvas | null;
+    /** Optional explicit canvas; defaults to shared runtime canvas from store. */
+    fabricCanvas?: fabric.Canvas | null;
     /** Width of the canvas in pixels. */
     canvasWidth: number;
     /** Height of the canvas in pixels. */
@@ -37,17 +38,19 @@ export const useCanvasInteraction = ({
     zoom,
     snapLinesRef,
 }: UseCanvasInteractionProps) => {
+    const sharedFabricCanvas = useFabricCanvas();
+    const activeCanvas = fabricCanvas ?? sharedFabricCanvas;
 
     useCanvasKeyboardEvents({
-        fabricCanvas
+        fabricCanvas: activeCanvas
     });
 
     const { hasSelection } = useCanvasSelection({
-        fabricCanvas,
+        fabricCanvas: activeCanvas,
     });
 
     useCanvasSnapping({
-        fabricCanvas,
+        fabricCanvas: activeCanvas,
         canvasWidth,
         canvasHeight,
         zoom,
@@ -55,7 +58,7 @@ export const useCanvasInteraction = ({
     });
 
     useCanvasPersistence({
-        fabricCanvas,
+        fabricCanvas: activeCanvas,
         canvasWidth,
         canvasHeight,
     });

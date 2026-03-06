@@ -13,6 +13,7 @@ import { TiptapTextEditor } from './canvas/TiptapTextEditor';
 import { TextEditingToolbar } from './canvas/TextEditingToolbar';
 import { useAlbumSpreads } from '../states/albumStore';
 import { useCurrentSpreadIndex, useSelectedPageSide } from '../states/uiStore';
+import { useFabricCanvas, useTiptapEditor } from '../states/editorInfraStore';
 import { useDndDropContext } from '../contexts/DndDropContext';
 import { useTextEditorTransition } from '../hooks/useTextEditorTransition';
 
@@ -39,6 +40,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const selectedPageSide = useSelectedPageSide();
+    const fabricCanvas = useFabricCanvas();
+    const tiptapEditor = useTiptapEditor();
     const {
         currentActiveEditorId,
         isCommitting,
@@ -55,7 +58,6 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     // Initialize rendering and zoom logic
     const {
-        fabricCanvas,
         canvasWidth,
         canvasHeight,
         zoom,
@@ -72,7 +74,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     const {
         hasSelection,
     } = useCanvasInteraction({
-        fabricCanvas,
         canvasWidth,
         canvasHeight,
         zoom,
@@ -81,7 +82,6 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     // Text editing lifecycle — Tiptap-based overlay
     const {
-        editor,
         editingElement,
         toolbarPosition,
         handleTextAlignChange,
@@ -89,7 +89,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         currentTextAlign,
         currentVerticalAlign,
     } = useTextEditing({
-        fabricCanvas,
         containerRef,
         activeEditorId: currentActiveEditorId,
         zoom,
@@ -98,7 +97,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
 
     // Synchronize Fabric selection with editingTextElementId in store
-    useTextEditingSelection({ fabricCanvas });
+    useTextEditingSelection({});
 
     useEffect(() => {
         if (!currentSpread) return;
@@ -224,7 +223,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                             {currentActiveEditorId && (
                                 <TiptapTextEditor
                                     key={currentActiveEditorId}
-                                    editor={editor}
                                     elementId={currentActiveEditorId}
                                     canvasWidth={canvasWidth}
                                     canvasHeight={canvasHeight}
@@ -241,10 +239,9 @@ export const Canvas: React.FC<CanvasProps> = ({
             </div>
 
             {/* Text editing toolbar — outside zoom container to prevent scaling */}
-            {toolbarPosition && editor && editingContent && !isCommitting && (
+            {toolbarPosition && tiptapEditor && editingContent && !isCommitting && (
                 <TextEditingToolbar
                     position={toolbarPosition}
-                    editor={editor}
                     defaultFontSizePt={editingContent.defaultStyle.fontSize}
                     onTextAlignChange={handleTextAlignChange}
                     onVerticalAlignChange={handleVerticalAlignChange}

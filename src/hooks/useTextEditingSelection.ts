@@ -2,13 +2,14 @@ import { useEffect } from 'react';
 import * as fabric from 'fabric';
 import { CanvasTextElement } from './CanvasTextElement';
 import { useEditingTextElementId, useSetEditingTextElementId } from '../states/uiStore';
+import { useFabricCanvas } from '../states/editorInfraStore';
 
 /**
  * Props for useTextEditingSelection.
  */
 interface UseTextEditingSelectionProps {
-    /** The Fabric.js canvas instance. */
-    fabricCanvas: fabric.Canvas | null;
+    /** Optional explicit canvas; defaults to shared runtime canvas from store. */
+    fabricCanvas?: fabric.Canvas | null;
 }
 
 /**
@@ -22,11 +23,13 @@ interface UseTextEditingSelectionProps {
 export const useTextEditingSelection = ({
     fabricCanvas,
 }: UseTextEditingSelectionProps) => {
+    const sharedFabricCanvas = useFabricCanvas();
+    const activeCanvas = fabricCanvas ?? sharedFabricCanvas;
     const setEditingTextElementId = useSetEditingTextElementId();
     const editingTextElementId = useEditingTextElementId();
 
     useEffect(() => {
-        const canvas = fabricCanvas;
+        const canvas = activeCanvas;
         if (!canvas) return;
 
         const handleSelection = (e: { selected: fabric.Object[] }) => {
@@ -77,5 +80,5 @@ export const useTextEditingSelection = ({
             canvas.off('selection:cleared', handleSelectionCleared);
             canvas.off('mouse:dblclick', handleDoubleClick);
         };
-    }, [fabricCanvas, editingTextElementId, setEditingTextElementId]);
+    }, [activeCanvas, editingTextElementId, setEditingTextElementId]);
 };

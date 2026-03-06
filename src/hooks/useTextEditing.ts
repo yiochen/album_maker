@@ -9,11 +9,10 @@
  * - Synchronizes editor content with the selected element
  */
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
-import * as fabric from 'fabric';
 import { useEditor } from '@tiptap/react';
-import type { Editor } from '@tiptap/react';
 import { textContentToTiptapDoc } from '../utils/tiptapSerializer';
 import { createTextEditorExtensions } from '../services/textEditorExtensions';
+import { useFabricCanvas, useSetTiptapEditor, useClearTiptapEditorIfMatch } from '../states/editorInfraStore';
 
 import { CanvasTextElement } from './CanvasTextElement';
 import { findCanvasTextObjectByElementId, getTextToolbarPosition } from './canvasTextObject';
@@ -33,8 +32,6 @@ export interface TextToolbarPosition {
 
 /** State exposed by this hook for the Canvas component to render the Tiptap overlay. */
 export interface TextEditingState {
-    /** The singleton Tiptap editor instance. */
-    editor: Editor | null;
     /** The PageElement being edited (null if not editing). */
     editingElement: PageElement | null;
     /** Toolbar position in container-relative pixels. */
@@ -58,7 +55,6 @@ export interface TextEditingState {
 }
 
 interface UseTextEditingProps {
-    fabricCanvas: fabric.Canvas | null;
     /** Ref to the canvas container element (used for toolbar coordinate conversion). */
     containerRef: React.RefObject<HTMLDivElement | null>;
     /** Active editor ID controlled by transition manager. */
@@ -72,14 +68,16 @@ interface UseTextEditingProps {
 }
 
 export const useTextEditing = ({
-    fabricCanvas,
     containerRef,
     activeEditorId,
     zoom,
     canvasWidth,
     canvasHeight,
 }: UseTextEditingProps): TextEditingState => {
+    const fabricCanvas = useFabricCanvas();
     const setEditingTextElementId = useSetEditingTextElementId();
+    const setSharedTiptapEditor = useSetTiptapEditor();
+    const clearSharedTiptapEditorIfMatch = useClearTiptapEditorIfMatch();
     const requestedEditingTextElementId = useEditingTextElementId();
     const editingTextElementId = activeEditorId ?? requestedEditingTextElementId;
     const spreads = useAlbumSpreads();
@@ -98,6 +96,17 @@ export const useTextEditing = ({
     const editor = useEditor({
         extensions: editorExtensions,
     });
+
+    useEffect(() => {
+        setSharedTiptapEditor(editor);
+        return () => {
+            if (editor) {
+                clearSharedTiptapEditorIfMatch(editor);
+            } else {
+                setSharedTiptapEditor(null);
+            }
+        };
+    }, [editor, setSharedTiptapEditor, clearSharedTiptapEditorIfMatch]);
 
     // Content sync effect: When the selected element changes, update the editor content.
     // This is done here in the hook so it only happens once when the ID switches.
@@ -217,7 +226,6 @@ export const useTextEditing = ({
     }, [containerRef, editingTextElementId, fabricCanvas, updateToolbarPosition]);
 
     return {
-        editor,
         editingElement,
         toolbarPosition,
         canvasWidth,

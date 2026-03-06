@@ -13,9 +13,9 @@
  * 5. TiptapTextEditor unmounts → runs cleanup code to persist final content to store
  */
 import React, { useEffect, useCallback, useMemo, useRef, useLayoutEffect, useState } from 'react';
-import type { Editor } from '@tiptap/react';
 import { useAlbumSpreads, useUpdateElement } from '../../states/albumStore';
 import { useCurrentSpreadIndex } from '../../states/uiStore';
+import { useTiptapEditor } from '../../states/editorInfraStore';
 import { buildTextRunsFromEditorDOM } from '../../services/textSnapshot';
 import {
     buildTextBoxFromOverlaySize,
@@ -26,8 +26,6 @@ import type { TextContent, PageElement } from '../../types';
 
 /** Props for the overlay position and styling. */
 interface TiptapTextEditorProps {
-    /** The singleton Tiptap editor instance. */
-    editor: Editor | null;
     /** The ID of the element being edited. */
     elementId: string;
     /** Canvas width in px (at canvas PPI). */
@@ -47,7 +45,6 @@ interface TiptapTextEditorProps {
 }
 
 export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
-    editor,
     elementId,
     canvasWidth,
     canvasHeight,
@@ -57,6 +54,7 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
     closeRequestNonce = 0,
     onRequestCloseCommitted,
 }) => {
+    const editor = useTiptapEditor();
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const updateElement = useUpdateElement();

@@ -9,6 +9,7 @@
 import React, { useCallback, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import type { Editor } from '@tiptap/react';
 import type { TextContent } from '../../types';
+import { useTiptapEditor } from '../../states/editorInfraStore';
 
 /** Height of the toolbar + gap above the text element. */
 const TOOLBAR_HEIGHT = 36;
@@ -106,8 +107,6 @@ export interface TextToolbarPosition {
 interface TextEditingToolbarProps {
     /** Absolute position of the text element (container-relative). */
     position: TextToolbarPosition;
-    /** The Tiptap editor instance. */
-    editor: Editor;
     /** Default font size in pt (for display). */
     defaultFontSizePt: number;
     /** Callback to update textAlign (stored on TextContent, not in Tiptap). */
@@ -121,7 +120,8 @@ interface TextEditingToolbarProps {
 }
 
 /** Parse the font size from the editor's current textStyle mark attributes. */
-function getEditorFontSizePt(editor: Editor, defaultSizePt: number): number {
+function getEditorFontSizePt(editor: Editor | null, defaultSizePt: number): number {
+    if (!editor) return Math.round(defaultSizePt);
     const attrs = editor.getAttributes('textStyle');
     if (attrs.fontSize) {
         const pt = parseFloat(attrs.fontSize);
@@ -132,13 +132,13 @@ function getEditorFontSizePt(editor: Editor, defaultSizePt: number): number {
 
 export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
     position,
-    editor,
     defaultFontSizePt,
     onTextAlignChange,
     textAlign,
     onVerticalAlignChange,
     verticalAlign,
 }) => {
+    const editor = useTiptapEditor();
     const toolbarRef = useRef<HTMLDivElement>(null);
     const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
     const fontMenuRef = useRef<HTMLDivElement>(null);
@@ -150,12 +150,18 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
 
     // Sync state from editor on selection/content change
     const refreshState = useCallback(() => {
+        if (!editor) {
+            setFontSizePt(Math.round(defaultFontSizePt));
+            setActiveFontFamily('');
+            return;
+        }
         setFontSizePt(getEditorFontSizePt(editor, defaultFontSizePt));
         const attrs = editor.getAttributes('textStyle');
         setActiveFontFamily(attrs.fontFamily || '');
     }, [editor, defaultFontSizePt]);
 
     useEffect(() => {
+        if (!editor) return;
         const timer = setTimeout(refreshState, 0);
         editor.on('selectionUpdate', refreshState);
         editor.on('transaction', refreshState);
@@ -200,25 +206,30 @@ export const TextEditingToolbar: React.FC<TextEditingToolbarProps> = ({
     }, [position.left, isFontMenuOpen, fontSizePt, activeFontFamily]);
 
     const handleFontChange = useCallback((fontFamily: string) => {
+        if (!editor) return;
         editor.chain().focus().setFontFamily(fontFamily).run();
         setIsFontMenuOpen(false);
     }, [editor]);
 
     const handleSizeChange = useCallback((deltaPt: number) => {
+        if (!editor) return;
         const newSize = Math.max(6, Math.min(200, fontSizePt + deltaPt));
         editor.chain().focus().setFontSize(`${newSize}pt`).run();
     }, [editor, fontSizePt]);
 
     const handleColorChange = useCallback((color: string) => {
+        if (!editor) return;
         editor.chain().focus().setColor(color).run();
     }, [editor]);
 
-    const isBold = editor.isActive('bold');
-    const isItalic = editor.isActive('italic');
-    const isUnderline = editor.isActive('underline');
+    const isBold = editor?.isActive('bold') ?? false;
+    const isItalic = editor?.isActive('italic') ?? false;
+    const isUnderline = editor?.isActive('underline') ?? false;
     const fontLabel = FONT_OPTIONS.find(opt => opt.value === activeFontFamily)?.label
         ?? (activeFontFamily ? activeFontFamily.split(',')[0] : FONT_OPTIONS[0].label);
-    const fillColor = editor.getAttributes('textStyle').color || '#000000';
+    const fillColor = editor?.getAttributes('textStyle').color || '#000000';
+
+    if (!editor) return null;
 
     return (
         <div
