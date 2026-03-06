@@ -30,6 +30,9 @@ export const getZoomCompensatedSizes = (zoomPercent: number) => {
         snapLineStrokeWidth: base.snapLineStrokeWidth * inverseScale,
         snapLineDash: base.snapLineDash * inverseScale,
         panControlSize: base.panControlSize * inverseScale,
+        lowResBadgeHeight: base.lowResBadgeHeight * inverseScale,
+        lowResBadgeFontSize: base.lowResBadgeFontSize * inverseScale,
+        lowResBadgeMargin: base.lowResBadgeMargin * inverseScale,
     };
 };
 
@@ -94,6 +97,12 @@ export async function renderSpread(
                 if (isInteractive) {
                     existingImage.updateControlVisibility(element.content.lockAspectRatio ?? true);
                     existingImage.setPanControlSize(uiSizes.panControlSize);
+                    existingImage.setLowResBadgeSizes(
+                        uiSizes.lowResBadgeHeight,
+                        uiSizes.lowResBadgeFontSize,
+                        uiSizes.lowResBadgeMargin
+                    );
+                    existingImage.setCanvasZoomPercent(zoom);
 
                     if (canvas instanceof fabric.Canvas && canvas.getActiveObject() === existingImage) {
                         canvas.uniformScaling = element.content.lockAspectRatio ?? true;
@@ -127,6 +136,14 @@ export async function renderSpread(
                     panControlSize: uiSizes.panControlSize,
                     onContentTransformChange: interactiveOpts?.onContentTransformChange,
                 });
+                if (isInteractive) {
+                    canvasEl.setLowResBadgeSizes(
+                        uiSizes.lowResBadgeHeight,
+                        uiSizes.lowResBadgeFontSize,
+                        uiSizes.lowResBadgeMargin
+                    );
+                    canvasEl.setCanvasZoomPercent(zoom);
+                }
 
                 canvas.add(canvasEl);
                 if (targetUrl) {

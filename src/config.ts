@@ -15,6 +15,9 @@ export const APP_CONFIG = {
     snapLineStrokeWidth: 1,
     snapLineDash: 4,
     panControlSize: 22,
+    lowResBadgeHeight: 20,
+    lowResBadgeFontSize: 11,
+    lowResBadgeMargin: 6,
   },
 
   // Image Pool
