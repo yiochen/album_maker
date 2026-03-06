@@ -2,118 +2,99 @@
 
 ## Project Overview
 
-A web-based photo album editor built with React + TypeScript. It provides a Google Slides-like interface for creating photo album pages with drag-and-drop image placement, customizable templates, and multi-source photo import.
+A web-based photo album editor built with React + TypeScript. It provides a Google Slides-like interface for creating spread layouts with drag-and-drop images, text overlays, templates, and export.
 
 ## Tech Stack
 
-- **Framework**: React 18 + TypeScript
+- **Framework**: React 19 + TypeScript
 - **Build Tool**: Vite
 - **State Management**: Zustand
 - **Database**: IndexedDB via Dexie.js
+- **Canvas**: Fabric.js v7 (editor view), native OffscreenCanvas 2D (worker export)
 - **Styling**: Vanilla CSS with design tokens
-- **Testing**: Cypress (E2E & Visual Regression)
+- **Testing**: Cypress (E2E + visual snapshots)
 
 ## Architecture
 
-The application is structured into modular layers. Please refer to the `AGENTS.md` file in each directory for specific implementation details and rules.
+The app is organized into modular layers. Always consult the nearest `AGENTS.md` before modifying a module.
 
 ### Core Modules
-- **[Commands](src/commands/AGENTS.md)**: Undo/Redo logic using the Command Pattern.
-- **[Components](src/components/AGENTS.md)**: React UI components and Canvas logic (Fabric.js).
-- **[Database](src/db/AGENTS.md)**: Client-side persistence with Dexie.js.
-- **[Hooks](src/hooks/AGENTS.md)**: Custom logic hooks.
-- **[Services](src/services/AGENTS.md)**: Stateless business logic (Export, Storage).
-- **[Sources](src/sources/AGENTS.md)**: Plugin system for image providers (Google Photos, etc.).
-- **[States](src/states/AGENTS.md)**: Global state management stores (Zustand).
-- **[Workers](src/workers/AGENTS.md)**: Web Workers for background tasks.
-- **Service Worker (`src/sw.ts`)**: Intercepts fetch requests for local image generation (dummy colors) and network image caching (Google Photos).
+- **[Commands](src/commands/AGENTS.md)**: Undo/Redo command pattern and merge/group behavior.
+- **[Components](src/components/AGENTS.md)**: View layer, canvas shell, editor layout.
+- **[Hooks](src/hooks/AGENTS.md)**: Canvas lifecycle, interactions, persistence, text editing orchestration.
+- **[States](src/states/AGENTS.md)**: Global stores (`albumStore`, `uiStore`, `editorInfraStore`).
+- **[Utils](src/utils/AGENTS.md)**: Pure render/math/conversion utilities used by editor and workers.
+- **[Services](src/services/AGENTS.md)**: Stateless business logic (upload processing, text editor helpers, template layout, storage).
+- **[Workers](src/workers/AGENTS.md)**: Export processor running off main thread.
+- **[Sources](src/sources/AGENTS.md)**: Provider plugin layer (dummy, uploaded, Google Photos).
+- **[Database](src/db/AGENTS.md)**: IndexedDB schema and persistence helpers.
+- **Service Worker (`src/sw.ts`)**: Local image routes + Google Photos caching.
 
 ## Core Concepts
 
 ### Spread Model
-The application operates on **Spreads** (typically 2 pages side-by-side) as the fundamental unit of design. While previously using "Pages", the datamodel and UI now focus on Spreads to enable seamless cross-page designing.
+The fundamental design unit is a **Spread** (two pages side by side). Elements are stored at spread scope.
 
 ### Text Editing Model (Product Rules)
-- Text elements enter editing mode on **double-click** (single click keeps normal selection/move behavior).
-- Exception: when a new text element is created, it should automatically enter editing mode immediately.
-- While editing text, resizing/transformation is **owned by the Tiptap overlay UI**, not Fabric transform handles.
-- Fabric remains the display/selection layer for text boxes; rich text interaction happens in the DOM overlay editor.
-- On editor close/unmount, the overlay's final dimensions are treated as the source of truth for the text element box (`box.x2/y2` updates).
-- This is intentional product behavior: edited content and the overlay's resulting size should determine final text element dimensions.
+- Enter text edit on **double-click**.
+- Newly created text enters edit mode immediately.
+- Fabric text is display/selection only; rich editing is handled by Tiptap DOM overlay.
+- Overlay size on close is source of truth for final text box dimensions.
+- Text formatting actions live in the floating text toolbar while editing.
 
-### Gapless Layout Engine (Normalized Coordinates)
-Elements are positioned using **Normalized Coordinates** (0.0 to 1.0) stored in a `box` object (`x1, y1, x2, y2`). This allows for seamless resizing of spreads and resolution-independent layouts.
--   **Storage**: Database stores the normalized `box` model.
--   **Rendering**: The **Gapless Engine** converts these floats to integer pixels at render time using `calculateGaplessRect()`. This ensures that adjacent elements share the exact same integer pixel boundary, eliminating "white seams" caused by floating-point rounding errors.
--   **Resolution**: While layout is normalized, the application targets **300 PPI** (Pixels Per Inch) as the base print resolution for all scaling calculations.
--   **No Bleed**: This project does not currently handle print bleed. The canvas edges are treated as the final trim edges, and elements can be positioned freely across them if desired for simple overflow, but no explicit bleed safety logic is enforced.
+### Gapless Normalized Layout
+- Elements store normalized `box` edges (`x1,y1,x2,y2` in `[0,1]`).
+- Rendering uses `calculateGaplessRect()` to snap box edges to shared integer pixel boundaries.
+- Layout math targets **300 PPI model space**.
+- Editor canvas renders in **96 PPI screen space** and uses conversion utilities.
 
-## Directory Structure & Quick Links
+### Image Quality Guardrail
+- Image content includes optional `originalWidth`/`originalHeight`.
+- `CanvasImageElement` computes effective print PPI and shows a **Low Res** pill when below 300 PPI.
+- Badge sizing and spacing are zoom-compensated and adaptive for small on-screen frames.
 
-```
+## Directory Snapshot
+
+```text
 src/
-├── commands/     # Command Pattern (Undo/Redo) -> See src/commands/AGENTS.md
-├── components/   # UI & Canvas -> See src/components/AGENTS.md
-├── db/           # IndexedDB -> See src/db/AGENTS.md
-├── hooks/        # React Hooks -> See src/hooks/AGENTS.md
-├── services/     # Business Logic -> See src/services/AGENTS.md
-├── sources/      # Image Sources -> See src/sources/AGENTS.md
-├── states/       # Zustand Stores -> See src/states/AGENTS.md
-├── templates/    # Layout Templates
-├── types/        # TypeScript Definitions
-├── utils/        # Utility Functions -> See src/utils/AGENTS.md
-├── workers/      # Web Workers -> See src/workers/AGENTS.md
-├── App.tsx       # Main Orchestrator
-├── sw.ts         # Service Worker (compiled to sw.js by Vite plugin)
-├── registerSW.ts # SW registration utility
-└── index.css     # Global Styles
+├── commands/
+├── components/
+├── db/
+├── hooks/
+├── services/
+├── sources/
+├── states/
+├── templates/
+├── types/
+├── utils/
+├── workers/
+├── sw.ts
+└── registerSW.ts
 ```
 
-### Service Worker (`src/sw.ts`)
-Compiled separately by a custom Vite plugin (esbuild) into `sw.js`. Handles two routes:
-- **`/__local__/dummyColors/<hex>/<WxH>`**: Generates SVG responses on the fly (no network).
-- **`lh3.googleusercontent.com/*`**: Cache-first strategy for Google Photos images, surviving URL expiration.
+## Service Worker (`src/sw.ts`)
 
-Registered via `src/registerSW.ts` from `main.tsx`. Uses `skipWaiting()` + `clients.claim()` for immediate activation.
+Compiled separately by the Vite plugin. Handles:
+- `__local__/dummyColors/...` generated image responses.
+- Uploaded image local routes.
+- Cache-first behavior for `lh3.googleusercontent.com` URLs.
+
+Registered via `src/registerSW.ts` with `skipWaiting()` + `clients.claim()`.
 
 ## Global Rules of Engagement
 
-1.  **Read Before You Write**: Always consult the local `AGENTS.md` in the directory you are working in.
-2.  **Visual Regression**: We use `cypress-visual-regression`. Run `npm run cypress:ci` to verify changes, especially for Canvas rendering.
-3.  **State Management**:
-    *   Use **Zustand** stores (`src/states/`) for global state and history (Undo/Redo via `CommandManager`).
-    *   Use `useReducer` or "State from Props" for complex local state.
-    *   Avoid deep prop drilling; use composition or context where appropriate.
-4.  **Testing**:
-    *   Use `data-testid` for selectors.
-    *   Close Modals explicitly in tests.
-    *   Wait for Canvas rendering (Fabric.js) to settle before snapshots.
-5.  **Performance**:
-    *   Offload heavy tasks to Web Workers.
-    *   Manage object lifecycles (especially Fabric.js objects) to avoid memory leaks.
-6.  **Fabric.js v7 Specifics**:
-    *   **Uniform Scaling**: In Fabric v7, the `uniformScaling` option for controls is a **canvas-level** setting (`canvas.uniformScaling`), not strictly per-object. When synchronizing selections or updating element properties, always ensure `canvas.uniformScaling` is synced with the active object's requirements to ensure consistent behavior.
-
-## Cypress Test Writing Notes
-
-- **Reset IndexedDB safely**: In Cypress support `beforeEach`, navigate to `about:blank` first, then clear stores inside `AlbumEditorDB` (`albums`, `settings`, `uploadedImages`). Avoid repeated `indexedDB.deleteDatabase()` in test loops because blocked/open handles can cause startup hangs.
-- **Use a robust app-ready gate**: `waitForAppReady()` should wait for loading UI to disappear and then assert key app containers (`[data-testid="album-editor"]`, `[data-testid="canvas-container"]`) with a generous timeout.
-- **Avoid external auth/network boot dependencies**: E2E tests should not depend on Google auth script initialization. Prefer local/dummy sources unless a spec explicitly tests provider auth.
-- **Follow the text editing product model**: Text style controls are in the floating text-editing toolbar (not the right properties panel). While text is in editing mode, keyboard delete should not remove the text element.
-- **Prefer stable selectors**: Use `data-testid` selectors for interaction/assertions. Avoid brittle assertions tied to incidental UI copy or layout.
+1. **Read Before You Write**: Check local `AGENTS.md` first.
+2. **State Mutation Discipline**: Persistent album edits must go through command-backed store actions.
+3. **Unit Discipline**: Be explicit whether code is in normalized, model px (300), or canvas px (96).
+4. **Render Parity**: Editor and worker export should produce matching visual results.
+5. **Fabric v7 Uniform Scaling**: Keep `canvas.uniformScaling` synchronized with active image lock setting.
+6. **Testing Discipline**: Prefer `data-testid`, deterministic waits, and no external auth dependencies unless under test.
 
 ## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Start dev server
 npm run dev
-
-# Run Lint
 npm run lint
-
-# Run Tests
 npm run test:e2e
 ```

@@ -16,6 +16,8 @@ Contains all React UI components for the application, including the main Canvas,
   - Delegates interaction logic to `useCanvasInteraction`.
   - Uses `APP_CONFIG` for global configuration (PPI, sizes, etc.).
   - For text elements, Fabric is selection/display only; text editing and resizing are handled by the Tiptap overlay. Do not re-enable Fabric text transform handles as the primary UX.
+  - Uses `useCanvasViewportLayout` for zoomed viewport sizing/centering and scrolling behavior.
+  - Registers drop target metadata via `DndDropContext` for accurate drag/drop hit testing.
 
 ### Navigation
 - **PageNavigator (`PageNavigator.tsx`)**: The sidebar for navigating spreads.
@@ -38,7 +40,7 @@ Contains all React UI components for the application, including the main Canvas,
 We use a global configuration file `src/config.ts` (`APP_CONFIG`) to avoid magic constants in components.
 - **PPI**: 300 (Print), 96 (Screen)
 - **UI Sizes**: Defined in `APP_CONFIG.BASE_UI_SIZES` and scaled via `getZoomCompensatedSizes`.
-- **Margins**: Bleed margins, drag preview sizes, etc.
+- **Other constants**: drag preview sizes, thumbnail sizes, and zoom-compensated badge/control defaults.
 
 ### Canvas Dimensions & Coordinates
 - **Absolute Pixels**: The application uses absolute pixels at 300 PPI for positioning.

@@ -33,31 +33,35 @@ The application uses a **normalized box model** for storage and a two-tier pixel
 - **`useKeyboardShortcuts`**: Manages global keyboard shortcuts (e.g., Undo/Redo).
 
 ### Canvas Logic
-- **`useCanvasRender`**: Manages the Fabric.js canvas instance, initialization, rendering cycle, zoom state, and syncing React state to Fabric objects.
+- **`useCanvasRender`**: Orchestrates canvas initialization, zoom, viewport layout, and React-to-Fabric sync.
+- **`useCanvasViewportLayout`**: Computes centered/scrollable viewport wrapper dimensions for zoomed canvas presentation.
+- **`useCanvasInitialization`**: Owns Fabric canvas lifecycle and registration into `editorInfraStore`.
 
 - **`useCanvasInteraction`**: Handles user interactions on the canvas, including selection, movement/snapping, and modification updates.
 -   **Resolution**: While layout is normalized, the application targets **300 PPI** (Pixels Per Inch) as the base print resolution for all scaling calculations.
 -   **No Bleed**: This project does not currently handle print bleed. The canvas edges are treated as the final trim edges, and elements can be positioned freely across them if desired for simple overflow, but no explicit bleed safety logic is enforced.
   > **Note**: Snapping is a runtime-only interaction behavior. Snap constraints are calculated during drag/resize to guide positioning but are **not persisted** in the state or database. Elements retain their absolute position once placed.
-  > **Note**: Drag-and-drop from the ImagePool is handled by `@dnd-kit/core` via `DndWrapper` component. See `src/components/DndWrapper.tsx` and `src/contexts/DndDropContext.ts`.
-- **`useCanvasThumbnail`**: Logic for generating spread thumbnails.
+  > **Note**: Drag-and-drop from the ImagePool is handled by `@dnd-kit/core` via `DndWrapper` and `DndDropContext`.
 
 - **`useReactToFabricSync`**: Syncs PageElement state to FabricJS objects. Converts MODEL PIXELS → CANVAS PIXELS for rendering.
-  
-  **Data Flow - Avoiding Circular Updates:**
-  - During editing: FabricJS → React State (via `object:modified`)
-  - User drags/resizes → FabricJS updates visually in real-time (no React)
-  - Mouse release → `object:modified` → `useCanvasSnapping` → `updateElement()` → Zustand store
-  - Zustand update triggers React re-render, but `useReactToFabricSync` **intentionally skips** re-positioning objects unless the user switched spreads
-  - This prevents FabricJS and React from fighting over positions during editing
+  - Also applies zoom-compensated UI sizes (handles, seam line, image pan control, low-res badge).
 
 - **`useCanvasSnapping`**: Handles snapping. Works in CANVAS PIXELS internally, converts to MODEL PIXELS for state updates. Note: This project does not enforce bleed constraints; elements can be positioned freely beyond canvas boundaries.
+- **`useCanvasPersistence`**: Commits Fabric object geometry/contentTransform back to album store on interaction completion.
 
 - **`useElementActions`**: Creates/updates elements. All inputs and outputs are in MODEL PIXELS.
+  - When binding an image to an element, persist `originalWidth`/`originalHeight` into `ImageContent` for quality checks.
+
+### Text Editing Hooks
+- **`useTextEditing`**: Coordinates active text element, toolbar positioning, and shared Tiptap editor registration.
+- **`useTextEditorTransition`**: Manages commit/close transitions for text editing lifecycle.
+- **`useTextEditingAlignmentState`**: Holds text/vertical alignment state during active editing.
+- **`canvasTextObject.ts`**: Shared helpers to locate text Fabric object and compute toolbar position.
 
 ### State Management
 - **`useAlbum`**: High-level hook exposing album actions (add spread, update element, etc.) via `useAlbumStore`.
 - **`useAutoSave`**: Handles auto-saving album data to IndexedDB.
+- **Shared Infra Store Usage**: Hooks should use `editorInfraStore` to reference runtime Fabric and Tiptap instances instead of ad-hoc globals.
 
 ## Rules of Engagement
 - **Do** separate complex logic from components into custom hooks.

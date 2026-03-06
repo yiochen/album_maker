@@ -11,11 +11,17 @@ We use **Zustand** for state management to avoid prop drilling and separate conc
     -   `selectedElementId` / `selectedPageId`: Selection state.
     -   `isImagePoolOpen`, `isSettingsOpen`: Panel visibility.
     -   `isSnappingEnabled`: Interaction preferences.
+    -   `editingTextElementId`: Current text element in edit mode.
+3.  **`editorInfraStore.ts`**: Runtime object references shared across hooks/components.
+    -   `fabricCanvas`: Active Fabric canvas instance.
+    -   `tiptapEditor`: Active Tiptap editor instance.
+    -   Includes clear-if-match helpers to prevent stale references on unmount.
 
 ## Rules of Engagement
 -   **Do** use individual selector hooks (e.g., `useAlbum()`, `useCurrentSpreadIndex()`) in components to minimize re-renders.
 -   **Do not** destructure the entire store object (e.g., `const { ... } = useAlbumStore()`) in large components, as this causes re-renders on any state change.
 -   **Command Pattern**: Mutations to the album MUST go through the `CommandManager` (wrapped by `albumStore` actions) to ensure Undo/Redo works.
+-   **Runtime refs**: Never serialize/store Fabric/Tiptap runtime objects in `albumStore` or `uiStore`; use `editorInfraStore` only.
 
 ## Integration
 -   **`AlbumEditor.tsx`**: Acts as the main orchestrator but now relies on stores instead of holding state itself.
