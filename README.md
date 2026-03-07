@@ -1,5 +1,8 @@
 # Photo Album Editor
 
+[![Netlify Status](https://api.netlify.com/api/v1/badges/978a5ce9-8bc5-40f6-84db-71ec466bdd3e/deploy-status)](https://app.netlify.com/projects/photobookmaker/deploys)
+[![CI](https://github.com/yiochen/album_maker/actions/workflows/ci.yml/badge.svg)](https://github.com/yiochen/album_maker/actions/workflows/ci.yml)
+
 A web-based photo album editor with a Google Slides-like interface. Create beautiful photo albums with drag-and-drop, customizable templates, and multi-source photo import.
 
 ## Features

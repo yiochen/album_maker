@@ -23,17 +23,37 @@ async function ensureCanvasSelection(page: Page): Promise<void> {
     return;
   }
 
-  const canvasLayer = page.getByTestId('canvas-layer');
-  const box = await canvasLayer.boundingBox();
+  const interactionLayer = page.getByTestId('interaction-layer');
+  const box = await interactionLayer.boundingBox();
   if (!box) {
     throw new Error('Canvas layer is not visible for selection.');
   }
 
-  await canvasLayer.click({
-    position: { x: box.width / 2, y: box.height / 2 },
-  });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await interactionLayer.click({
+      force: true,
+      position: { x: box.width / 2, y: box.height / 2 },
+    });
+    if ((await canvasContainer.getAttribute('data-has-selection')) === 'true') {
+      return;
+    }
+    await page.waitForTimeout(100);
+  }
 
   await expect(canvasContainer).toHaveAttribute('data-has-selection', 'true');
+}
+
+async function focusCanvasForKeyboard(page: Page): Promise<void> {
+  const interactionLayer = page.getByTestId('interaction-layer');
+  const box = await interactionLayer.boundingBox();
+  if (!box) {
+    throw new Error('Interaction layer is not visible for keyboard focus.');
+  }
+
+  await interactionLayer.click({
+    force: true,
+    position: { x: box.width / 2, y: box.height / 2 },
+  });
 }
 
 test.describe('Canvas', () => {
@@ -122,7 +142,8 @@ test.describe('Canvas', () => {
       });
 
       await test.step('Press Delete and verify spread properties', async () => {
-        await appPage.getByTestId('canvas-viewport').click();
+        await ensureCanvasSelection(appPage);
+        await focusCanvasForKeyboard(appPage);
         await appPage.keyboard.press('Delete');
         await expect(appPage.getByRole('heading', { name: 'Spread Properties' })).toBeVisible();
       });
@@ -134,7 +155,8 @@ test.describe('Canvas', () => {
       });
 
       await test.step('Press Backspace and verify spread properties', async () => {
-        await appPage.getByTestId('canvas-viewport').click();
+        await ensureCanvasSelection(appPage);
+        await focusCanvasForKeyboard(appPage);
         await appPage.keyboard.press('Backspace');
         await expect(appPage.getByRole('heading', { name: 'Spread Properties' })).toBeVisible();
       });
