@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npm run generate-schema && GOOGLE_REDIRECT_URI=http://localhost:5173/edit npx netlify dev --command \"npm run dev:vite\" --targetPort 5173",
+    "dev": "npm run generate-schema && GOOGLE_REDIRECT_URI=http://localhost:5173/edit npx netlify dev --command \"npm run dev:vite\" --target-port 5173",
     "dev:vite": "vite",
     "build": "npm run generate-schema && tsc -b && vite build",
     "generate-schema": "ts-json-schema-generator --path 'src/types/index.ts' --type 'Album' --out 'src/schemas/albumSchema.json' --tsconfig 'tsconfig.app.json'",
@@ -13,7 +13,7 @@
     "pw:open": "playwright test --ui",
     "pw:run": "playwright test",
     "pw:run:update": "playwright test --update-snapshots",
-    "test:e2e": "start-server-and-test dev http://localhost:5173 pw:run",
+    "test:e2e": "start-server-and-test \"npm run generate-schema && npm run dev:vite\" http://localhost:5173 pw:run",
     "clean-port": "kill -9 $(lsof -t -i:5173)"
   },
   "dependencies": {
