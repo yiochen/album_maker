@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npm run generate-schema && vite",
+    "dev": "npm run generate-schema && GOOGLE_REDIRECT_URI=http://localhost:5173/edit npx netlify dev --command \"npm run dev:vite\" --targetPort 5173",
+    "dev:vite": "vite",
     "build": "npm run generate-schema && tsc -b && vite build",
     "generate-schema": "ts-json-schema-generator --path 'src/types/index.ts' --type 'Album' --out 'src/schemas/albumSchema.json' --tsconfig 'tsconfig.app.json'",
     "lint": "npm run generate-schema && eslint . && tsc -b --noEmit",

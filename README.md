@@ -48,7 +48,22 @@ Or add a `netlify.toml`:
 [build]
   command = "npm run build"
   publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
 ```
+
+### Google OAuth Function
+
+Create these Netlify environment variables:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI` (optional, defaults to `https://photobookmaker.netlify.app/edit`)
+
+Then POST your Google auth `code` to:
+
+- `/.netlify/functions/auth`
 
 ## Project Structure
 
