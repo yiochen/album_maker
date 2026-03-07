@@ -31,9 +31,9 @@ npm run dev
 | `npm run preview` | Preview production build |
 | `npm run lint` | Run ESLint |
 | `npx tsc --noEmit` | Type check without building |
-| `npm run cy:open` | Open Cypress Test Runner (GUI) |
-| `npm run cy:run` | Run Cypress tests headlessly |
-| `npm run test:e2e` | Start dev server and run Cypress tests |
+| `npm run pw:open` | Open Playwright test UI |
+| `npm run pw:run` | Run Playwright tests |
+| `npm run test:e2e` | Start dev server and run Playwright tests |
 
 ## Netlify Deployment
 
@@ -52,7 +52,7 @@ Or add a `netlify.toml`:
 
 ## Project Structure
 
-See [AGENTS.md](./AGENT.md) for detailed architecture and development documentation.
+See [AGENTS.md](./AGENTS.md) for detailed architecture and development documentation.
 
 ## Tech Stack
 
