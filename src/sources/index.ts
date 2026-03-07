@@ -42,6 +42,10 @@ export const unregisterSource = (id: string): boolean => {
 // Initialize all sources that need initialization
 export const initializeSources = async (): Promise<void> => {
     const isCypress = typeof window !== 'undefined' && Boolean((window as Window & { Cypress?: unknown }).Cypress);
+    // Playwright does not expose a stable global by default; navigator.webdriver is a practical signal
+    // for browser automation contexts where external auth/script flows are flaky in CI/headless.
+    const isPlaywright = typeof navigator !== 'undefined' && navigator.webdriver === true;
+    const isAutomatedE2E = isCypress || isPlaywright;
 
     const withTimeout = async (promise: Promise<void>): Promise<void> => {
         let timeoutId: number | undefined;
@@ -63,8 +67,8 @@ export const initializeSources = async (): Promise<void> => {
 
     const initPromises = Array.from(sources.values())
         .filter(isInitializableSource)
-        // Cypress E2E does not use Google auth flows and external script loading is flaky in CI/headless.
-        .filter(source => !(isCypress && source.id === 'google-photos'))
+        // Automated E2E does not use Google auth flows and external script loading is flaky in CI/headless.
+        .filter(source => !(isAutomatedE2E && source.id === 'google-photos'))
         .map(source => withTimeout(source.initialize()).catch(err => {
             console.error(`Failed to initialize source ${source.id}:`, err);
         }));

@@ -48,7 +48,7 @@ We use a global configuration file `src/config.ts` (`APP_CONFIG`) to avoid magic
 - **Zoom**: Handled via CSS transforms, managed by `useCanvasRender`.
 
 ## Rules of Engagement
-- **Do** use `data-testid` attributes on interactive elements to support Cypress testing.
-- **Do** explicitly close Modals in Cypress tests.
+- **Do** use `data-testid` attributes on interactive elements to support E2E testing (Playwright).
+- **Do** explicitly close Modals in E2E tests.
 - **Do** use `APP_CONFIG` instead of hardcoded numbers.
 - **Do not** mix heavy business logic directly into view components; delegate to hooks or commands.

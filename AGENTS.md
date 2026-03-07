@@ -12,7 +12,7 @@ A web-based photo album editor built with React + TypeScript. It provides a Goog
 - **Database**: IndexedDB via Dexie.js
 - **Canvas**: Fabric.js v7 (editor view), native OffscreenCanvas 2D (worker export)
 - **Styling**: Vanilla CSS with design tokens
-- **Testing**: Cypress (E2E + visual snapshots)
+- **Testing**: Playwright (E2E + visual snapshots)
 
 ## Architecture
 

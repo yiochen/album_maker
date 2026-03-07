@@ -14,4 +14,4 @@ Contains reusable, atomic UI components that are shared across different panels 
 ## Rules of Engagement
 - **Do** keep these components generic.
 - **Do** handle local UI state (like intermediate typing) within these components.
-- **Do** use `data-testid` for Cypress tests.
+- **Do** use `data-testid` for Playwright E2E tests.

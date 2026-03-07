@@ -11,10 +11,10 @@ async function waitForAppReady(page: Page): Promise<void> {
 }
 
 export const test = base.extend<AppFixtures>({
-  appPage: async ({ page, baseURL }, use) => {
+  appPage: async ({ page, baseURL }, runFixture) => {
     await page.goto(baseURL ?? '/');
     await waitForAppReady(page);
-    await use(page);
+    await runFixture(page);
   },
 });
 

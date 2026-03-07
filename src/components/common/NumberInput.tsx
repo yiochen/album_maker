@@ -19,7 +19,7 @@ interface NumberInputProps {
     id?: string;
     /** If true, triggers onChange on every valid numeric keystroke. If false (default), only on blur/Enter. */
     immediate?: boolean;
-    /** Test ID for Cypress tests */
+    /** Test ID for E2E tests */
     'data-testid'?: string;
 }
 
