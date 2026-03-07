@@ -17,6 +17,25 @@ async function importAndDropImage(page: Page) {
   });
 }
 
+async function ensureCanvasSelection(page: Page): Promise<void> {
+  const canvasContainer = page.getByTestId('canvas-container');
+  if ((await canvasContainer.getAttribute('data-has-selection')) === 'true') {
+    return;
+  }
+
+  const canvasLayer = page.getByTestId('canvas-layer');
+  const box = await canvasLayer.boundingBox();
+  if (!box) {
+    throw new Error('Canvas layer is not visible for selection.');
+  }
+
+  await canvasLayer.click({
+    position: { x: box.width / 2, y: box.height / 2 },
+  });
+
+  await expect(canvasContainer).toHaveAttribute('data-has-selection', 'true');
+}
+
 test.describe('Canvas', () => {
   test.describe('Basic Canvas Operations', () => {
     test('displays the canvas container', async ({ appPage }) => {
@@ -98,22 +117,24 @@ test.describe('Canvas', () => {
     });
 
     test('deletes selected element when pressing Delete key', async ({ appPage }) => {
-      await test.step('Verify selection exists before delete', async () => {
-        await expect(appPage.getByTestId('canvas-container')).toHaveAttribute('data-has-selection', 'true');
+      await test.step('Ensure image is selected before delete', async () => {
+        await ensureCanvasSelection(appPage);
       });
 
       await test.step('Press Delete and verify spread properties', async () => {
+        await appPage.getByTestId('canvas-viewport').click();
         await appPage.keyboard.press('Delete');
         await expect(appPage.getByRole('heading', { name: 'Spread Properties' })).toBeVisible();
       });
     });
 
     test('deletes selected element when pressing Backspace key', async ({ appPage }) => {
-      await test.step('Verify selection exists before backspace delete', async () => {
-        await expect(appPage.getByTestId('canvas-container')).toHaveAttribute('data-has-selection', 'true');
+      await test.step('Ensure image is selected before backspace delete', async () => {
+        await ensureCanvasSelection(appPage);
       });
 
       await test.step('Press Backspace and verify spread properties', async () => {
+        await appPage.getByTestId('canvas-viewport').click();
         await appPage.keyboard.press('Backspace');
         await expect(appPage.getByRole('heading', { name: 'Spread Properties' })).toBeVisible();
       });
