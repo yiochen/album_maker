@@ -23,17 +23,24 @@ async function ensureCanvasSelection(page: Page): Promise<void> {
     return;
   }
 
-  const interactionLayer = page.getByTestId('interaction-layer');
-  const box = await interactionLayer.boundingBox();
+  const viewport = page.getByTestId('canvas-viewport');
+  const box = await viewport.boundingBox();
   if (!box) {
     throw new Error('Canvas layer is not visible for selection.');
   }
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await interactionLayer.click({
-      force: true,
-      position: { x: box.width / 2, y: box.height / 2 },
-    });
+  const clickTargets = [
+    { dx: 0, dy: 0 },
+    { dx: 50, dy: 0 },
+    { dx: -50, dy: 0 },
+    { dx: 0, dy: 50 },
+    { dx: 0, dy: -50 },
+  ];
+
+  for (const target of clickTargets) {
+    const x = box.x + box.width / 2 + target.dx;
+    const y = box.y + box.height / 2 + target.dy;
+    await page.mouse.click(x, y);
     if ((await canvasContainer.getAttribute('data-has-selection')) === 'true') {
       return;
     }
