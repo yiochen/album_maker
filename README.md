@@ -20,6 +20,9 @@ A web-based photo album editor with a Google Slides-like interface. Create beaut
 # Install dependencies
 npm install
 
+# Configure Google Photos client ID for the browser
+echo "VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com" > .env.local
+
 # Start development server
 npm run dev
 ```
@@ -29,7 +32,7 @@ npm run dev
 | Command | Description |
 |---------|-------------|
 | `npm install` | Install dependencies |
-| `npm run dev` | Start dev server (http://localhost:5173) |
+| `npm run dev` | Start Netlify dev server (http://localhost:8888) |
 | `npm run build` | Build for production |
 | `npm run preview` | Preview production build |
 | `npm run lint` | Run ESLint |
@@ -56,15 +59,39 @@ Or add a `netlify.toml`:
   directory = "netlify/functions"
 ```
 
-### Google OAuth Function
+### Google Photos Picker OAuth
+
+The Google Photos import flow uses the Google Photos Picker API plus a Netlify Function that exchanges the Google authorization code for an access token.
+
+For local development, put this in `.env.local`:
+
+```bash
+VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+```
+
+Enable the Google Photos Picker API in the same Google Cloud project as your OAuth client.
+
+The browser and Netlify function use these environment variables:
 
 Create these Netlify environment variables:
 
+- `VITE_GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_REDIRECT_URI` (optional, defaults to `https://photobookmaker.netlify.app/edit`)
+- `GOOGLE_REDIRECT_URI` (optional, defaults to `https://photobookmaker.netlify.app`)
 
-Then POST your Google auth `code` to:
+For local development with `netlify dev`, set:
+
+```bash
+GOOGLE_REDIRECT_URI=http://localhost:8888
+```
+
+In Google Cloud Console, add these to the same OAuth client:
+
+- `Authorized JavaScript origins`: `http://localhost:8888`, `https://photobookmaker.netlify.app`
+- `Authorized redirect URIs`: `http://localhost:8888`, `https://photobookmaker.netlify.app`
+
+The browser posts the Google auth `code` to:
 
 - `/.netlify/functions/auth`
 

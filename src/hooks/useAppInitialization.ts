@@ -9,7 +9,7 @@ import {
 } from '../services/storage';
 import { initializeSources } from '../sources';
 import { useAlbumStore } from '../states/albumStore';
-import { db } from '../db';
+import { db, deleteLegacyDatabases } from '../db';
 
 const SOURCE_INIT_TIMEOUT_MS = 8000;
 const STORAGE_LOAD_TIMEOUT_MS = 8000;
@@ -41,6 +41,8 @@ export const useAppInitialization = () => {
   useEffect(() => {
     const init = async () => {
       try {
+        await deleteLegacyDatabases();
+
         // Initialize photo sources
         await withTimeout(
           initializeSources(),

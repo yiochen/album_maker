@@ -4,6 +4,9 @@ import { calculateThumbnailSize, calculateCanvasMaxDimensions } from '../utils/i
 import exifr from 'exifr';
 import heic2any from 'heic2any';
 
+const PREVIEW_MAX_DIMENSION = 1024;
+const FALLBACK_THUMBNAIL_MAX_DIMENSION = 512;
+
 /**
  * Custom error for unsupported HEIF formats (e.g., HDR or new iOS profiles).
  */
@@ -12,6 +15,138 @@ export class HeifUnsupportedError extends Error {
         super(`HEIF format not supported for: ${filename}`);
         this.name = 'HeifUnsupportedError';
     }
+}
+
+export interface SavedImageAsset {
+    storageId: string;
+    width: number;
+    height: number;
+    createdAt: number;
+    filename: string;
+    mimeType: string;
+    fullUrl: string;
+    previewUrl: string;
+    thumbnailUrl: string;
+    thumbnailWidth: number;
+    thumbnailHeight: number;
+}
+
+const loadImageDimensions = async (sourceFile: File): Promise<{ width: number; height: number }> => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(sourceFile);
+
+    try {
+        await new Promise((res, rej) => {
+            img.onload = res;
+            img.onerror = (e) => {
+                console.error(`Failed to load image: ${sourceFile.name}`, {
+                    type: sourceFile.type,
+                    size: sourceFile.size,
+                    error: e
+                });
+                rej(new Error(`Failed to load image: ${sourceFile.name}`));
+            };
+            img.src = objectUrl;
+        });
+
+        return { width: img.width, height: img.height };
+    } finally {
+        URL.revokeObjectURL(objectUrl);
+    }
+};
+
+const drawResizedBlob = async (
+    sourceFile: File,
+    width: number,
+    height: number,
+    mimeType: string,
+    quality: number
+): Promise<Blob> => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(sourceFile);
+
+    try {
+        await new Promise((res, rej) => {
+            img.onload = res;
+            img.onerror = rej;
+            img.src = objectUrl;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        return await new Promise<Blob>((res) => {
+            canvas.toBlob((b) => res(b!), mimeType, quality);
+        });
+    } finally {
+        URL.revokeObjectURL(objectUrl);
+    }
+};
+
+export async function saveImageAsset(
+    sourceFile: File,
+    options?: {
+        sourceImageId?: string;
+        createdAt?: number;
+        previewMaxDimension?: number;
+        thumbnailMaxWidth?: number;
+        thumbnailMaxHeight?: number;
+    }
+): Promise<SavedImageAsset> {
+    const { width: originalWidth, height: originalHeight } = await loadImageDimensions(sourceFile);
+    const previewLimit = options?.previewMaxDimension ?? PREVIEW_MAX_DIMENSION;
+    const previewSize = calculateThumbnailSize(originalWidth, originalHeight, previewLimit, previewLimit);
+    const thumbWidthLimit = options?.thumbnailMaxWidth ?? FALLBACK_THUMBNAIL_MAX_DIMENSION;
+    const thumbHeightLimit = options?.thumbnailMaxHeight ?? FALLBACK_THUMBNAIL_MAX_DIMENSION;
+    const thumbSize = calculateThumbnailSize(originalWidth, originalHeight, thumbWidthLimit, thumbHeightLimit);
+
+    const previewBlob = await drawResizedBlob(
+        sourceFile,
+        previewSize.width,
+        previewSize.height,
+        sourceFile.type,
+        0.85
+    );
+    const thumbnailBlob = await drawResizedBlob(
+        sourceFile,
+        thumbSize.width,
+        thumbSize.height,
+        sourceFile.type,
+        0.8
+    );
+
+    const storageId = crypto.randomUUID();
+    const record: UploadedImageRecord = {
+        id: storageId,
+        sourceImageId: options?.sourceImageId ?? sourceFile.name,
+        blob: new Blob([sourceFile], { type: sourceFile.type }),
+        previewBlob,
+        thumbnailBlob,
+        filename: sourceFile.name,
+        mimeType: sourceFile.type,
+        width: originalWidth,
+        height: originalHeight,
+        createdAt: options?.createdAt ?? Date.now(),
+    };
+
+    await uploadedImageDB.save(record);
+
+    return {
+        storageId,
+        width: originalWidth,
+        height: originalHeight,
+        createdAt: record.createdAt,
+        filename: sourceFile.name,
+        mimeType: sourceFile.type,
+        fullUrl: `/__local__/uploaded/full/${storageId}`,
+        previewUrl: `/__local__/uploaded/preview/${storageId}`,
+        thumbnailUrl: `/__local__/uploaded/thumb/${storageId}`,
+        thumbnailWidth: thumbSize.width,
+        thumbnailHeight: thumbSize.height,
+    };
 }
 
 /**
@@ -51,8 +186,6 @@ export async function processAndSaveUpload(
         }
     }
 
-    const blob = new Blob([sourceFile], { type: sourceFile.type });
-
     // 1. Extract metadata and generate ID
     let creationDate: number | undefined;
     let sourceImageId = file.name;
@@ -68,99 +201,27 @@ export async function processAndSaveUpload(
         console.warn('Failed to parse EXIF metadata:', e);
     }
 
-    const id = crypto.randomUUID(); // This is still the internal DB primary key/resource ID
+    const { maxWidth, maxHeight } = calculateCanvasMaxDimensions(pageWidth, pageHeight);
+    const saved = await saveImageAsset(sourceFile, {
+        sourceImageId,
+        createdAt: creationDate || Date.now(),
+        thumbnailMaxWidth: maxWidth,
+        thumbnailMaxHeight: maxHeight,
+    });
 
-    // 1. Get image dimensions
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(sourceFile);
-
-    try {
-        await new Promise((res, rej) => {
-            img.onload = res;
-            img.onerror = (e) => {
-                console.error(`Failed to load image: ${sourceFile.name}`, {
-                    type: sourceFile.type,
-                    size: sourceFile.size,
-                    error: e
-                });
-                rej(new Error(`Failed to load image: ${sourceFile.name}`));
-            };
-            img.src = objectUrl;
-        });
-
-        const originalWidth = img.width;
-        const originalHeight = img.height;
-
-        // 2. Generate preview blob via Canvas (at most 1024px)
-        const previewSize = calculateThumbnailSize(
-            originalWidth,
-            originalHeight,
-            1024,
-            1024
-        );
-        const previewCanvas = document.createElement('canvas');
-        previewCanvas.width = previewSize.width;
-        previewCanvas.height = previewSize.height;
-        const previewCtx = previewCanvas.getContext('2d')!;
-        previewCtx.drawImage(img, 0, 0, previewSize.width, previewSize.height);
-
-        const previewBlob = await new Promise<Blob>((res) => {
-            previewCanvas.toBlob((b) => res(b!), sourceFile.type, 0.85);
-        });
-
-        // 3. Calculate optimal thumbnail size
-        const { maxWidth, maxHeight } = calculateCanvasMaxDimensions(pageWidth, pageHeight);
-        const thumbSize = calculateThumbnailSize(
-            originalWidth,
-            originalHeight,
-            maxWidth,
-            maxHeight
-        );
-
-        // 4. Generate thumbnail blob via Canvas
-        const thumbCanvas = document.createElement('canvas');
-        thumbCanvas.width = thumbSize.width;
-        thumbCanvas.height = thumbSize.height;
-        const thumbCtx = thumbCanvas.getContext('2d')!;
-        thumbCtx.drawImage(img, 0, 0, thumbSize.width, thumbSize.height);
-
-        const thumbnailBlob = await new Promise<Blob>((res) => {
-            thumbCanvas.toBlob((b) => res(b!), sourceFile.type, 0.8);
-        });
-
-        // 5. Save to IndexedDB
-        const record: UploadedImageRecord = {
-            id,
-            sourceImageId: sourceImageId,
-            blob,
-            previewBlob,
-            thumbnailBlob,
-            filename: sourceFile.name,
-            mimeType: sourceFile.type,
-            width: originalWidth,
-            height: originalHeight,
-            createdAt: creationDate || Date.now(),
-        };
-
-        await uploadedImageDB.save(record);
-
-        // 6. Return PoolImage
-        return {
-            id: crypto.randomUUID(), // Unique ID for the pool instance
-            sourceId: 'uploaded',
-            sourceImageId: sourceImageId,
-            fullUrl: `/__local__/uploaded/full/${id}`,
-            previewUrl: `/__local__/uploaded/preview/${id}`,
-            thumbnailUrl: `/__local__/uploaded/thumb/${id}`,
-            filename: sourceFile.name,
-            mimeType: sourceFile.type,
-            width: originalWidth,
-            height: originalHeight,
-            thumbnailWidth: thumbSize.width,
-            thumbnailHeight: thumbSize.height,
-            createdAt: record.createdAt,
-        };
-    } finally {
-        URL.revokeObjectURL(img.src);
-    }
+    return {
+        id: crypto.randomUUID(),
+        sourceId: 'uploaded',
+        sourceImageId,
+        fullUrl: saved.fullUrl,
+        previewUrl: saved.previewUrl,
+        thumbnailUrl: saved.thumbnailUrl,
+        filename: saved.filename,
+        mimeType: saved.mimeType,
+        width: saved.width,
+        height: saved.height,
+        thumbnailWidth: saved.thumbnailWidth,
+        thumbnailHeight: saved.thumbnailHeight,
+        createdAt: saved.createdAt,
+    };
 }

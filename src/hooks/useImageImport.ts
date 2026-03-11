@@ -32,13 +32,17 @@ export const useImageImport = (onImport: (images: PoolImage[]) => void) => {
 
         setIsLoading(true);
         try {
-            const result = await activeSource.fetchImages();
-
             // Calculate canvas max dimensions based on album settings
             const { maxWidth, maxHeight } = calculateCanvasMaxDimensions(
                 pageWidth,
                 pageHeight
             );
+
+            const result = await activeSource.fetchImages({
+                thumbnailMaxWidth: maxWidth,
+                thumbnailMaxHeight: maxHeight,
+                onProgress: (images) => onImport(images),
+            });
 
             // Convert source images to pool images with optimal thumbnail sizes
             const poolImages: PoolImage[] = result.images.map((img: SourceImage) => {
@@ -64,6 +68,8 @@ export const useImageImport = (onImport: (images: PoolImage[]) => void) => {
                     thumbnailWidth: thumbSize.width,
                     thumbnailHeight: thumbSize.height,
                     createdAt: img.createdAt,
+                    importStage: 'done',
+                    importProgress: 100,
                 };
             });
 

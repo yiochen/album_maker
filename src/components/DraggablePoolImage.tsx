@@ -33,6 +33,7 @@ export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({ image })
             style={{
                 opacity: isDragging ? 0.5 : 1,
                 cursor: 'grab',
+                position: 'relative',
             }}
         >
             <img
@@ -43,6 +44,41 @@ export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({ image })
                 data-width-px={image.width}
                 data-height-px={image.height}
             />
+            {image.importStage && image.importStage !== 'done' && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        left: 6,
+                        right: 6,
+                        bottom: 6,
+                        padding: '6px 8px',
+                        borderRadius: 8,
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        color: '#fff',
+                        fontSize: 12,
+                    }}
+                >
+                    <div style={{ marginBottom: 4, textTransform: 'capitalize' }}>
+                        {image.importStage === 'full' ? 'Loading full image' : `Loading ${image.importStage}`}
+                    </div>
+                    <div
+                        style={{
+                            height: 4,
+                            borderRadius: 999,
+                            background: 'rgba(255,255,255,0.24)',
+                            overflow: 'hidden',
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: `${image.importProgress ?? 0}%`,
+                                height: '100%',
+                                background: '#fff',
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

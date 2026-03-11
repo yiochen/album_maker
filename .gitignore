@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
 
 # Editor directories and files
 .vscode/*
@@ -34,3 +35,6 @@ src/schemas/
 # Compiled Service Worker (source is src/sw.ts)
 sw.js
 .aider*
+
+# Local Netlify folder
+.netlify

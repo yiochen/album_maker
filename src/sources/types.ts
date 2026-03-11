@@ -1,4 +1,5 @@
 import React from 'react';
+import type { PoolImage } from '../types';
 
 // Source image from any provider
 export interface SourceImage {
@@ -20,6 +21,9 @@ export interface FetchImagesOptions {
     albumId?: string;
     pageToken?: string;
     pageSize?: number;
+    thumbnailMaxWidth?: number;
+    thumbnailMaxHeight?: number;
+    onProgress?: (images: PoolImage[]) => void;
 }
 
 // Result from fetching images

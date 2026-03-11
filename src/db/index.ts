@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import { DB_NAME, LEGACY_DB_NAMES } from './constants';
 
 // Types for database
 export interface AlbumRecord {
@@ -18,13 +19,13 @@ export interface SettingsRecord {
 export interface UploadedImageRecord {
     id: string; // Internal DB Primary Key (UUID)
     sourceImageId: string; // Stable ID (<CreationDate>/<Filename>)
-    blob: Blob;
+    blob?: Blob;
     previewBlob?: Blob;
-    thumbnailBlob: Blob;
+    thumbnailBlob?: Blob;
     filename: string;
     mimeType: string;
-    width: number;
-    height: number;
+    width?: number;
+    height?: number;
     createdAt: number;
 }
 
@@ -35,7 +36,7 @@ class AlbumDatabase extends Dexie {
     uploadedImages!: Table<UploadedImageRecord, string>;
 
     constructor() {
-        super('AlbumEditorDB');
+        super(DB_NAME);
 
         this.version(1).stores({
             albums: 'id, name, lastModified',
@@ -47,6 +48,19 @@ class AlbumDatabase extends Dexie {
 
 // Singleton instance
 export const db = new AlbumDatabase();
+
+export const deleteLegacyDatabases = async (): Promise<void> => {
+    await Promise.all(
+        LEGACY_DB_NAMES.map((name) =>
+            new Promise<void>((resolve, reject) => {
+                const request = indexedDB.deleteDatabase(name);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error ?? new Error(`Failed to delete legacy DB ${name}`));
+                request.onblocked = () => resolve();
+            }),
+        ),
+    );
+};
 
 // Helper functions for album operations
 export const albumDB = {

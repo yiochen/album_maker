@@ -12,6 +12,7 @@ declare const self: ServiceWorkerGlobalScope;
 import { renderSpread } from './utils/offscreenCanvasRenderer';
 import type { Album, Spread } from './types';
 import { APP_CONFIG } from './config';
+import { DB_NAME } from './db/constants';
 
 const GOOGLE_PHOTOS_CACHE = 'google-photos-v1';
 const THUMBNAIL_CACHE = 'spread-thumbnails-v1';
@@ -310,7 +311,7 @@ async function eventualCacheCleanup(cache: Cache, albumId: string, spreadId: str
 
 async function getAlbumFromDB(id: string): Promise<Album | null> {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('AlbumEditorDB');
+        const request = indexedDB.open(DB_NAME);
 
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
@@ -364,13 +365,17 @@ async function handleUploadedImage(url: URL): Promise<Response> {
             return new Response('Image not found', { status: 404 });
         }
 
-        let blob: Blob;
+        let blob: Blob | undefined;
         if (type === 'full') {
-            blob = record.blob;
+            blob = record.blob || record.previewBlob || record.thumbnailBlob;
         } else if (type === 'preview') {
-            blob = record.previewBlob || record.blob; // Fallback to full if preview missing
+            blob = record.previewBlob || record.thumbnailBlob || record.blob;
         } else {
-            blob = record.thumbnailBlob;
+            blob = record.thumbnailBlob || record.previewBlob || record.blob;
+        }
+
+        if (!blob) {
+            return new Response('Image variant not ready', { status: 404 });
         }
 
         return new Response(blob, {
@@ -387,13 +392,13 @@ async function handleUploadedImage(url: URL): Promise<Response> {
 
 interface UploadedImageRecord {
     id: string;
-    blob: Blob;
+    blob?: Blob;
     previewBlob?: Blob;
-    thumbnailBlob: Blob;
+    thumbnailBlob?: Blob;
     filename: string;
     mimeType: string;
-    width: number;
-    height: number;
+    width?: number;
+    height?: number;
     createdAt: number;
 }
 
@@ -403,7 +408,7 @@ interface UploadedImageRecord {
  */
 function getRecordFromDB(id: string): Promise<UploadedImageRecord | null> {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('AlbumEditorDB'); // Must match db/index.ts
+        const request = indexedDB.open(DB_NAME); // Must match db/index.ts
 
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {

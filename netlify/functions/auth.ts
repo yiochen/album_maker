@@ -10,7 +10,7 @@ type NetlifyHandlerResponse = {
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
-const DEFAULT_REDIRECT_URI = 'https://photobookmaker.netlify.app/edit'
+const DEFAULT_REDIRECT_URI = 'https://photobookmaker.netlify.app'
 
 const getEnv = () => {
   const maybeProcess = globalThis as unknown as {

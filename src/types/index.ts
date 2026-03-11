@@ -228,6 +228,8 @@ export interface PoolImage {
   /** Actual height of the thumbnail image in pixels */
   thumbnailHeight?: number;
   createdAt?: number;
+  importStage?: 'thumbnail' | 'preview' | 'full' | 'done';
+  importProgress?: number;
 }
 
 // App state types
