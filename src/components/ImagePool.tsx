@@ -30,7 +30,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
     onImport,
     onClose,
 }) => {
-    const [activeSourceId, setActiveSourceId] = useState<string>('dummy-colors');
+    const [activeSourceId, setActiveSourceId] = useState<string>('google-photos');
     const [uploadErrorMessage, setUploadErrorMessage] = useState<string | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const pageWidth = usePageWidth();
