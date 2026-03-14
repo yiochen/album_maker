@@ -214,6 +214,14 @@ class GooglePhotosSource implements PhotoSource, InitializableSource {
             await this.initialize();
         }
 
+        // Open popup immediately in the user-gesture call stack so the
+        // browser doesn't block it. We'll navigate it to the picker URL
+        // once the async setup completes.
+        const pickerWindow = window.open('about:blank', 'google-photos-picker', 'popup,width=1280,height=900');
+        if (!pickerWindow) {
+            throw new Error('Google Photos picker popup was blocked');
+        }
+
         try {
             await this.authorize();
             pendingPickerSession = await this.createPickerSession();
@@ -222,15 +230,9 @@ class GooglePhotosSource implements PhotoSource, InitializableSource {
                 throw new Error('Google Photos picker did not return a valid session');
             }
 
-            const pickerWindow = window.open(
-                `${pendingPickerSession.pickerUri}/autoclose`,
-                'google-photos-picker',
-                'popup,width=1280,height=900'
-            );
-            if (!pickerWindow) {
-                throw new Error('Google Photos picker popup was blocked');
-            }
+            pickerWindow.location.href = `${pendingPickerSession.pickerUri}/autoclose`;
         } catch (error) {
+            pickerWindow.close();
             pendingPickerSession = null;
             throw error;
         }
