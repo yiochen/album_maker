@@ -5,6 +5,10 @@
 
 A web-based photo album editor with a Google Slides-like interface. Create beautiful photo albums with drag-and-drop, customizable templates, and multi-source photo import.
 
+## Interface
+
+![Photo Album Editor interface showing the spread canvas, spread panel, toolbar, and image pool](docs/screenshot.png)
+
 ## Features
 
 - 📸 **Multi-source Import** - Google Photos, dummy test images, or add your own
