@@ -20,8 +20,12 @@ interface SpreadThumbnailProps {
     isLeftSelected: boolean;
     /** Whether right page is selected. */
     isRightSelected: boolean;
+    /** Whether left page is in multi-selection. */
+    isLeftInSelection: boolean;
+    /** Whether right page is in multi-selection. */
+    isRightInSelection: boolean;
     /** Callback fired when a page is clicked. */
-    onPageClick: (side: 'left' | 'right') => void;
+    onPageClick: (side: 'left' | 'right', event: React.MouseEvent) => void;
 }
 
 /**
@@ -36,6 +40,8 @@ export const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
     isShowing,
     isLeftSelected,
     isRightSelected,
+    isLeftInSelection,
+    isRightInSelection,
     onPageClick,
 }) => {
     // Virtual URL for the Service Worker to intercept
@@ -58,9 +64,10 @@ export const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
             <div className="spread-thumbnail-pages" data-testid="spread-thumbnail-pages">
                 <button
                     type="button"
-                    className={`spread-page-button ${isLeftSelected ? 'active' : ''}`}
-                    onClick={() => onPageClick('left')}
+                    className={`spread-page-button ${isLeftSelected ? 'active' : ''} ${isLeftInSelection ? 'in-selection' : ''}`}
+                    onClick={(e) => onPageClick('left', e)}
                     data-testid="page-thumbnail-left"
+                    data-page-number={spreadIndex * 2 + 1}
                 >
                     <PageHalfThumbnail
                         imageUrl={thumbnailUrl}
@@ -76,9 +83,10 @@ export const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
 
                 <button
                     type="button"
-                    className={`spread-page-button ${isRightSelected ? 'active' : ''}`}
-                    onClick={() => onPageClick('right')}
+                    className={`spread-page-button ${isRightSelected ? 'active' : ''} ${isRightInSelection ? 'in-selection' : ''}`}
+                    onClick={(e) => onPageClick('right', e)}
                     data-testid="page-thumbnail-right"
+                    data-page-number={spreadIndex * 2 + 2}
                 >
                     <PageHalfThumbnail
                         imageUrl={thumbnailUrl}
