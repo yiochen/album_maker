@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useAlbumSpreads, useAlbumSettings, useAlbumId, useAddSpreads, useDeleteSpread } from '../states/albumStore';
+import { useAlbumSpreads, useAlbumSettings, useAlbumId, useAddSpreads, useDeleteSpread, useDeletePages } from '../states/albumStore';
 import {
     useCurrentSpreadIndex, useSelectedPageSide, useSetCurrentSpreadIndex, useSetSelectedPageSide,
     useSelectedPages, useTogglePageSelection, useSetSelectedPages, useClearPageSelection,
@@ -28,6 +28,7 @@ export const PageNavigator: React.FC = () => {
     const albumId = useAlbumId();
     const addSpreads = useAddSpreads();
     const deleteSpread = useDeleteSpread();
+    const deletePages = useDeletePages();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const selectedPageSide = useSelectedPageSide();
     const setCurrentSpreadIndex = useSetCurrentSpreadIndex();
@@ -147,7 +148,7 @@ export const PageNavigator: React.FC = () => {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-            if (spreads.length <= 1) return;
+            if (spreads.length <= 1 && selectedPages.size === 0) return;
 
             const target = e.target as HTMLElement | null;
             if (target && (
@@ -159,16 +160,34 @@ export const PageNavigator: React.FC = () => {
                 return;
             }
 
-            const spread = spreads[selectedSpreadIndexSafe];
-            if (!spread) return;
-
             e.preventDefault();
-            deleteSpread(spread.id);
+
+            if (selectedPages.size > 0) {
+                // Page-level deletion: delete selected pages and re-pair remaining
+                const totalPages = spreads.length * 2;
+                const remainingCount = totalPages - selectedPages.size;
+                // Ensure at least 1 page (and thus 1 spread) remains
+                if (remainingCount < 1) return;
+
+                deletePages([...selectedPages]);
+                clearPageSelection();
+                // Clamp currentSpreadIndex to new spread count
+                const newSpreadCount = Math.ceil(remainingCount / 2);
+                if (currentSpreadIndex >= newSpreadCount) {
+                    setCurrentSpreadIndex(Math.max(0, newSpreadCount - 1));
+                }
+            } else {
+                // Fallback: delete entire spread (legacy behavior)
+                if (spreads.length <= 1) return;
+                const spread = spreads[selectedSpreadIndexSafe];
+                if (!spread) return;
+                deleteSpread(spread.id);
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedSpreadIndexSafe, spreads, deleteSpread]);
+    }, [selectedSpreadIndexSafe, spreads, deleteSpread, deletePages, selectedPages, clearPageSelection, currentSpreadIndex, setCurrentSpreadIndex]);
 
     if (!settings) return null;
 
