@@ -10,6 +10,8 @@ interface UIState {
   isSnappingEnabled: boolean;
   /** ID of the text element currently in inline-editing mode, or null. */
   editingTextElementId: string | null;
+  /** Set of 1-based page numbers that are selected for batch operations. */
+  selectedPages: Set<number>;
 
   // Actions
   setCurrentSpreadIndex: (index: number) => void;
@@ -24,6 +26,9 @@ interface UIState {
   setSnappingEnabled: (enabled: boolean) => void;
   setEditingTextElementId: (id: string | null) => void;
   resetSelection: () => void;
+  togglePageSelection: (pageNum: number) => void;
+  setSelectedPages: (pages: Set<number>) => void;
+  clearPageSelection: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -35,6 +40,7 @@ export const useUIStore = create<UIState>((set) => ({
   isSettingsOpen: false,
   isSnappingEnabled: true,
   editingTextElementId: null,
+  selectedPages: new Set<number>(),
 
   setCurrentSpreadIndex: (index) => set({ currentSpreadIndex: index }),
 
@@ -59,6 +65,20 @@ export const useUIStore = create<UIState>((set) => ({
   setEditingTextElementId: (id) => set({ editingTextElementId: id }),
 
   resetSelection: () => set({ selectedElementId: null, selectedPageId: null, editingTextElementId: null }),
+
+  togglePageSelection: (pageNum) => set((state) => {
+    const next = new Set(state.selectedPages);
+    if (next.has(pageNum)) {
+      next.delete(pageNum);
+    } else {
+      next.add(pageNum);
+    }
+    return { selectedPages: next };
+  }),
+
+  setSelectedPages: (pages) => set({ selectedPages: pages }),
+
+  clearPageSelection: () => set({ selectedPages: new Set<number>() }),
 }));
 
 // ============ Selector Helper Hooks ============
@@ -123,3 +143,15 @@ export const useSetEditingTextElementId = () => useUIStore(state => state.setEdi
 
 /** Whether a text element is currently in inline-editing mode */
 export const useIsEditingText = () => useUIStore(state => state.editingTextElementId !== null);
+
+/** Select the set of selected page numbers */
+export const useSelectedPages = () => useUIStore(state => state.selectedPages);
+
+/** Select the togglePageSelection action */
+export const useTogglePageSelection = () => useUIStore(state => state.togglePageSelection);
+
+/** Select the setSelectedPages action */
+export const useSetSelectedPages = () => useUIStore(state => state.setSelectedPages);
+
+/** Select the clearPageSelection action */
+export const useClearPageSelection = () => useUIStore(state => state.clearPageSelection);

@@ -378,6 +378,20 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  position: relative;
+}
+
+.page-list.marquee-active {
+  user-select: none;
+  cursor: crosshair;
+}
+
+.marquee-rect {
+  position: absolute;
+  border: 1px dashed var(--color-accent);
+  background: rgba(99, 102, 241, 0.1);
+  pointer-events: none;
+  z-index: 10;
 }
 
 .page-thumbnail {
@@ -1969,6 +1983,16 @@ body {
   background: white;
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-sm);
+}
+
+.spread-page-button.in-selection .page-half-thumbnail::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(99, 102, 241, 0.3);
+  pointer-events: none;
+  z-index: 1;
+  border-radius: var(--radius-sm);
 }
 
 .page-half-thumbnail-image {
