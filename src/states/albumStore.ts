@@ -12,6 +12,7 @@ import {
     AddSpreadsCommand,
     DeleteSpreadCommand,
     DeleteSpreadsCommand,
+    DeletePagesCommand,
     ReorderSpreadsCommand,
     UpdateSpreadCommand
 } from '../commands/spreadCommands';
@@ -41,6 +42,7 @@ interface AlbumState {
     addSpreads: (count?: number, index?: number) => void;
     deleteSpread: (spreadId: string) => void;
     deleteSpreads: (spreadIds: string[]) => void;
+    deletePages: (pageNumbers: number[]) => void;
     reorderSpreads: (fromIndex: number, toIndex: number) => void;
     updateSpread: (spreadId: string, updates: Partial<Spread>) => void;
     addElement: (spreadId: string, element: PageElement) => void;
@@ -150,6 +152,13 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
             });
 
             commandManager.execute(new DeleteSpreadsCommand(Array.from(validIds), spreadsToDelete));
+            syncState();
+        },
+
+        deletePages: (pageNumbers: number[]) => {
+            const album = get().album;
+            if (!album || pageNumbers.length === 0) return;
+            commandManager.execute(new DeletePagesCommand(pageNumbers));
             syncState();
         },
 
@@ -407,6 +416,9 @@ export const useDeleteSpread = () => useAlbumStore(state => state.deleteSpread);
 
 /** Select deleteSpreads action */
 export const useDeleteSpreads = () => useAlbumStore(state => state.deleteSpreads);
+
+/** Select deletePages action */
+export const useDeletePages = () => useAlbumStore(state => state.deletePages);
 
 /** Select undo action */
 export const useUndo = () => useAlbumStore(state => state.undo);

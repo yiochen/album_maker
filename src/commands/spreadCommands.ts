@@ -1,6 +1,65 @@
 import { Command } from './Command';
-import { Album, Spread } from '../types';
+import { Album, Spread, PageElement } from '../types';
 import { createNewSpread } from '../services/storage';
+
+/** A logical page extracted from a spread. */
+interface LogicalPage {
+    elements: PageElement[];
+    side: 'left' | 'right';
+    background?: string;
+}
+
+function isElementOnLeft(el: PageElement): boolean {
+    return el.box.x2 <= 0.5;
+}
+
+/** Shift element x-coordinates when a page changes side within a spread. */
+function shiftElementSide(el: PageElement, from: 'left' | 'right', to: 'left' | 'right'): PageElement {
+    if (from === to) return el;
+    const dx = to === 'right' ? 0.5 : -0.5;
+    return {
+        ...el,
+        box: {
+            ...el.box,
+            x1: el.box.x1 + dx,
+            x2: el.box.x2 + dx,
+        },
+    };
+}
+
+/** Extract logical pages from spreads. Returns a flat array of pages (2 per spread). */
+function extractPages(spreads: Spread[]): LogicalPage[] {
+    const pages: LogicalPage[] = [];
+    for (const spread of spreads) {
+        const leftElements = spread.elements.filter(el => isElementOnLeft(el));
+        const rightElements = spread.elements.filter(el => !isElementOnLeft(el));
+        pages.push({ elements: leftElements, side: 'left', background: spread.background });
+        pages.push({ elements: rightElements, side: 'right', background: spread.background });
+    }
+    return pages;
+}
+
+/** Re-pair logical pages into spreads. */
+function pairPagesIntoSpreads(pages: LogicalPage[]): Spread[] {
+    const spreads: Spread[] = [];
+    for (let i = 0; i < pages.length; i += 2) {
+        const leftPage = pages[i];
+        const rightPage = pages[i + 1]; // may be undefined if odd count
+
+        const elements: PageElement[] = [
+            ...leftPage.elements.map(el => shiftElementSide(el, leftPage.side, 'left')),
+            ...(rightPage ? rightPage.elements.map(el => shiftElementSide(el, rightPage.side, 'right')) : []),
+        ];
+
+        spreads.push({
+            id: crypto.randomUUID(),
+            versionId: crypto.randomUUID(),
+            elements,
+            background: leftPage.background,
+        });
+    }
+    return spreads;
+}
 
 export class AddSpreadCommand implements Command<Album> {
     readonly type = 'ADD_SPREAD';
@@ -231,6 +290,54 @@ export class DeleteSpreadsCommand implements Command<Album> {
         return {
             ...state,
             spreads: newSpreads,
+            updatedAt: Date.now(),
+        };
+    }
+}
+
+export class DeletePagesCommand implements Command<Album> {
+    readonly type = 'DELETE_PAGES';
+    private originalSpreads: Spread[] | null = null;
+
+    constructor(
+        public readonly pageNumbers: number[]
+    ) { }
+
+    execute(state: Album): Album {
+        // Store original spreads for undo (only on first execute)
+        if (!this.originalSpreads) {
+            this.originalSpreads = state.spreads;
+        }
+
+        const pagesToDelete = new Set(this.pageNumbers);
+        const allPages = extractPages(state.spreads);
+
+        // Filter out deleted pages (pageNumbers are 1-based)
+        const remainingPages = allPages.filter((_, i) => !pagesToDelete.has(i + 1));
+
+        // Ensure at least one page remains
+        if (remainingPages.length === 0) {
+            if (allPages.length > 0) {
+                remainingPages.push(allPages[0]);
+            } else {
+                return state;
+            }
+        }
+
+        const newSpreads = pairPagesIntoSpreads(remainingPages);
+
+        return {
+            ...state,
+            spreads: newSpreads,
+            updatedAt: Date.now(),
+        };
+    }
+
+    undo(state: Album): Album {
+        if (!this.originalSpreads) return state;
+        return {
+            ...state,
+            spreads: this.originalSpreads,
             updatedAt: Date.now(),
         };
     }
