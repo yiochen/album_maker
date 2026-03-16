@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { LogicalPage } from '../commands/spreadCommands';
 
 interface UIState {
   currentSpreadIndex: number;
@@ -12,6 +13,12 @@ interface UIState {
   editingTextElementId: string | null;
   /** Set of 1-based page numbers that are selected for batch operations. */
   selectedPages: Set<number>;
+  /** Pages stored in the internal clipboard. */
+  clipboardPages: LogicalPage[];
+  /** Whether the clipboard was populated via copy or cut. */
+  clipboardMode: 'copy' | 'cut' | null;
+  /** 1-based page index where paste inserts before. null = append to end. */
+  insertionPoint: number | null;
 
   // Actions
   setCurrentSpreadIndex: (index: number) => void;
@@ -29,6 +36,9 @@ interface UIState {
   togglePageSelection: (pageNum: number) => void;
   setSelectedPages: (pages: Set<number>) => void;
   clearPageSelection: () => void;
+  setClipboard: (pages: LogicalPage[], mode: 'copy' | 'cut') => void;
+  clearClipboard: () => void;
+  setInsertionPoint: (pageIndex: number | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -41,6 +51,9 @@ export const useUIStore = create<UIState>((set) => ({
   isSnappingEnabled: true,
   editingTextElementId: null,
   selectedPages: new Set<number>(),
+  clipboardPages: [],
+  clipboardMode: null,
+  insertionPoint: null,
 
   setCurrentSpreadIndex: (index) => set({ currentSpreadIndex: index }),
 
@@ -79,6 +92,12 @@ export const useUIStore = create<UIState>((set) => ({
   setSelectedPages: (pages) => set({ selectedPages: pages }),
 
   clearPageSelection: () => set({ selectedPages: new Set<number>() }),
+
+  setClipboard: (pages, mode) => set({ clipboardPages: pages, clipboardMode: mode }),
+
+  clearClipboard: () => set({ clipboardPages: [], clipboardMode: null }),
+
+  setInsertionPoint: (pageIndex) => set({ insertionPoint: pageIndex }),
 }));
 
 // ============ Selector Helper Hooks ============
@@ -155,3 +174,21 @@ export const useSetSelectedPages = () => useUIStore(state => state.setSelectedPa
 
 /** Select the clearPageSelection action */
 export const useClearPageSelection = () => useUIStore(state => state.clearPageSelection);
+
+/** Select clipboard pages */
+export const useClipboardPages = () => useUIStore(state => state.clipboardPages);
+
+/** Select clipboard mode */
+export const useClipboardMode = () => useUIStore(state => state.clipboardMode);
+
+/** Select the setClipboard action */
+export const useSetClipboard = () => useUIStore(state => state.setClipboard);
+
+/** Select the clearClipboard action */
+export const useClearClipboard = () => useUIStore(state => state.clearClipboard);
+
+/** Select the insertion point */
+export const useInsertionPoint = () => useUIStore(state => state.insertionPoint);
+
+/** Select the setInsertionPoint action */
+export const useSetInsertionPoint = () => useUIStore(state => state.setInsertionPoint);

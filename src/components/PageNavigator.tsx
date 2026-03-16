@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useAlbumSpreads, useAlbumSettings, useAlbumId, useAddSpreads, useDeleteSpread, useDeletePages } from '../states/albumStore';
+import { useAlbumSpreads, useAlbumSettings, useAlbumId, useAddSpreads, useDeleteSpread, useDeletePages, useInsertPages } from '../states/albumStore';
 import {
     useCurrentSpreadIndex, useSelectedPageSide, useSetCurrentSpreadIndex, useSetSelectedPageSide,
     useSelectedPages, useTogglePageSelection, useSetSelectedPages, useClearPageSelection,
+    useClipboardPages, useClipboardMode, useSetClipboard, useClearClipboard,
+    useInsertionPoint, useSetInsertionPoint,
 } from '../states/uiStore';
+import { extractPages } from '../commands/spreadCommands';
 import { SpreadThumbnail } from './SpreadThumbnail';
 import { Spread } from '../types';
 import { PlusIcon } from './icons/PlusIcon';
@@ -37,6 +40,13 @@ export const PageNavigator: React.FC = () => {
     const togglePageSelection = useTogglePageSelection();
     const setSelectedPages = useSetSelectedPages();
     const clearPageSelection = useClearPageSelection();
+    const insertPages = useInsertPages();
+    const clipboardPages = useClipboardPages();
+    const clipboardMode = useClipboardMode();
+    const setClipboard = useSetClipboard();
+    const clearClipboard = useClearClipboard();
+    const insertionPoint = useInsertionPoint();
+    const setInsertionPoint = useSetInsertionPoint();
 
     const pageListRef = useRef<HTMLDivElement>(null);
     const [marquee, setMarquee] = useState<MarqueeState | null>(null);
@@ -62,7 +72,13 @@ export const PageNavigator: React.FC = () => {
             setCurrentSpreadIndex(spreadIndex);
             setSelectedPageSide(side);
         }
-    }, [setCurrentSpreadIndex, setSelectedPageSide, togglePageSelection, clearPageSelection]);
+        setInsertionPoint(null);
+    }, [setCurrentSpreadIndex, setSelectedPageSide, togglePageSelection, clearPageSelection, setInsertionPoint]);
+
+    const handleInsertionPointClick = useCallback((pageIndex: number, event: React.MouseEvent) => {
+        event.stopPropagation();
+        setInsertionPoint(pageIndex);
+    }, [setInsertionPoint]);
 
     // Compute pages intersecting the marquee rectangle
     const computeMarqueeSelection = useCallback((mx: MarqueeState) => {
@@ -102,7 +118,7 @@ export const PageNavigator: React.FC = () => {
     const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         // Only start marquee if clicking on the container background, not on a page button
         const target = e.target as HTMLElement;
-        if (target.closest('.spread-page-button') || target.closest('.add-page-btn')) return;
+        if (target.closest('.spread-page-button') || target.closest('.add-page-btn') || target.closest('.insertion-zone')) return;
 
         const container = pageListRef.current;
         if (!container) return;
@@ -116,7 +132,8 @@ export const PageNavigator: React.FC = () => {
         if (!e.ctrlKey && !e.metaKey) {
             clearPageSelection();
         }
-    }, [clearPageSelection]);
+        setInsertionPoint(null);
+    }, [clearPageSelection, setInsertionPoint]);
 
     useEffect(() => {
         if (!marquee) return;
@@ -147,9 +164,6 @@ export const PageNavigator: React.FC = () => {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-            if (spreads.length <= 1 && selectedPages.size === 0) return;
-
             const target = e.target as HTMLElement | null;
             if (target && (
                 target.tagName === 'INPUT' ||
@@ -160,24 +174,72 @@ export const PageNavigator: React.FC = () => {
                 return;
             }
 
+            const isMod = e.ctrlKey || e.metaKey;
+
+            // Copy: Cmd/Ctrl+C
+            if (isMod && e.key === 'c' && selectedPages.size > 0) {
+                e.preventDefault();
+                const allPages = extractPages(spreads);
+                const sorted = [...selectedPages].sort((a, b) => a - b);
+                const copied = sorted.map(pn => allPages[pn - 1]).filter(Boolean);
+                if (copied.length > 0) {
+                    setClipboard(copied, 'copy');
+                }
+                return;
+            }
+
+            // Cut: Cmd/Ctrl+X
+            if (isMod && e.key === 'x' && selectedPages.size > 0) {
+                e.preventDefault();
+                const allPages = extractPages(spreads);
+                const sorted = [...selectedPages].sort((a, b) => a - b);
+                const copied = sorted.map(pn => allPages[pn - 1]).filter(Boolean);
+                if (copied.length > 0) {
+                    setClipboard(copied, 'cut');
+                    const totalPages = spreads.length * 2;
+                    const remainingCount = totalPages - selectedPages.size;
+                    if (remainingCount < 1) return;
+                    deletePages([...selectedPages]);
+                    clearPageSelection();
+                    const newSpreadCount = Math.ceil(remainingCount / 2);
+                    if (currentSpreadIndex >= newSpreadCount) {
+                        setCurrentSpreadIndex(Math.max(0, newSpreadCount - 1));
+                    }
+                }
+                return;
+            }
+
+            // Paste: Cmd/Ctrl+V
+            if (isMod && e.key === 'v' && clipboardPages.length > 0) {
+                e.preventDefault();
+                const allPages = extractPages(spreads);
+                const atIndex = insertionPoint != null ? insertionPoint - 1 : allPages.length;
+                insertPages(clipboardPages, atIndex);
+                if (clipboardMode === 'cut') {
+                    clearClipboard();
+                }
+                setInsertionPoint(null);
+                return;
+            }
+
+            // Delete/Backspace
+            if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+            if (spreads.length <= 1 && selectedPages.size === 0) return;
+
             e.preventDefault();
 
             if (selectedPages.size > 0) {
-                // Page-level deletion: delete selected pages and re-pair remaining
                 const totalPages = spreads.length * 2;
                 const remainingCount = totalPages - selectedPages.size;
-                // Ensure at least 1 page (and thus 1 spread) remains
                 if (remainingCount < 1) return;
 
                 deletePages([...selectedPages]);
                 clearPageSelection();
-                // Clamp currentSpreadIndex to new spread count
                 const newSpreadCount = Math.ceil(remainingCount / 2);
                 if (currentSpreadIndex >= newSpreadCount) {
                     setCurrentSpreadIndex(Math.max(0, newSpreadCount - 1));
                 }
             } else {
-                // Fallback: delete entire spread (legacy behavior)
                 if (spreads.length <= 1) return;
                 const spread = spreads[selectedSpreadIndexSafe];
                 if (!spread) return;
@@ -187,7 +249,8 @@ export const PageNavigator: React.FC = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedSpreadIndexSafe, spreads, deleteSpread, deletePages, selectedPages, clearPageSelection, currentSpreadIndex, setCurrentSpreadIndex]);
+    }, [selectedSpreadIndexSafe, spreads, deleteSpread, deletePages, selectedPages, clearPageSelection, currentSpreadIndex, setCurrentSpreadIndex,
+        setClipboard, clipboardPages, clipboardMode, clearClipboard, insertPages, insertionPoint, setInsertionPoint]);
 
     if (!settings) return null;
 
@@ -219,20 +282,43 @@ export const PageNavigator: React.FC = () => {
                 onMouseDown={handleMouseDown}
             >
                 {spreads.map((spread: Spread, spreadIndex: number) => (
-                    <SpreadThumbnail
-                        key={spread.id}
-                        spread={spread}
-                        spreadIndex={spreadIndex}
-                        albumId={albumId!}
-                        pageAspectRatio={pageAspectRatio}
-                        isShowing={spreadIndex === currentSpreadIndex}
-                        isLeftSelected={spreadIndex === selectedSpreadIndexSafe && selectedPageSide === 'left'}
-                        isRightSelected={spreadIndex === selectedSpreadIndexSafe && selectedPageSide === 'right'}
-                        isLeftInSelection={selectedPages.has(spreadIndex * 2 + 1)}
-                        isRightInSelection={selectedPages.has(spreadIndex * 2 + 2)}
-                        onPageClick={(side, event) => handlePageClick(spreadIndex, side, event)}
-                    />
+                    <React.Fragment key={spread.id}>
+                        {/* Insertion zone before this spread (between spreads, or before the first) */}
+                        <div
+                            className={`insertion-zone between-spreads ${insertionPoint === spreadIndex * 2 + 1 ? 'active' : ''}`}
+                            data-testid={`insertion-zone-before-spread-${spreadIndex}`}
+                            onClick={(e) => handleInsertionPointClick(spreadIndex * 2 + 1, e)}
+                        >
+                            <div className="insertion-line" />
+                        </div>
+
+                        <SpreadThumbnail
+                            spread={spread}
+                            spreadIndex={spreadIndex}
+                            albumId={albumId!}
+                            pageAspectRatio={pageAspectRatio}
+                            isShowing={spreadIndex === currentSpreadIndex}
+                            isLeftSelected={spreadIndex === selectedSpreadIndexSafe && selectedPageSide === 'left'}
+                            isRightSelected={spreadIndex === selectedSpreadIndexSafe && selectedPageSide === 'right'}
+                            isLeftInSelection={selectedPages.has(spreadIndex * 2 + 1)}
+                            isRightInSelection={selectedPages.has(spreadIndex * 2 + 2)}
+                            insertionPointInner={insertionPoint === spreadIndex * 2 + 2 ? 'between' : null}
+                            onPageClick={(side, event) => handlePageClick(spreadIndex, side, event)}
+                            onInsertionPointClick={handleInsertionPointClick}
+                        />
+                    </React.Fragment>
                 ))}
+
+                {/* Insertion zone after the last spread */}
+                {spreads.length > 0 && (
+                    <div
+                        className={`insertion-zone between-spreads ${insertionPoint === spreads.length * 2 + 1 ? 'active' : ''}`}
+                        data-testid="insertion-zone-after-last"
+                        onClick={(e) => handleInsertionPointClick(spreads.length * 2 + 1, e)}
+                    >
+                        <div className="insertion-line" />
+                    </div>
+                )}
 
                 <button
                     className="add-page-btn"

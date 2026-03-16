@@ -3,14 +3,14 @@ import { Album, Spread, PageElement } from '../types';
 import { createNewSpread } from '../services/storage';
 
 /** A logical page extracted from a spread. */
-interface LogicalPage {
+export interface LogicalPage {
     elements: PageElement[];
     side: 'left' | 'right';
     background?: string;
 }
 
 function isElementOnLeft(el: PageElement): boolean {
-    return el.box.x2 <= 0.5;
+    return el.box.x1 + el.box.x2 < 1;
 }
 
 /** Shift element x-coordinates when a page changes side within a spread. */
@@ -28,7 +28,7 @@ function shiftElementSide(el: PageElement, from: 'left' | 'right', to: 'left' | 
 }
 
 /** Extract logical pages from spreads. Returns a flat array of pages (2 per spread). */
-function extractPages(spreads: Spread[]): LogicalPage[] {
+export function extractPages(spreads: Spread[]): LogicalPage[] {
     const pages: LogicalPage[] = [];
     for (const spread of spreads) {
         const leftElements = spread.elements.filter(el => isElementOnLeft(el));
@@ -39,8 +39,17 @@ function extractPages(spreads: Spread[]): LogicalPage[] {
     return pages;
 }
 
+/** Pad to even count so we never have a half spread. */
+function ensureEvenPages(pages: LogicalPage[]): LogicalPage[] {
+    if (pages.length % 2 !== 0) {
+        pages.push({ elements: [], side: 'right' });
+    }
+    return pages;
+}
+
 /** Re-pair logical pages into spreads. */
 function pairPagesIntoSpreads(pages: LogicalPage[]): Spread[] {
+    pages = ensureEvenPages(pages);
     const spreads: Spread[] = [];
     for (let i = 0; i < pages.length; i += 2) {
         const leftPage = pages[i];
@@ -325,6 +334,72 @@ export class DeletePagesCommand implements Command<Album> {
         }
 
         const newSpreads = pairPagesIntoSpreads(remainingPages);
+
+        return {
+            ...state,
+            spreads: newSpreads,
+            updatedAt: Date.now(),
+        };
+    }
+
+    undo(state: Album): Album {
+        if (!this.originalSpreads) return state;
+        return {
+            ...state,
+            spreads: this.originalSpreads,
+            updatedAt: Date.now(),
+        };
+    }
+}
+
+/** Deep-copy logical pages so pasted pages get independent element references. */
+function deepCopyPages(pages: LogicalPage[]): LogicalPage[] {
+    return pages.map(p => ({
+        ...p,
+        elements: p.elements.map(el => ({
+            ...el,
+            id: crypto.randomUUID(),
+            box: { ...el.box },
+        })),
+    }));
+}
+
+export class InsertPagesCommand implements Command<Album> {
+    readonly type = 'INSERT_PAGES';
+    private originalSpreads: Spread[] | null = null;
+
+    /**
+     * @param pages Logical pages to insert (will be deep-copied).
+     * @param atPageIndex 0-based index in the logical page array to insert before.
+     *                    If undefined or past the end, appends.
+     */
+    constructor(
+        public readonly pages: LogicalPage[],
+        public readonly atPageIndex?: number
+    ) { }
+
+    execute(state: Album): Album {
+        if (this.pages.length === 0) return state;
+
+        if (!this.originalSpreads) {
+            this.originalSpreads = state.spreads;
+        }
+
+        const allPages = extractPages(state.spreads);
+        const insertIdx = this.atPageIndex !== undefined && this.atPageIndex >= 0 && this.atPageIndex <= allPages.length
+            ? this.atPageIndex
+            : allPages.length;
+
+        const copied = deepCopyPages(this.pages);
+        allPages.splice(insertIdx, 0, ...copied);
+
+        // Enforce maxPages limit
+        const maxPages = state.settings?.maxPages ?? 40;
+        if (allPages.length > maxPages) {
+            allPages.length = maxPages;
+        }
+
+        const newSpreads = pairPagesIntoSpreads(allPages);
 
         return {
             ...state,
