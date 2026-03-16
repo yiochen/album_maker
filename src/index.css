@@ -2047,6 +2047,53 @@ body {
   /* Hidden used as border in placeholder */
 }
 
+/* ---- Insertion Point Zones ---- */
+
+.insertion-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.insertion-zone .insertion-line {
+  background: transparent;
+  border-radius: 1px;
+  transition: background 0.15s ease;
+}
+
+.insertion-zone.between-spreads {
+  width: 100%;
+  height: 8px;
+  margin: -2px 0;
+}
+
+.insertion-zone.between-spreads .insertion-line {
+  width: 80%;
+  height: 2px;
+}
+
+.insertion-zone.between-pages {
+  width: 8px;
+  align-self: stretch;
+  margin: 0 -2px;
+}
+
+.insertion-zone.between-pages .insertion-line {
+  width: 2px;
+  height: 80%;
+}
+
+.insertion-zone:hover .insertion-line,
+.insertion-zone.active .insertion-line {
+  background: var(--color-accent);
+}
+
+.insertion-zone.active .insertion-line {
+  box-shadow: 0 0 4px var(--color-accent);
+}
+
 /* =============================================
    Resize Handles
    ============================================= */

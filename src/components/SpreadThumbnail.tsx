@@ -24,8 +24,12 @@ interface SpreadThumbnailProps {
     isLeftInSelection: boolean;
     /** Whether right page is in multi-selection. */
     isRightInSelection: boolean;
+    /** If 'between', show an active insertion point between left and right pages. */
+    insertionPointInner: 'between' | null;
     /** Callback fired when a page is clicked. */
     onPageClick: (side: 'left' | 'right', event: React.MouseEvent) => void;
+    /** Callback fired when an insertion point zone is clicked. pageIndex is 1-based. */
+    onInsertionPointClick: (pageIndex: number, event: React.MouseEvent) => void;
 }
 
 /**
@@ -42,7 +46,9 @@ export const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
     isRightSelected,
     isLeftInSelection,
     isRightInSelection,
+    insertionPointInner,
     onPageClick,
+    onInsertionPointClick,
 }) => {
     // Virtual URL for the Service Worker to intercept
     const thumbnailUrl = `/__local__/spreadThumbnails/${albumId}/${spread.id}/${spread.versionId}`;
@@ -80,6 +86,15 @@ export const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
                         {spreadIndex * 2 + 1}
                     </span>
                 </button>
+
+                {/* Insertion zone between left and right pages */}
+                <div
+                    className={`insertion-zone between-pages ${insertionPointInner === 'between' ? 'active' : ''}`}
+                    data-testid={`insertion-zone-between-${spreadIndex}`}
+                    onClick={(e) => onInsertionPointClick(spreadIndex * 2 + 2, e)}
+                >
+                    <div className="insertion-line" />
+                </div>
 
                 <button
                     type="button"
