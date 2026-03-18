@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject } from './fabricTypes';
-import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex } from '../states/uiStore';
+import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex, useSelectedPageSide, useSetSelectedPages } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
 
 /**
@@ -23,6 +23,8 @@ export const useCanvasSelection = ({
     const [hasSelection, setHasSelection] = useState(false);
     const setSelectedElementId = useSetSelectedElementId();
     const setSelectedPageId = useSetSelectedPageId();
+    const setSelectedPages = useSetSelectedPages();
+    const selectedPageSide = useSelectedPageSide();
 
     // We need the current spread ID to set it when an element is selected
     const currentSpreadIndex = useCurrentSpreadIndex();
@@ -61,16 +63,26 @@ export const useCanvasSelection = ({
             }
         };
 
+        // When clicking on canvas background (no object), reset page selection to just the current page
+        const handleMouseDown = (e: { target?: fabric.Object | null }) => {
+            if (!e.target) {
+                const currentPageNum = currentSpreadIndex * 2 + (selectedPageSide === 'left' ? 1 : 2);
+                setSelectedPages(new Set([currentPageNum]));
+            }
+        };
+
         canvas.on('selection:created', handleSelection);
         canvas.on('selection:updated', handleSelection);
         canvas.on('selection:cleared', handleSelectionCleared);
+        canvas.on('mouse:down', handleMouseDown);
 
         return () => {
             canvas.off('selection:created', handleSelection);
             canvas.off('selection:updated', handleSelection);
             canvas.off('selection:cleared', handleSelectionCleared);
+            canvas.off('mouse:down', handleMouseDown);
         };
-    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId]);
+    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId, currentSpreadIndex, selectedPageSide, setSelectedPages]);
 
     return {
         hasSelection,
