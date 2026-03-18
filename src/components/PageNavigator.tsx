@@ -67,24 +67,37 @@ export const PageNavigator: React.FC = () => {
     const pageAspectRatio = settings ? settings.pageWidth / settings.pageHeight : 1;
     const selectedSpreadIndexSafe = Math.max(0, Math.min(currentSpreadIndex, spreads.length - 1));
 
+    // Ensure the current page is always in selectedPages (Google Slides behavior)
+    const currentPageNum = selectedSpreadIndexSafe * 2 + (selectedPageSide === 'left' ? 1 : 2);
+    useEffect(() => {
+        if (selectedPages.size === 0) {
+            setSelectedPages(new Set([currentPageNum]));
+        }
+    }, [currentPageNum, selectedPages.size, setSelectedPages]);
+
     const handleAddSpread = () => {
         const insertIndex = currentSpreadIndex + 1;
         addSpreads(1, insertIndex);
         setCurrentSpreadIndex(insertIndex);
         setSelectedPageSide('left');
+        setSelectedPages(new Set([insertIndex * 2 + 1]));
     };
 
     const handlePageClick = useCallback((spreadIndex: number, side: 'left' | 'right', event: React.MouseEvent) => {
         const pageNum = spreadIndex * 2 + (side === 'left' ? 1 : 2);
         if (event.ctrlKey || event.metaKey) {
+            // Cmd+click: toggle in selection AND navigate to the clicked page
             togglePageSelection(pageNum);
+            setCurrentSpreadIndex(spreadIndex);
+            setSelectedPageSide(side);
         } else {
-            clearPageSelection();
+            // Normal click: select only this page and navigate
+            setSelectedPages(new Set([pageNum]));
             setCurrentSpreadIndex(spreadIndex);
             setSelectedPageSide(side);
         }
         setInsertionPoint(null);
-    }, [setCurrentSpreadIndex, setSelectedPageSide, togglePageSelection, clearPageSelection, setInsertionPoint]);
+    }, [setCurrentSpreadIndex, setSelectedPageSide, togglePageSelection, setSelectedPages, setInsertionPoint]);
 
     const handleInsertionPointClick = useCallback((pageIndex: number, event: React.MouseEvent) => {
         event.stopPropagation();
@@ -309,8 +322,6 @@ export const PageNavigator: React.FC = () => {
                             albumId={albumId!}
                             pageAspectRatio={pageAspectRatio}
                             isShowing={spreadIndex === currentSpreadIndex}
-                            isLeftSelected={spreadIndex === selectedSpreadIndexSafe && selectedPageSide === 'left'}
-                            isRightSelected={spreadIndex === selectedSpreadIndexSafe && selectedPageSide === 'right'}
                             isLeftInSelection={selectedPages.has(spreadIndex * 2 + 1)}
                             isRightInSelection={selectedPages.has(spreadIndex * 2 + 2)}
                             insertionPointInner={insertionPoint === spreadIndex * 2 + 2 ? 'between' : null}
