@@ -51,6 +51,17 @@ export const PageNavigator: React.FC = () => {
     const pageListRef = useRef<HTMLDivElement>(null);
     const [marquee, setMarquee] = useState<MarqueeState | null>(null);
 
+    const preserveScroll = useCallback((action: () => void) => {
+        const container = pageListRef.current;
+        const scrollTop = container?.scrollTop ?? 0;
+        action();
+        requestAnimationFrame(() => {
+            if (pageListRef.current) {
+                pageListRef.current.scrollTop = scrollTop;
+            }
+        });
+    }, []);
+
     const maxSpreads = settings ? settings.maxPages / 2 : 20;
     const canAddMore = spreads.length < maxSpreads;
     const pageAspectRatio = settings ? settings.pageWidth / settings.pageHeight : 1;
@@ -199,7 +210,7 @@ export const PageNavigator: React.FC = () => {
                     const totalPages = spreads.length * 2;
                     const remainingCount = totalPages - selectedPages.size;
                     if (remainingCount < 1) return;
-                    deletePages([...selectedPages]);
+                    preserveScroll(() => deletePages([...selectedPages]));
                     clearPageSelection();
                     const newSpreadCount = Math.ceil(remainingCount / 2);
                     if (currentSpreadIndex >= newSpreadCount) {
@@ -214,7 +225,7 @@ export const PageNavigator: React.FC = () => {
                 e.preventDefault();
                 const allPages = extractPages(spreads);
                 const atIndex = insertionPoint != null ? insertionPoint - 1 : allPages.length;
-                insertPages(clipboardPages, atIndex);
+                preserveScroll(() => insertPages(clipboardPages, atIndex));
                 if (clipboardMode === 'cut') {
                     clearClipboard();
                 }
@@ -233,7 +244,7 @@ export const PageNavigator: React.FC = () => {
                 const remainingCount = totalPages - selectedPages.size;
                 if (remainingCount < 1) return;
 
-                deletePages([...selectedPages]);
+                preserveScroll(() => deletePages([...selectedPages]));
                 clearPageSelection();
                 const newSpreadCount = Math.ceil(remainingCount / 2);
                 if (currentSpreadIndex >= newSpreadCount) {
@@ -243,14 +254,14 @@ export const PageNavigator: React.FC = () => {
                 if (spreads.length <= 1) return;
                 const spread = spreads[selectedSpreadIndexSafe];
                 if (!spread) return;
-                deleteSpread(spread.id);
+                preserveScroll(() => deleteSpread(spread.id));
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [selectedSpreadIndexSafe, spreads, deleteSpread, deletePages, selectedPages, clearPageSelection, currentSpreadIndex, setCurrentSpreadIndex,
-        setClipboard, clipboardPages, clipboardMode, clearClipboard, insertPages, insertionPoint, setInsertionPoint]);
+        setClipboard, clipboardPages, clipboardMode, clearClipboard, insertPages, insertionPoint, setInsertionPoint, preserveScroll]);
 
     if (!settings) return null;
 
