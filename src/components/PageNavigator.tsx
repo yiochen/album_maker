@@ -49,6 +49,7 @@ export const PageNavigator: React.FC = () => {
     const setInsertionPoint = useSetInsertionPoint();
 
     const pageListRef = useRef<HTMLDivElement>(null);
+    const lastClickedPage = useRef<number | null>(null);
     const [marquee, setMarquee] = useState<MarqueeState | null>(null);
 
     const preserveScroll = useCallback((action: () => void) => {
@@ -85,7 +86,17 @@ export const PageNavigator: React.FC = () => {
 
     const handlePageClick = useCallback((spreadIndex: number, side: 'left' | 'right', event: React.MouseEvent) => {
         const pageNum = spreadIndex * 2 + (side === 'left' ? 1 : 2);
-        if (event.ctrlKey || event.metaKey) {
+        if (event.shiftKey) {
+            // Shift+click: range select from last clicked page to this one
+            const anchor = lastClickedPage.current ?? pageNum;
+            const min = Math.min(anchor, pageNum);
+            const max = Math.max(anchor, pageNum);
+            const range = new Set<number>();
+            for (let i = min; i <= max; i++) range.add(i);
+            setSelectedPages(range);
+            setCurrentSpreadIndex(spreadIndex);
+            setSelectedPageSide(side);
+        } else if (event.ctrlKey || event.metaKey) {
             // Cmd+click: toggle in selection AND navigate to the clicked page
             togglePageSelection(pageNum);
             setCurrentSpreadIndex(spreadIndex);
@@ -96,6 +107,7 @@ export const PageNavigator: React.FC = () => {
             setCurrentSpreadIndex(spreadIndex);
             setSelectedPageSide(side);
         }
+        lastClickedPage.current = pageNum;
         setInsertionPoint(null);
     }, [setCurrentSpreadIndex, setSelectedPageSide, togglePageSelection, setSelectedPages, setInsertionPoint]);
 
