@@ -16,13 +16,9 @@ interface SpreadThumbnailProps {
     pageAspectRatio: number;
     /** Whether this spread is currently shown on canvas. */
     isShowing: boolean;
-    /** Whether left page is selected. */
-    isLeftSelected: boolean;
-    /** Whether right page is selected. */
-    isRightSelected: boolean;
-    /** Whether left page is in multi-selection. */
+    /** Whether left page is in selection. */
     isLeftInSelection: boolean;
-    /** Whether right page is in multi-selection. */
+    /** Whether right page is in selection. */
     isRightInSelection: boolean;
     /** If 'between', show an active insertion point between left and right pages. */
     insertionPointInner: 'between' | null;
@@ -42,8 +38,6 @@ export const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
     albumId,
     pageAspectRatio,
     isShowing,
-    isLeftSelected,
-    isRightSelected,
     isLeftInSelection,
     isRightInSelection,
     insertionPointInner,
@@ -70,7 +64,7 @@ export const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
             <div className="spread-thumbnail-pages" data-testid="spread-thumbnail-pages">
                 <button
                     type="button"
-                    className={`spread-page-button ${isLeftSelected ? 'active' : ''} ${isLeftInSelection ? 'in-selection' : ''}`}
+                    className={`spread-page-button ${isLeftInSelection ? 'in-selection' : ''}`}
                     onClick={(e) => onPageClick('left', e)}
                     data-testid="page-thumbnail-left"
                     data-page-number={spreadIndex * 2 + 1}
@@ -98,7 +92,7 @@ export const SpreadThumbnail: React.FC<SpreadThumbnailProps> = ({
 
                 <button
                     type="button"
-                    className={`spread-page-button ${isRightSelected ? 'active' : ''} ${isRightInSelection ? 'in-selection' : ''}`}
+                    className={`spread-page-button ${isRightInSelection ? 'in-selection' : ''}`}
                     onClick={(e) => onPageClick('right', e)}
                     data-testid="page-thumbnail-right"
                     data-page-number={spreadIndex * 2 + 2}

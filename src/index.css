@@ -1971,7 +1971,7 @@ body {
   outline-offset: 1px;
 }
 
-.spread-page-button.active .page-half-thumbnail {
+.spread-page-button.in-selection .page-half-thumbnail {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
   box-shadow: var(--shadow-glow);
@@ -1985,15 +1985,6 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.spread-page-button.in-selection .page-half-thumbnail::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(99, 102, 241, 0.3);
-  pointer-events: none;
-  z-index: 1;
-  border-radius: var(--radius-sm);
-}
 
 .page-half-thumbnail-image {
   position: absolute;
