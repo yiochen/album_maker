@@ -16,6 +16,8 @@ interface MarqueeState {
     startY: number;
     currentX: number;
     currentY: number;
+    /** Container scrollTop captured at marquee update – avoids reading ref during render */
+    scrollTop: number;
 }
 
 function rectsIntersect(
@@ -166,7 +168,7 @@ export const PageNavigator: React.FC = () => {
         const x = e.clientX - containerRect.left;
         const y = e.clientY - containerRect.top + container.scrollTop;
 
-        setMarquee({ startX: x, startY: y, currentX: x, currentY: y });
+        setMarquee({ startX: x, startY: y, currentX: x, currentY: y, scrollTop: container.scrollTop });
         // Clear existing selection when starting a new marquee (unless modifier held)
         if (!e.ctrlKey && !e.metaKey) {
             clearPageSelection();
@@ -184,7 +186,7 @@ export const PageNavigator: React.FC = () => {
             const containerRect = container.getBoundingClientRect();
             const x = e.clientX - containerRect.left;
             const y = e.clientY - containerRect.top + container.scrollTop;
-            const updated: MarqueeState = { startX: marquee.startX, startY: marquee.startY, currentX: x, currentY: y };
+            const updated: MarqueeState = { startX: marquee.startX, startY: marquee.startY, currentX: x, currentY: y, scrollTop: container.scrollTop };
             setMarquee(updated);
             computeMarqueeSelection(updated);
         };
@@ -293,18 +295,16 @@ export const PageNavigator: React.FC = () => {
 
     if (!settings) return null;
 
-    // Compute marquee div style (relative to container content area)
-    const marqueeStyle = marquee ? (() => {
-        const container = pageListRef.current;
-        if (!container) return undefined;
-        const scrollTop = container.scrollTop;
-        const left = Math.min(marquee.startX, marquee.currentX);
-        const top = Math.min(marquee.startY, marquee.currentY) - scrollTop;
-        const width = Math.abs(marquee.currentX - marquee.startX);
-        const height = Math.abs(marquee.currentY - marquee.startY);
-        // Position relative to the container's visible area using fixed positioning within the container
-        return { left, top, width, height } as React.CSSProperties;
-    })() : undefined;
+    // Compute marquee div style (relative to container visible area).
+    // scrollTop is captured in MarqueeState so we don't read pageListRef during render.
+    const marqueeStyle: React.CSSProperties | undefined = marquee
+        ? {
+              left: Math.min(marquee.startX, marquee.currentX),
+              top: Math.min(marquee.startY, marquee.currentY) - marquee.scrollTop,
+              width: Math.abs(marquee.currentX - marquee.startX),
+              height: Math.abs(marquee.currentY - marquee.startY),
+          }
+        : undefined;
 
     return (
         <aside className="page-navigator" data-testid="page-navigator">
