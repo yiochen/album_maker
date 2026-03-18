@@ -97,10 +97,13 @@ export const PageNavigator: React.FC = () => {
             setCurrentSpreadIndex(spreadIndex);
             setSelectedPageSide(side);
         } else if (event.ctrlKey || event.metaKey) {
-            // Cmd+click: toggle in selection AND navigate to the clicked page
+            // Cmd+click: toggle in selection; only navigate if page ends up selected
+            const willSelect = !selectedPages.has(pageNum);
             togglePageSelection(pageNum);
-            setCurrentSpreadIndex(spreadIndex);
-            setSelectedPageSide(side);
+            if (willSelect) {
+                setCurrentSpreadIndex(spreadIndex);
+                setSelectedPageSide(side);
+            }
         } else {
             // Normal click: select only this page and navigate
             setSelectedPages(new Set([pageNum]));
@@ -109,7 +112,7 @@ export const PageNavigator: React.FC = () => {
         }
         lastClickedPage.current = pageNum;
         setInsertionPoint(null);
-    }, [setCurrentSpreadIndex, setSelectedPageSide, togglePageSelection, setSelectedPages, setInsertionPoint]);
+    }, [setCurrentSpreadIndex, setSelectedPageSide, togglePageSelection, setSelectedPages, setInsertionPoint, selectedPages]);
 
     const handleInsertionPointClick = useCallback((pageIndex: number, event: React.MouseEvent) => {
         event.stopPropagation();
