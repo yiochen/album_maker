@@ -91,10 +91,17 @@ export const useCanvasInitialization = ({
         setFabricCanvas(canvas);
         setSharedFabricCanvas(canvas);
 
+        // Expose for E2E tests — allows programmatic object selection on headless CI
+        // where pixel-based Fabric hit-testing is unreliable.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__FABRIC_CANVAS__ = canvas;
+
         return () => {
             canvas.dispose();
             setFabricCanvas(null);
             clearSharedFabricCanvasIfMatch(canvas);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            delete (window as any).__FABRIC_CANVAS__;
         };
     }, [
         canvasElRef,

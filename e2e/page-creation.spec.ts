@@ -65,7 +65,10 @@ test.describe('Page Creation', () => {
       const spreadThumbnails = appPage.getByTestId('spread-thumbnail');
       const countBefore = await spreadThumbnails.count();
 
-      await spreadThumbnails.last().getByTestId('page-thumbnail-left').click();
+      const lastPageLeft = spreadThumbnails.last().getByTestId('page-thumbnail-left');
+      await lastPageLeft.click();
+      // Wait for React state (selectedPages) to settle before pressing Delete
+      await expect(lastPageLeft).toHaveClass(/in-selection/);
       await appPage.keyboard.press('Delete');
 
       await expect(spreadThumbnails).toHaveCount(countBefore - 1);

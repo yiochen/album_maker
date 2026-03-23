@@ -23,34 +23,38 @@ async function ensureCanvasSelection(page: Page): Promise<void> {
     return;
   }
 
-  // Target the Fabric upper-canvas (the event-handling layer) directly.
-  // This is more reliable than viewport-relative coordinates on headless CI.
+  // Programmatically select the first Fabric object via the canvas instance.
+  // Pixel-based clicks are unreliable on headless CI due to software rendering
+  // affecting Fabric's hit detection.
+  const selected = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabricCanvas = (window as any).__FABRIC_CANVAS__;
+    if (!fabricCanvas) return false;
+    const objects = fabricCanvas.getObjects().filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (o: any) => o.data?.id !== 'seam'
+    );
+    if (objects.length === 0) return false;
+    fabricCanvas.setActiveObject(objects[0]);
+    fabricCanvas.requestRenderAll();
+    return true;
+  });
+
+  if (selected) {
+    // Wait for React state to propagate the selection
+    await expect(canvasContainer).toHaveAttribute('data-has-selection', 'true', { timeout: 5000 });
+    return;
+  }
+
+  // Fallback: click on the upper-canvas directly
   const upperCanvas = page.locator('.upper-canvas');
   const box = await upperCanvas.boundingBox();
   if (!box) {
     throw new Error('Fabric upper-canvas is not visible for selection.');
   }
 
-  // Click at center and several offsets to find the object
-  const clickTargets = [
-    { dx: 0, dy: 0 },
-    { dx: 50, dy: 0 },
-    { dx: -50, dy: 0 },
-    { dx: 0, dy: 50 },
-    { dx: 0, dy: -50 },
-  ];
-
-  for (const target of clickTargets) {
-    const x = box.x + box.width / 2 + target.dx;
-    const y = box.y + box.height / 2 + target.dy;
-    await page.mouse.click(x, y);
-    await page.waitForTimeout(200);
-    if ((await canvasContainer.getAttribute('data-has-selection')) === 'true') {
-      return;
-    }
-  }
-
-  await expect(canvasContainer).toHaveAttribute('data-has-selection', 'true');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(canvasContainer).toHaveAttribute('data-has-selection', 'true', { timeout: 5000 });
 }
 
 async function focusCanvasForKeyboard(page: Page): Promise<void> {
