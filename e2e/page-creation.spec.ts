@@ -65,12 +65,26 @@ test.describe('Page Creation', () => {
       const spreadThumbnails = appPage.getByTestId('spread-thumbnail');
       const countBefore = await spreadThumbnails.count();
 
-      const lastPageLeft = spreadThumbnails.last().getByTestId('page-thumbnail-left');
-      await lastPageLeft.click();
-      // Wait for React state (selectedPages) to settle before pressing Delete
-      await expect(lastPageLeft).toHaveClass(/in-selection/);
+      const lastSpread = spreadThumbnails.last();
+      const leftPage = lastSpread.getByTestId('page-thumbnail-left');
+      const rightPage = lastSpread.getByTestId('page-thumbnail-right');
+
+      // Select both pages to ensure the entire spread is removed from the count
+      await leftPage.click();
+      await appPage.keyboard.down('Shift');
+      await rightPage.click();
+      await appPage.keyboard.up('Shift');
+
+      // Wait for React state (selectedPages) to settle.
+      // The CSS class is applied during render, but the keydown handler is
+      // re-registered in useEffect (after render), so we need a brief delay.
+      await expect(leftPage).toHaveClass(/in-selection/);
+      await expect(rightPage).toHaveClass(/in-selection/);
+      await appPage.waitForTimeout(200);
+
       await appPage.keyboard.press('Delete');
 
+      // Now the spread count should actually decrease
       await expect(spreadThumbnails).toHaveCount(countBefore - 1);
     });
   });
