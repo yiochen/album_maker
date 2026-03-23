@@ -23,12 +23,15 @@ async function ensureCanvasSelection(page: Page): Promise<void> {
     return;
   }
 
-  const viewport = page.getByTestId('canvas-viewport');
-  const box = await viewport.boundingBox();
+  // Target the Fabric upper-canvas (the event-handling layer) directly.
+  // This is more reliable than viewport-relative coordinates on headless CI.
+  const upperCanvas = page.locator('.upper-canvas');
+  const box = await upperCanvas.boundingBox();
   if (!box) {
-    throw new Error('Canvas layer is not visible for selection.');
+    throw new Error('Fabric upper-canvas is not visible for selection.');
   }
 
+  // Click at center and several offsets to find the object
   const clickTargets = [
     { dx: 0, dy: 0 },
     { dx: 50, dy: 0 },
@@ -41,10 +44,10 @@ async function ensureCanvasSelection(page: Page): Promise<void> {
     const x = box.x + box.width / 2 + target.dx;
     const y = box.y + box.height / 2 + target.dy;
     await page.mouse.click(x, y);
+    await page.waitForTimeout(200);
     if ((await canvasContainer.getAttribute('data-has-selection')) === 'true') {
       return;
     }
-    await page.waitForTimeout(100);
   }
 
   await expect(canvasContainer).toHaveAttribute('data-has-selection', 'true');

@@ -17,11 +17,10 @@ test.describe('Page Multi-Selection', () => {
 
     await page.screenshot({ path: 'test-results/01-four-spreads.png' });
 
-    await test.step('Click pages normally — no selection overlay', async () => {
+    await test.step('Click pages normally — single page selected', async () => {
       const firstLeft = page.getByTestId('spread-thumbnail').nth(0).getByTestId('page-thumbnail-left');
       await firstLeft.click();
-      await expect(firstLeft).toHaveClass(/active/);
-      await expect(firstLeft).not.toHaveClass(/in-selection/);
+      await expect(firstLeft).toHaveClass(/in-selection/);
     });
 
     await test.step('Ctrl+Click to add pages to selection', async () => {

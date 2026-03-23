@@ -35,13 +35,13 @@ test.describe('Page Creation', () => {
     await test.step('Select left page of second spread', async () => {
       const secondSpreadLeftPage = appPage.getByTestId('spread-thumbnail').nth(1).getByTestId('page-thumbnail-left');
       await secondSpreadLeftPage.click();
-      await expect(secondSpreadLeftPage).toHaveClass(/active/);
+      await expect(secondSpreadLeftPage).toHaveClass(/in-selection/);
     });
 
     await test.step('Select right page of first spread', async () => {
       const firstSpreadRightPage = appPage.getByTestId('spread-thumbnail').first().getByTestId('page-thumbnail-right');
       await firstSpreadRightPage.click();
-      await expect(firstSpreadRightPage).toHaveClass(/active/);
+      await expect(firstSpreadRightPage).toHaveClass(/in-selection/);
     });
   });
 
