@@ -14,15 +14,15 @@ const ACCENT_COLOR = '#6366f1';
 const origDrawBorders = fabric.FabricObject.prototype.drawBorders;
 fabric.FabricObject.prototype.drawBorders = function (
     ctx: CanvasRenderingContext2D,
-    options: Record<string, unknown>,
-    styleOverride?: Record<string, unknown>,
+    options: Parameters<typeof origDrawBorders>[1],
+    styleOverride?: Parameters<typeof origDrawBorders>[2],
 ) {
     const obj = this as unknown as { borderLineWidth?: number };
     const savedLineWidth = ctx.lineWidth;
     if (obj.borderLineWidth) {
         ctx.lineWidth = obj.borderLineWidth;
     }
-    origDrawBorders.call(this, ctx, options, styleOverride);
+    origDrawBorders.call(this, ctx, options, styleOverride!);
     ctx.lineWidth = savedLineWidth;
 };
 
@@ -165,7 +165,6 @@ export async function renderSpread(
                     ...SHARED_SELECTION_STYLE,
                     cornerSize: uiSizes.cornerSize,
                     borderScaleFactor: uiSizes.borderScaleFactor,
-                    borderLineWidth: uiSizes.borderLineWidth,
                     selectable: isInteractive,
                     hasControls: isInteractive,
                     evented: isInteractive,
@@ -173,6 +172,8 @@ export async function renderSpread(
                     panControlSize: uiSizes.panControlSize,
                     onContentTransformChange: interactiveOpts?.onContentTransformChange,
                 });
+                // Set custom property outside constructor to avoid TS error
+                (canvasEl as unknown as { borderLineWidth: number }).borderLineWidth = uiSizes.borderLineWidth;
                 if (isInteractive) {
                     canvasEl.setLowResBadgeSizes(
                         uiSizes.lowResBadgeHeight,
