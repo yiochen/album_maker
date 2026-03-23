@@ -965,6 +965,58 @@ body {
 }
 
 /* =============================================
+   Layout Picker (Side Panel Tab)
+   ============================================= */
+
+.layout-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  overflow-y: auto;
+  height: 100%;
+}
+
+.layout-picker-header {
+  display: flex;
+  align-items: center;
+}
+
+.layout-picker-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.layout-picker-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.layout-filter-chip {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full, 9999px);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.layout-filter-chip:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.layout-filter-chip.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+/* =============================================
    Image Pool (Bottom Panel)
    ============================================= */
 

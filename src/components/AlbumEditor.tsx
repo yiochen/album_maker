@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import type { PageElement } from '../types';
 import {
   useAlbum,
@@ -19,11 +19,11 @@ import {
   useSelectedPageSide,
   useSetSelectedPageId,
   useSetSelectedElementId,
-  useIsImagePoolOpen,
+  useActiveSidePanelTab,
   useIsSettingsOpen,
   useIsSnappingEnabled,
   useSetCurrentSpreadIndex,
-  useSetImagePoolOpen,
+  useSetActiveSidePanelTab,
   useSetSettingsOpen,
   useSetSnappingEnabled,
   useEditingTextElementId,
@@ -44,9 +44,9 @@ import { Modal } from './Modal';
 import { LoadingScreen } from './LoadingScreen';
 import { Toolbar } from './Toolbar';
 import { Tabs, TabPane } from './Tabs';
-import { TemplatePreview } from './TemplatePreview';
+import { LayoutPicker } from './LayoutPicker';
 import { templates } from '../templates';
-import { applyTemplateToSpreadSide, isTemplateAspectRatioValid } from '../services/templateLayout';
+import { applyTemplateToSpreadSide } from '../services/templateLayout';
 
 export const AlbumEditor: React.FC = () => {
   // Global State (Album)
@@ -68,15 +68,14 @@ export const AlbumEditor: React.FC = () => {
   const selectedPageSide = useSelectedPageSide();
   const setSelectedPageId = useSetSelectedPageId();
   const setSelectedElementId = useSetSelectedElementId();
-  const isImagePoolOpen = useIsImagePoolOpen();
+  const activeSidePanelTab = useActiveSidePanelTab();
   const isSettingsOpen = useIsSettingsOpen();
   const isSnappingEnabled = useIsSnappingEnabled();
   const setCurrentSpreadIndex = useSetCurrentSpreadIndex();
-  const setImagePoolOpen = useSetImagePoolOpen();
+  const setActiveSidePanelTab = useSetActiveSidePanelTab();
   const setSettingsOpen = useSetSettingsOpen();
   const setSnappingEnabled = useSetSnappingEnabled();
   const editingTextElementId = useEditingTextElementId();
-  const [isLayoutPickerOpen, setLayoutPickerOpen] = useState(false);
 
   // Auto-save
   useAutoSave();
@@ -157,7 +156,7 @@ export const AlbumEditor: React.FC = () => {
         onAddText={() => {
           if (currentSpread) handleAddText(currentSpread.id);
         }}
-        onLayoutClick={() => setLayoutPickerOpen(true)}
+        onLayoutClick={() => setActiveSidePanelTab('layouts')}
       />
 
       <DndWrapper className="main-content">
@@ -168,8 +167,8 @@ export const AlbumEditor: React.FC = () => {
         />
 
         <Tabs
-          activeId={isImagePoolOpen ? 'images' : 'properties'}
-          onChange={(id) => setImagePoolOpen(id === 'images')}
+          activeId={activeSidePanelTab}
+          onChange={(id) => setActiveSidePanelTab(id as 'properties' | 'images' | 'layouts')}
         >
           <TabPane id="properties" label="Properties">
             <PropertiesPanel
@@ -192,7 +191,31 @@ export const AlbumEditor: React.FC = () => {
             <ImagePool
               images={album.imagePool}
               onImport={addToPool}
-              onClose={() => setImagePoolOpen(false)}
+              onClose={() => setActiveSidePanelTab('properties')}
+            />
+          </TabPane>
+          <TabPane id="layouts" label="Layouts">
+            <LayoutPicker
+              templates={templates}
+              pageAspectRatio={pageAspectRatio}
+              pageWidth={album.settings.pageWidth}
+              pageHeight={album.settings.pageHeight}
+              pageUnit={album.settings.unit}
+              selectedPageElementCount={selectedPageElementCount}
+              selectedPageLabel={selectedPageLabel}
+              selectedPageNumber={selectedPageNumber}
+              onApply={(template) => {
+                const nextElements = applyTemplateToSpreadSide(
+                  currentSpread.elements,
+                  template,
+                  album.settings,
+                  selectedPageSide
+                );
+                updateSpread(currentSpread.id, { elements: nextElements });
+                setSelectedPageId(currentSpread.id);
+                setSelectedElementId(null);
+                setActiveSidePanelTab('properties');
+              }}
             />
           </TabPane>
         </Tabs>
@@ -212,56 +235,6 @@ export const AlbumEditor: React.FC = () => {
         </Modal>
       )}
 
-      {isLayoutPickerOpen && (
-        <Modal
-          title={`Apply Layout (${selectedPageLabel} - Page ${selectedPageNumber})`}
-          onClose={() => setLayoutPickerOpen(false)}
-          titleTestId="layout-picker-title"
-        >
-          {selectedPageElementCount > 0 && (
-            <p className="layout-warning-text" data-testid="layout-warning-text">
-              Warning: This page already has {selectedPageElementCount} element{selectedPageElementCount > 1 ? 's' : ''}. Applying a layout will replace them.
-            </p>
-          )}
-          <div className="template-grid" data-testid="layout-picker-grid">
-            {templates.map((template) => {
-              const isCompatible = isTemplateAspectRatioValid(template, pageAspectRatio);
-              return (
-              <button
-                key={template.id}
-                type="button"
-                className="template-option"
-                data-testid={`layout-option-${template.id}`}
-                disabled={!isCompatible}
-                onClick={() => {
-                  const nextElements = applyTemplateToSpreadSide(
-                    currentSpread.elements,
-                    template,
-                    album.settings,
-                    selectedPageSide
-                  );
-                  updateSpread(currentSpread.id, { elements: nextElements });
-                  setSelectedPageId(currentSpread.id);
-                  setSelectedElementId(null);
-                  setLayoutPickerOpen(false);
-                }}
-              >
-                <TemplatePreview
-                  template={template}
-                  pageAspectRatio={pageAspectRatio}
-                  pageWidth={album.settings.pageWidth}
-                  pageHeight={album.settings.pageHeight}
-                  pageUnit={album.settings.unit}
-                  maxWidth={180}
-                  maxHeight={110}
-                />
-                <span className="template-name">{template.name}</span>
-              </button>
-              );
-            })}
-          </div>
-        </Modal>
-      )}
     </div>
   );
 };
