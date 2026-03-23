@@ -8,8 +8,9 @@ export const APP_CONFIG = {
 
   // UI Sizes (Zoom compensated base values)
   BASE_UI_SIZES: {
-    cornerSize: 10,
-    borderWidth: 1,
+    cornerSize: 6,
+    borderWidth: 2,
+    selectionLineWidth: 2,
     seamStrokeWidth: 2,
     seamDash: 5,
     snapLineStrokeWidth: 1,

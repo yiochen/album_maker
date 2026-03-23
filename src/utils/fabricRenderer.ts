@@ -7,11 +7,30 @@ import { APP_CONFIG } from '../config';
 import { FabricRenderOptions } from './rendererTypes';
 import { getImageUrlForPpi } from './imageSourceSelection';
 
+const ACCENT_COLOR = '#6366f1';
+
+// Patch fabric to support thicker, accent-colored selection borders.
+// Fabric v7's strokeBorders never sets ctx.lineWidth, so borders are always 1px.
+const origDrawBorders = fabric.FabricObject.prototype.drawBorders;
+fabric.FabricObject.prototype.drawBorders = function (
+    ctx: CanvasRenderingContext2D,
+    options: Record<string, unknown>,
+    styleOverride?: Record<string, unknown>,
+) {
+    const obj = this as unknown as { borderLineWidth?: number };
+    const savedLineWidth = ctx.lineWidth;
+    if (obj.borderLineWidth) {
+        ctx.lineWidth = obj.borderLineWidth;
+    }
+    origDrawBorders.call(this, ctx, options, styleOverride);
+    ctx.lineWidth = savedLineWidth;
+};
+
 const SHARED_SELECTION_STYLE: Partial<fabric.FabricObjectProps> = {
-    cornerStyle: 'circle',
-    cornerColor: 'white',
-    cornerStrokeColor: '#333',
-    borderColor: '#333',
+    cornerStyle: 'rect',
+    cornerColor: ACCENT_COLOR,
+    cornerStrokeColor: ACCENT_COLOR,
+    borderColor: ACCENT_COLOR,
     transparentCorners: false,
 };
 
@@ -26,8 +45,10 @@ export const getZoomCompensatedSizes = (zoomPercent: number) => {
     return {
         cornerSize: base.cornerSize * inverseScale,
         borderScaleFactor: base.borderWidth * inverseScale,
+        borderLineWidth: base.borderWidth * inverseScale,
         seamStrokeWidth: base.seamStrokeWidth * inverseScale,
         seamDash: base.seamDash * inverseScale,
+        selectionLineWidth: base.selectionLineWidth * inverseScale,
         snapLineStrokeWidth: base.snapLineStrokeWidth * inverseScale,
         snapLineDash: base.snapLineDash * inverseScale,
         panControlSize: base.panControlSize * inverseScale,
@@ -57,6 +78,13 @@ export async function renderSpread(
 
     // 1. Calculate zoom-compensated UI sizes (corner handles, etc.)
     const uiSizes = getZoomCompensatedSizes(zoom);
+
+    // Apply zoom-compensated selection box styling to the canvas itself
+    if (canvas instanceof fabric.Canvas) {
+        canvas.selectionColor = 'rgba(99, 102, 241, 0.15)';
+        canvas.selectionBorderColor = ACCENT_COLOR;
+        canvas.selectionLineWidth = uiSizes.selectionLineWidth;
+    }
 
     const currentObjects = canvas.getObjects() as CustomFabricObject[];
     const objectsById = new Map<string, CustomFabricObject>();
@@ -95,6 +123,7 @@ export async function renderSpread(
                     evented: isInteractive,
                     cornerSize: uiSizes.cornerSize,
                     borderScaleFactor: uiSizes.borderScaleFactor,
+                    borderLineWidth: uiSizes.borderLineWidth,
                     uniformScaling: element.content.lockAspectRatio,
                 });
 
@@ -136,6 +165,7 @@ export async function renderSpread(
                     ...SHARED_SELECTION_STYLE,
                     cornerSize: uiSizes.cornerSize,
                     borderScaleFactor: uiSizes.borderScaleFactor,
+                    borderLineWidth: uiSizes.borderLineWidth,
                     selectable: isInteractive,
                     hasControls: isInteractive,
                     evented: isInteractive,
@@ -178,6 +208,7 @@ export async function renderSpread(
                         uniformScaling: false,
                     cornerSize: uiSizes.cornerSize,
                     borderScaleFactor: uiSizes.borderScaleFactor,
+                    borderLineWidth: uiSizes.borderLineWidth,
                 });
 
                 if (!(existingText as ExtendedFabricObject).preventLayoutSync) {
