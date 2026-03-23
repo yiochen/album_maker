@@ -49,6 +49,9 @@ export const useCanvasInitialization = ({
             backgroundColor: '#f0f0f0',
             width: canvasWidth,
             height: canvasHeight,
+            selectionColor: 'rgba(99, 102, 241, 0.15)',
+            selectionBorderColor: '#6366f1',
+            selectionLineWidth: 2,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
 
@@ -86,6 +89,36 @@ export const useCanvasInitialization = ({
 
         canvas.on('mouse:down', () => {
             containerRef.current?.focus();
+        });
+
+        // Hover preview: draw accent border when hovering over an unselected element
+        let hoveredObj: fabric.Object | null = null;
+        canvas.on('mouse:over', (e: { target?: fabric.Object }) => {
+            const target = e.target;
+            if (!target || !target.selectable) return;
+            if (canvas.getActiveObject() === target) return;
+            hoveredObj = target;
+            canvas.requestRenderAll();
+        });
+        canvas.on('mouse:out', (e: { target?: fabric.Object }) => {
+            if (e.target && e.target === hoveredObj) {
+                hoveredObj = null;
+                canvas.requestRenderAll();
+            }
+        });
+        canvas.on('after:render', () => {
+            const ctx = canvas.getTopContext();
+            // Clear previous hover drawing; fabric redraws active object controls on this context
+            canvas.clearContext(ctx);
+            // Redraw active object controls (fabric normally does this, but we just cleared)
+            canvas.drawControls(ctx);
+            if (!hoveredObj || canvas.getActiveObject() === hoveredObj) return;
+            const bound = hoveredObj.getBoundingRect();
+            ctx.save();
+            ctx.strokeStyle = '#6366f1';
+            ctx.lineWidth = (hoveredObj as unknown as { borderLineWidth?: number }).borderLineWidth || 2;
+            ctx.strokeRect(bound.left, bound.top, bound.width, bound.height);
+            ctx.restore();
         });
 
         setFabricCanvas(canvas);
