@@ -1,15 +1,15 @@
 import { test, expect } from './fixtures';
 
 async function openLayoutsTab(page: import('playwright/test').Page): Promise<void> {
-  await page.getByTestId('layout-btn').click();
+  await page.getByTestId('nav-templates').click();
   await expect(page.getByTestId('layout-picker')).toBeVisible();
 }
 
 test.describe('Layout Picker', () => {
-  test('opens layouts tab via toolbar button', async ({ appPage }) => {
-    await test.step('Click layout button and verify tab is active', async () => {
+  test('opens layouts tab via nav rail button', async ({ appPage }) => {
+    await test.step('Click layouts nav icon and verify panel is active', async () => {
       await openLayoutsTab(appPage);
-      await expect(appPage.getByTestId('tab-trigger-layouts')).toHaveAttribute('aria-selected', 'true');
+      await expect(appPage.getByTestId('nav-templates')).toHaveClass(/active/);
       await expect(appPage.getByTestId('layout-picker')).toBeVisible();
     });
   });
@@ -45,8 +45,8 @@ test.describe('Layout Picker', () => {
       await expect(firstOption).toBeVisible();
       await firstOption.click();
 
-      // Should switch back to properties tab
-      await expect(appPage.getByTestId('tab-trigger-properties')).toHaveAttribute('aria-selected', 'true');
+      // Should switch back to properties panel
+      await expect(appPage.getByTestId('nav-properties')).toHaveClass(/active/);
     });
   });
 

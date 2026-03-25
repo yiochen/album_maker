@@ -25,12 +25,12 @@ export async function openAlbumSettings(page: Page): Promise<void> {
 }
 
 export async function openImagePool(page: Page): Promise<void> {
-  await page.getByRole('tab', { name: 'Images' }).click();
+  await page.getByTestId('nav-images').click();
   await expect(page.getByTestId('image-pool')).toBeVisible();
 }
 
 export async function openPropertiesTab(page: Page): Promise<void> {
-  await page.getByRole('tab', { name: 'Properties' }).click();
+  await page.getByTestId('nav-properties').click();
 }
 
 export async function importDummyImages(page: Page): Promise<void> {

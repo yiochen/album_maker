@@ -8,11 +8,11 @@ test.describe('Image Pool', () => {
     });
   });
 
-  test('closes image pool when clicking close button', async ({ appPage }) => {
-    await test.step('Open image pool and close it', async () => {
+  test('closes image pool when toggling nav rail', async ({ appPage }) => {
+    await test.step('Open image pool and close it via nav rail toggle', async () => {
       await openImagePool(appPage);
-      const pool = appPage.getByTestId('image-pool');
-      await pool.getByRole('button', { name: 'Close' }).click();
+      // Click the same nav icon again to collapse
+      await appPage.getByTestId('nav-images').click();
       await expect(appPage.getByTestId('image-pool')).toHaveCount(0);
     });
   });
@@ -89,7 +89,8 @@ test.describe('Image Pool', () => {
 
     await test.step('Close and reopen image pool', async () => {
       const countBefore = await appPage.getByTestId('pool-image').count();
-      await appPage.getByTestId('image-pool').getByRole('button', { name: 'Close' }).click();
+      // Toggle off via nav rail
+      await appPage.getByTestId('nav-images').click();
       await expect(appPage.getByTestId('image-pool')).toHaveCount(0);
 
       await openImagePool(appPage);
