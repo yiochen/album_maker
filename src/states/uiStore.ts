@@ -6,7 +6,7 @@ interface UIState {
   selectedElementId: string | null;
   selectedPageId: string | null;
   selectedPageSide: 'left' | 'right';
-  isImagePoolOpen: boolean;
+  activeSidePanelTab: 'properties' | 'images' | 'layouts';
   isSettingsOpen: boolean;
   isSnappingEnabled: boolean;
   /** ID of the text element currently in inline-editing mode, or null. */
@@ -25,8 +25,7 @@ interface UIState {
   setSelectedElementId: (id: string | null) => void;
   setSelectedPageId: (id: string | null) => void;
   setSelectedPageSide: (side: 'left' | 'right') => void;
-  toggleImagePool: () => void;
-  setImagePoolOpen: (isOpen: boolean) => void;
+  setActiveSidePanelTab: (tab: 'properties' | 'images' | 'layouts') => void;
   toggleSettings: () => void;
   setSettingsOpen: (isOpen: boolean) => void;
   toggleSnapping: () => void;
@@ -46,7 +45,7 @@ export const useUIStore = create<UIState>((set) => ({
   selectedElementId: null,
   selectedPageId: null,
   selectedPageSide: 'left',
-  isImagePoolOpen: true,
+  activeSidePanelTab: 'images',
   isSettingsOpen: false,
   isSnappingEnabled: true,
   editingTextElementId: null,
@@ -63,9 +62,7 @@ export const useUIStore = create<UIState>((set) => ({
 
   setSelectedPageSide: (side) => set({ selectedPageSide: side }),
 
-  toggleImagePool: () => set((state) => ({ isImagePoolOpen: !state.isImagePoolOpen })),
-
-  setImagePoolOpen: (isOpen) => set({ isImagePoolOpen: isOpen }),
+  setActiveSidePanelTab: (tab) => set({ activeSidePanelTab: tab }),
 
   toggleSettings: () => set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
 
@@ -127,11 +124,8 @@ export const useSelectedPageSide = () => useUIStore(state => state.selectedPageS
 /** Select the setSelectedPageSide action */
 export const useSetSelectedPageSide = () => useUIStore(state => state.setSelectedPageSide);
 
-/** Select whether the image pool is open */
-export const useIsImagePoolOpen = () => useUIStore(state => state.isImagePoolOpen);
-
-/** Select the toggleImagePool action */
-export const useToggleImagePool = () => useUIStore(state => state.toggleImagePool);
+/** Select the active side panel tab */
+export const useActiveSidePanelTab = () => useUIStore(state => state.activeSidePanelTab);
 
 /** Select whether settings modal is open */
 export const useIsSettingsOpen = () => useUIStore(state => state.isSettingsOpen);
@@ -145,8 +139,8 @@ export const useIsSnappingEnabled = () => useUIStore(state => state.isSnappingEn
 /** Select the toggleSnapping action */
 export const useToggleSnapping = () => useUIStore(state => state.toggleSnapping);
 
-/** Select the setImagePoolOpen action */
-export const useSetImagePoolOpen = () => useUIStore(state => state.setImagePoolOpen);
+/** Select the setActiveSidePanelTab action */
+export const useSetActiveSidePanelTab = () => useUIStore(state => state.setActiveSidePanelTab);
 
 /** Select the setSettingsOpen action */
 export const useSetSettingsOpen = () => useUIStore(state => state.setSettingsOpen);

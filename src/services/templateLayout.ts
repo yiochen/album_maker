@@ -190,6 +190,17 @@ function templateContentToElement(
   };
 }
 
+function countImageElements(node: TemplateNode): number {
+  if (node.nodeType === 'leaf') {
+    return node.content === null || node.content.type === 'image' ? 1 : 0;
+  }
+  return node.children.reduce((sum, child) => sum + countImageElements(child), 0);
+}
+
+export function countTemplateImageElements(template: TemplateDefinition): number {
+  return countImageElements(template.root);
+}
+
 export function isTemplateAspectRatioValid(template: TemplateDefinition, pageAspectRatio: number): boolean {
   if (template.validAspectRatio.min !== undefined && pageAspectRatio < template.validAspectRatio.min) return false;
   if (template.validAspectRatio.max !== undefined && pageAspectRatio > template.validAspectRatio.max) return false;
