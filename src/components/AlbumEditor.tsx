@@ -93,7 +93,6 @@ export const AlbumEditor: React.FC = () => {
     handleSelectAlbum,
     handleCreateAlbum,
     handleDeleteAlbum,
-    handleImportAlbum,
   } = useAlbumLifecycle();
 
 
