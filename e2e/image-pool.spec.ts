@@ -104,7 +104,7 @@ test.describe('Image Pool', () => {
     });
 
     await test.step('Verify image pool content scrolls', async () => {
-      const content = appPage.locator('[data-testid="image-pool"] .image-pool-content');
+      const content = appPage.locator('[data-testid="side-panel"] .side-panel-content');
       const metrics = await content.evaluate((node) => {
         const el = node as HTMLElement;
         return {

@@ -94,7 +94,7 @@ test.describe('Canvas', () => {
 
     test('adds a placeholder image element from toolbar', async ({ appPage }) => {
       await test.step('Add image placeholder using toolbar', async () => {
-        await appPage.getByRole('button', { name: 'Image' }).click();
+        await appPage.getByTestId('add-image-btn').click();
       });
 
       await test.step('Verify image placeholder selection', async () => {
@@ -118,7 +118,7 @@ test.describe('Canvas', () => {
 
     test('replaces placeholder image when dropping onto it', async ({ appPage }) => {
       await test.step('Insert image placeholder', async () => {
-        await appPage.getByRole('button', { name: 'Image' }).click();
+        await appPage.getByTestId('add-image-btn').click();
       });
 
       await test.step('Drop pool image onto placeholder area', async () => {
