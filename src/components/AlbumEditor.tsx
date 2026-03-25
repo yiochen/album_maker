@@ -24,6 +24,7 @@ import {
   useIsSnappingEnabled,
   useSetCurrentSpreadIndex,
   useSetActiveSidePanelTab,
+  useToggleSidePanel,
   useSetSettingsOpen,
   useSetSnappingEnabled,
   useEditingTextElementId,
@@ -32,7 +33,6 @@ import { useAutoSave } from '../hooks/useAutoSave';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useElementActions } from '../hooks/useElementActions';
 import { useAlbumLifecycle } from '../hooks/useAlbumLifecycle';
-import { Headerbar } from './Headerbar';
 import { AlbumSettingsPanel } from './AlbumSettingsPanel';
 import { PageNavigator } from './PageNavigator';
 import { Canvas } from './Canvas';
@@ -42,8 +42,9 @@ import { AlbumSelector } from './AlbumSelector';
 import { DndWrapper } from './DndWrapper';
 import { Modal } from './Modal';
 import { LoadingScreen } from './LoadingScreen';
-import { Toolbar } from './Toolbar';
-import { Tabs, TabPane } from './Tabs';
+import { NavRail } from './NavRail';
+import { SidePanel } from './SidePanel';
+import { TopBar } from './TopBar';
 import { LayoutPicker } from './LayoutPicker';
 import { templates } from '../templates';
 import { applyTemplateToSpreadSide } from '../services/templateLayout';
@@ -73,6 +74,7 @@ export const AlbumEditor: React.FC = () => {
   const isSnappingEnabled = useIsSnappingEnabled();
   const setCurrentSpreadIndex = useSetCurrentSpreadIndex();
   const setActiveSidePanelTab = useSetActiveSidePanelTab();
+  const toggleSidePanel = useToggleSidePanel();
   const setSettingsOpen = useSetSettingsOpen();
   const setSnappingEnabled = useSetSnappingEnabled();
   const editingTextElementId = useEditingTextElementId();
@@ -91,7 +93,6 @@ export const AlbumEditor: React.FC = () => {
     handleSelectAlbum,
     handleCreateAlbum,
     handleDeleteAlbum,
-    handleImportAlbum,
   } = useAlbumLifecycle();
 
 
@@ -125,9 +126,68 @@ export const AlbumEditor: React.FC = () => {
       : element.box.x1 >= 0.5 && element.box.x2 <= 1
   )).length;
 
+  const renderSidePanelContent = () => {
+    switch (activeSidePanelTab) {
+      case 'navigator':
+        return <PageNavigator />;
+      case 'images':
+        return (
+          <ImagePool
+            images={album.imagePool}
+            onImport={addToPool}
+          />
+        );
+      case 'properties':
+        return (
+          <PropertiesPanel
+            spread={currentSpread}
+            settings={album.settings}
+            selectedElement={selectedElement}
+            onElementUpdate={(updates, groupId) => {
+              if (effectiveSelectedElementId && selectedPageId) {
+                handleElementUpdate(selectedPageId, effectiveSelectedElementId, updates, groupId);
+              }
+            }}
+            onElementDelete={() => {
+              if (effectiveSelectedElementId && selectedPageId) {
+                handleElementDelete(selectedPageId, effectiveSelectedElementId);
+              }
+            }}
+          />
+        );
+      case 'templates':
+        return (
+          <LayoutPicker
+            templates={templates}
+            pageAspectRatio={pageAspectRatio}
+            pageWidth={album.settings.pageWidth}
+            pageHeight={album.settings.pageHeight}
+            pageUnit={album.settings.unit}
+            selectedPageElementCount={selectedPageElementCount}
+            selectedPageLabel={selectedPageLabel}
+            selectedPageNumber={selectedPageNumber}
+            onApply={(template) => {
+              const nextElements = applyTemplateToSpreadSide(
+                currentSpread.elements,
+                template,
+                album.settings,
+                selectedPageSide
+              );
+              updateSpread(currentSpread.id, { elements: nextElements });
+              setSelectedPageId(currentSpread.id);
+              setSelectedElementId(null);
+              setActiveSidePanelTab('properties');
+            }}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="app-container" data-testid="album-editor">
-      <Headerbar
+      <TopBar
         albumSelector={
           <AlbumSelector
             currentAlbumId={album.id}
@@ -138,87 +198,36 @@ export const AlbumEditor: React.FC = () => {
             onDeleteAlbum={handleDeleteAlbum}
           />
         }
-        onImport={handleImportAlbum}
-        onExport={() => navigate('/export')}
-        onSettingsClick={() => setSettingsOpen(!isSettingsOpen)}
-      />
-
-      <Toolbar
-        isSnappingEnabled={isSnappingEnabled}
-        onSnappingToggle={() => setSnappingEnabled(!isSnappingEnabled)}
         onUndo={undo}
         onRedo={redo}
         canUndo={canUndo}
         canRedo={canRedo}
+        onExport={() => navigate('/export')}
+        onSettingsClick={() => setSettingsOpen(!isSettingsOpen)}
         onAddImage={() => {
           if (currentSpread) handleAddImage(currentSpread.id);
         }}
         onAddText={() => {
           if (currentSpread) handleAddText(currentSpread.id);
         }}
-        onLayoutClick={() => setActiveSidePanelTab('layouts')}
+        isSnappingEnabled={isSnappingEnabled}
+        onSnappingToggle={() => setSnappingEnabled(!isSnappingEnabled)}
       />
 
       <DndWrapper className="main-content">
-        <PageNavigator />
+        <NavRail
+          activePanel={activeSidePanelTab}
+          onTogglePanel={toggleSidePanel}
+          onExport={() => navigate('/export')}
+        />
+
+        <SidePanel activePanel={activeSidePanelTab}>
+          {renderSidePanelContent()}
+        </SidePanel>
 
         <Canvas
           onImageDrop={handleImageDrop}
         />
-
-        <Tabs
-          activeId={activeSidePanelTab}
-          onChange={(id) => setActiveSidePanelTab(id as 'properties' | 'images' | 'layouts')}
-        >
-          <TabPane id="properties" label="Properties">
-            <PropertiesPanel
-              spread={currentSpread}
-              settings={album.settings}
-              selectedElement={selectedElement}
-              onElementUpdate={(updates, groupId) => {
-                if (effectiveSelectedElementId && selectedPageId) {
-                  handleElementUpdate(selectedPageId, effectiveSelectedElementId, updates, groupId);
-                }
-              }}
-              onElementDelete={() => {
-                if (effectiveSelectedElementId && selectedPageId) {
-                  handleElementDelete(selectedPageId, effectiveSelectedElementId);
-                }
-              }}
-            />
-          </TabPane>
-          <TabPane id="images" label="Images">
-            <ImagePool
-              images={album.imagePool}
-              onImport={addToPool}
-              onClose={() => setActiveSidePanelTab('properties')}
-            />
-          </TabPane>
-          <TabPane id="layouts" label="Layouts">
-            <LayoutPicker
-              templates={templates}
-              pageAspectRatio={pageAspectRatio}
-              pageWidth={album.settings.pageWidth}
-              pageHeight={album.settings.pageHeight}
-              pageUnit={album.settings.unit}
-              selectedPageElementCount={selectedPageElementCount}
-              selectedPageLabel={selectedPageLabel}
-              selectedPageNumber={selectedPageNumber}
-              onApply={(template) => {
-                const nextElements = applyTemplateToSpreadSide(
-                  currentSpread.elements,
-                  template,
-                  album.settings,
-                  selectedPageSide
-                );
-                updateSpread(currentSpread.id, { elements: nextElements });
-                setSelectedPageId(currentSpread.id);
-                setSelectedElementId(null);
-                setActiveSidePanelTab('properties');
-              }}
-            />
-          </TabPane>
-        </Tabs>
       </DndWrapper>
 
       {isSettingsOpen && (

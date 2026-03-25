@@ -237,7 +237,7 @@ export interface AppState {
   album: Album;
   currentPageIndex: number;
   selectedElementId: string | null;
-  activeSidePanelTab: 'properties' | 'images' | 'layouts';
+  activeSidePanelTab: 'navigator' | 'images' | 'properties' | 'templates' | null;
   activeSourceId: string | null;
   isSnappingEnabled: boolean;
 }

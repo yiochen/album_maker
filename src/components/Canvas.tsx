@@ -151,6 +151,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         position: 'relative' as const,
         transform: `scale(${zoom / 100})`,
         transformOrigin: '0 0', // Top-left origin for standard expansion
+        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15), 0 1px 6px rgba(0, 0, 0, 0.08)',
     };
 
     // Resolve editing element content for the overlay

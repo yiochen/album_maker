@@ -6,7 +6,7 @@ interface UIState {
   selectedElementId: string | null;
   selectedPageId: string | null;
   selectedPageSide: 'left' | 'right';
-  activeSidePanelTab: 'properties' | 'images' | 'layouts';
+  activeSidePanelTab: 'navigator' | 'images' | 'properties' | 'templates' | null;
   isSettingsOpen: boolean;
   isSnappingEnabled: boolean;
   /** ID of the text element currently in inline-editing mode, or null. */
@@ -25,7 +25,8 @@ interface UIState {
   setSelectedElementId: (id: string | null) => void;
   setSelectedPageId: (id: string | null) => void;
   setSelectedPageSide: (side: 'left' | 'right') => void;
-  setActiveSidePanelTab: (tab: 'properties' | 'images' | 'layouts') => void;
+  setActiveSidePanelTab: (tab: 'navigator' | 'images' | 'properties' | 'templates' | null) => void;
+  toggleSidePanel: (tab: 'navigator' | 'images' | 'properties' | 'templates') => void;
   toggleSettings: () => void;
   setSettingsOpen: (isOpen: boolean) => void;
   toggleSnapping: () => void;
@@ -45,7 +46,7 @@ export const useUIStore = create<UIState>((set) => ({
   selectedElementId: null,
   selectedPageId: null,
   selectedPageSide: 'left',
-  activeSidePanelTab: 'images',
+  activeSidePanelTab: 'navigator',
   isSettingsOpen: false,
   isSnappingEnabled: true,
   editingTextElementId: null,
@@ -63,6 +64,10 @@ export const useUIStore = create<UIState>((set) => ({
   setSelectedPageSide: (side) => set({ selectedPageSide: side }),
 
   setActiveSidePanelTab: (tab) => set({ activeSidePanelTab: tab }),
+
+  toggleSidePanel: (tab) => set((state) => ({
+    activeSidePanelTab: state.activeSidePanelTab === tab ? null : tab,
+  })),
 
   toggleSettings: () => set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
 
@@ -141,6 +146,9 @@ export const useToggleSnapping = () => useUIStore(state => state.toggleSnapping)
 
 /** Select the setActiveSidePanelTab action */
 export const useSetActiveSidePanelTab = () => useUIStore(state => state.setActiveSidePanelTab);
+
+/** Select the toggleSidePanel action */
+export const useToggleSidePanel = () => useUIStore(state => state.toggleSidePanel);
 
 /** Select the setSettingsOpen action */
 export const useSetSettingsOpen = () => useUIStore(state => state.setSettingsOpen);
