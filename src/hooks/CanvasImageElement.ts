@@ -325,13 +325,15 @@ export class CanvasImageElement extends fabric.Group {
     }
 
     private updatePlaceholderLayout(width: number, height: number) {
+        const inverseScale = 100 / Math.max(1, this.canvasZoomPercent);
         this.placeholderFrame.set({
             left: -width / 2,
             top: -height / 2,
             width,
             height,
+            strokeWidth: inverseScale,
+            strokeDashArray: [6 * inverseScale, 6 * inverseScale],
         });
-        const inverseScale = 100 / Math.max(1, this.canvasZoomPercent);
         this.placeholderPlusH.set({
             left: 0,
             top: 0,
