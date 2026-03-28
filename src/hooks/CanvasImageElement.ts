@@ -331,17 +331,18 @@ export class CanvasImageElement extends fabric.Group {
             width,
             height,
         });
+        const inverseScale = 100 / Math.max(1, this.canvasZoomPercent);
         this.placeholderPlusH.set({
             left: 0,
             top: 0,
-            width: Math.max(24, Math.min(40, width * 0.18)),
-            height: Math.max(3, Math.min(6, height * 0.02)),
+            width: Math.max(24, Math.min(40, width * 0.18)) * inverseScale,
+            height: Math.max(3, Math.min(6, height * 0.02)) * inverseScale,
         });
         this.placeholderPlusV.set({
             left: 0,
             top: 0,
-            width: Math.max(3, Math.min(6, width * 0.02)),
-            height: Math.max(24, Math.min(40, height * 0.18)),
+            width: Math.max(3, Math.min(6, width * 0.02)) * inverseScale,
+            height: Math.max(24, Math.min(40, height * 0.18)) * inverseScale,
         });
     }
 
@@ -438,6 +439,7 @@ export class CanvasImageElement extends fabric.Group {
 
     setCanvasZoomPercent(zoomPercent: number) {
         this.canvasZoomPercent = Math.max(10, zoomPercent);
+        this.updatePlaceholderLayout(this.width ?? 0, this.height ?? 0);
         this.updateLowResBadgeLayout(this.width ?? 0, this.height ?? 0);
         this.updateLowResBadgeVisibility();
     }
