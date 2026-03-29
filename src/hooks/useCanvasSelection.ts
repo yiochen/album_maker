@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject } from './fabricTypes';
-import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex, useSelectedPageSide, useSetSelectedPages, useSetSelectedPageSide } from '../states/uiStore';
+import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex, useSetSelectedPages, useSetSelectedPageSide } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
 
 /**
@@ -25,7 +25,7 @@ export const useCanvasSelection = ({
     const setSelectedPageId = useSetSelectedPageId();
     const setSelectedPages = useSetSelectedPages();
     const setSelectedPageSide = useSetSelectedPageSide();
-    const selectedPageSide = useSelectedPageSide();
+    const isDragging = useRef(false);
 
     // We need the current spread ID to set it when an element is selected
     const currentSpreadIndex = useCurrentSpreadIndex();
@@ -48,6 +48,14 @@ export const useCanvasSelection = ({
                     }
                     // Sync canvas uniformScaling with the selected object's setting
                     canvas.uniformScaling = obj.get('uniformScaling') !== false;
+                    // Switch active page side to whichever half the element's center is on
+                    if (canvas.width) {
+                        const objCenterX = obj.left + (obj.width ?? 0) * (obj.scaleX ?? 1) / 2;
+                        const side = objCenterX < canvas.width / 2 ? 'left' : 'right';
+                        setSelectedPageSide(side);
+                        const newPageNum = currentSpreadIndex * 2 + (side === 'left' ? 1 : 2);
+                        setSelectedPages(new Set([newPageNum]));
+                    }
                 }
             } else {
                 setSelectedElementId(null);
@@ -74,18 +82,35 @@ export const useCanvasSelection = ({
             }
         };
 
+        const handleObjectMoving = () => { isDragging.current = true; };
+
+        // After a drag, switch active page side based on where the mouse was released
+        const handleMouseUp = (e: { pointer?: { x: number; y: number } }) => {
+            if (isDragging.current && e.pointer && canvas.width) {
+                isDragging.current = false;
+                const side = e.pointer.x < canvas.width / 2 ? 'left' : 'right';
+                setSelectedPageSide(side);
+                const newPageNum = currentSpreadIndex * 2 + (side === 'left' ? 1 : 2);
+                setSelectedPages(new Set([newPageNum]));
+            }
+        };
+
         canvas.on('selection:created', handleSelection);
         canvas.on('selection:updated', handleSelection);
         canvas.on('selection:cleared', handleSelectionCleared);
         canvas.on('mouse:down', handleMouseDown);
+        canvas.on('object:moving', handleObjectMoving);
+        canvas.on('mouse:up', handleMouseUp);
 
         return () => {
             canvas.off('selection:created', handleSelection);
             canvas.off('selection:updated', handleSelection);
             canvas.off('selection:cleared', handleSelectionCleared);
             canvas.off('mouse:down', handleMouseDown);
+            canvas.off('object:moving', handleObjectMoving);
+            canvas.off('mouse:up', handleMouseUp);
         };
-    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId, currentSpreadIndex, selectedPageSide, setSelectedPages, setSelectedPageSide]);
+    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId, currentSpreadIndex, setSelectedPages, setSelectedPageSide]);
 
     return {
         hasSelection,
