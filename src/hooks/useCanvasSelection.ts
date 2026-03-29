@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject } from './fabricTypes';
-import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex, useSelectedPageSide, useSetSelectedPages } from '../states/uiStore';
+import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex, useSelectedPageSide, useSetSelectedPages, useSetSelectedPageSide } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
 
 /**
@@ -24,6 +24,7 @@ export const useCanvasSelection = ({
     const setSelectedElementId = useSetSelectedElementId();
     const setSelectedPageId = useSetSelectedPageId();
     const setSelectedPages = useSetSelectedPages();
+    const setSelectedPageSide = useSetSelectedPageSide();
     const selectedPageSide = useSelectedPageSide();
 
     // We need the current spread ID to set it when an element is selected
@@ -63,11 +64,13 @@ export const useCanvasSelection = ({
             }
         };
 
-        // When clicking on canvas background (no object), reset page selection to just the current page
-        const handleMouseDown = (e: { target?: fabric.Object | null }) => {
-            if (!e.target) {
-                const currentPageNum = currentSpreadIndex * 2 + (selectedPageSide === 'left' ? 1 : 2);
-                setSelectedPages(new Set([currentPageNum]));
+        // When clicking on canvas background (no object), switch active page side to whichever half was clicked
+        const handleMouseDown = (e: { target?: fabric.Object | null; pointer?: { x: number; y: number } }) => {
+            if (!e.target && e.pointer && canvas.width) {
+                const clickedSide = e.pointer.x < canvas.width / 2 ? 'left' : 'right';
+                setSelectedPageSide(clickedSide);
+                const newPageNum = currentSpreadIndex * 2 + (clickedSide === 'left' ? 1 : 2);
+                setSelectedPages(new Set([newPageNum]));
             }
         };
 
@@ -82,7 +85,7 @@ export const useCanvasSelection = ({
             canvas.off('selection:cleared', handleSelectionCleared);
             canvas.off('mouse:down', handleMouseDown);
         };
-    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId, currentSpreadIndex, selectedPageSide, setSelectedPages]);
+    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId, currentSpreadIndex, selectedPageSide, setSelectedPages, setSelectedPageSide]);
 
     return {
         hasSelection,
