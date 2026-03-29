@@ -182,6 +182,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             >
                 {/* Scroller content wrapper ensures the viewport has content to scroll */}
                 <div
+                    className={`canvas-page-highlight canvas-page-highlight-${selectedPageSide}`}
                     style={{
                         width: zoomedWidth,
                         height: zoomedHeight,
@@ -198,8 +199,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     >
                         <div
                             ref={wrapperRef}
-                            className={`canvas-page-highlight canvas-page-highlight-${selectedPageSide}`}
-                            style={{ width: '100%', height: '100%', position: 'relative', overflow: 'visible' }}
+                            style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
                         >
                             <canvas ref={canvasElRef} data-testid="canvas-layer" style={{ position: 'relative', zIndex: 1 }} />
                             {currentSpread.elements.length === 0 && (
