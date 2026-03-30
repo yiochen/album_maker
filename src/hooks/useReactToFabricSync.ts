@@ -5,7 +5,7 @@ import { isImageElement } from '../types';
 import { renderSpread } from '../utils/fabricRenderer';
 import { CustomFabricObject } from './fabricTypes';
 import { useAlbumSettings, useAlbumSpreads, useUpdateElement } from '../states/albumStore';
-import { useSelectedElementId, useCurrentSpreadIndex } from '../states/uiStore';
+import { useSelectedElementIds, useCurrentSpreadIndex } from '../states/uiStore';
 
 /**
  * Props for useReactToFabricSync.
@@ -28,7 +28,7 @@ export const useReactToFabricSync = ({
     const currentSpreadIndex = useCurrentSpreadIndex();
     const spread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
     const settings = useAlbumSettings();
-    const selectedElementId = useSelectedElementId();
+    const selectedElementIds = useSelectedElementIds();
     const onElementUpdate = useUpdateElement();
 
     const ppi = APP_CONFIG.PPI;
@@ -73,13 +73,25 @@ export const useReactToFabricSync = ({
             });
 
             // Handle selection after sync
-            if (selectedElementId && canvas instanceof fabric.Canvas) {
-                const obj = canvas.getObjects().find(o => (o as CustomFabricObject).data?.id === selectedElementId);
-                if (obj && canvas.getActiveObject() !== obj) {
-                    canvas.setActiveObject(obj);
+            if (selectedElementIds.length > 0 && canvas instanceof fabric.Canvas) {
+                const objects = canvas.getObjects();
+                const idSet = new Set(selectedElementIds);
+                const matchedObjects = objects.filter(o => {
+                    const id = (o as CustomFabricObject).data?.id;
+                    return id && idSet.has(id);
+                });
+
+                if (matchedObjects.length === 1) {
+                    if (canvas.getActiveObject() !== matchedObjects[0]) {
+                        canvas.setActiveObject(matchedObjects[0]);
+                        canvas.requestRenderAll();
+                    }
+                } else if (matchedObjects.length > 1) {
+                    const sel = new fabric.ActiveSelection(matchedObjects, { canvas });
+                    canvas.setActiveObject(sel);
                     canvas.requestRenderAll();
                 }
-            } else if (!selectedElementId && canvas instanceof fabric.Canvas) {
+            } else if (selectedElementIds.length === 0 && canvas instanceof fabric.Canvas) {
                 canvas.discardActiveObject();
                 canvas.requestRenderAll();
             }
@@ -97,5 +109,5 @@ export const useReactToFabricSync = ({
         };
 
         sync();
-    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, settings, selectedElementId]);
+    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, settings, selectedElementIds]);
 };
