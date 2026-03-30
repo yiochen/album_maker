@@ -50,7 +50,7 @@ export const useCanvasSelection = ({
                     canvas.uniformScaling = obj.get('uniformScaling') !== false;
                     // Switch active page side to whichever half the element's center is on
                     if (canvas.width) {
-                        const objCenterX = obj.left + (obj.width ?? 0) * (obj.scaleX ?? 1) / 2;
+                        const objCenterX = (obj.left ?? 0) + (obj.width ?? 0) * (obj.scaleX ?? 1) / 2;
                         const side = objCenterX < canvas.width / 2 ? 'left' : 'right';
                         setSelectedPageSide(side);
                         const newPageNum = currentSpreadIndex * 2 + (side === 'left' ? 1 : 2);
