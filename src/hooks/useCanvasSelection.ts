@@ -26,6 +26,7 @@ export const useCanvasSelection = ({
     const setSelectedPages = useSetSelectedPages();
     const setSelectedPageSide = useSetSelectedPageSide();
     const isDragging = useRef(false);
+    const lastDragPointerX = useRef(0);
 
     // We need the current spread ID to set it when an element is selected
     const currentSpreadIndex = useCurrentSpreadIndex();
@@ -82,13 +83,21 @@ export const useCanvasSelection = ({
             }
         };
 
-        const handleObjectMoving = () => { isDragging.current = true; };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const handleObjectMoving = (e: { target?: fabric.Object; pointer?: any }) => {
+            isDragging.current = true;
+            if (typeof e.pointer?.x === 'number') {
+                lastDragPointerX.current = e.pointer.x;
+            }
+        };
 
-        // After a drag, switch active page side based on where the mouse was released
-        const handleMouseUp = (e: { pointer?: { x: number; y: number } }) => {
-            if (isDragging.current && e.pointer && canvas.width) {
+        // After a drag, switch active page side based on the last pointer position during the drag.
+        // mouse:up in Fabric v7 (TPointerEventInfo & { isClick }) does not expose pointer coords,
+        // so we track them from object:moving and consume here.
+        const handleMouseUp = () => {
+            if (isDragging.current && canvas.width) {
                 isDragging.current = false;
-                const side = e.pointer.x < canvas.width / 2 ? 'left' : 'right';
+                const side = lastDragPointerX.current < canvas.width / 2 ? 'left' : 'right';
                 setSelectedPageSide(side);
                 const newPageNum = currentSpreadIndex * 2 + (side === 'left' ? 1 : 2);
                 setSelectedPages(new Set([newPageNum]));
