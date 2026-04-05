@@ -63,6 +63,35 @@ The application uses a **normalized box model** for storage and a two-tier pixel
 - **`useAutoSave`**: Handles auto-saving album data to IndexedDB.
 - **Shared Infra Store Usage**: Hooks should use `editorInfraStore` to reference runtime Fabric and Tiptap instances instead of ad-hoc globals.
 
+## Fabric.js v7 API Gotchas
+
+These differences from earlier versions have caused bugs. **Check this list before writing any canvas event handler or accessing Fabric object properties.**
+
+### Event: `mouse:up` has no pointer coordinates
+`mouse:up` is typed as `TPointerEventInfo<TPointerEvent> & { isClick: boolean }` and does **not** expose pointer coordinates in its type. Using `(e: { pointer?: ... })` will cause `TS2345` ("no properties in common"). To get canvas-pixel coordinates at mouse-up time, track position during `object:moving` using the native event (see below).
+
+### Event: `mouse:down` / `object:moving` — use native event for coordinates
+`e.pointer` may not be present at runtime in Fabric v7 mouse events. Instead, get canvas-pixel X from the native event:
+```typescript
+const canvasEl = canvas.getElement();
+const rect = canvasEl.getBoundingClientRect();
+const canvasPixelX = (e.e.clientX - rect.left) * (canvas.width / rect.width);
+```
+`e.e` is the native `MouseEvent`. Dividing by `rect.width / canvas.width` correctly accounts for CSS zoom scaling.
+
+### Object property: `left`, `top`, `width`, `height` are `number | undefined`
+`FabricObject.left` (and `top`, `width`, `height`, `scaleX`, `scaleY`) are typed as potentially `undefined` in v7. Always use null-coalescing:
+```typescript
+const left = obj.left ?? 0;
+const width = (obj.width ?? 0) * (obj.scaleX ?? 1);
+```
+Failing to do so causes `TS2345` when combining with arithmetic operators under `strict: true`.
+
+### Event handler typing: "no properties in common" error
+TypeScript raises this error when a handler's parameter type shares zero properties with the actual Fabric event type. Always include at least one property that exists on the actual event (e.g., `target?: fabric.Object`) so TypeScript finds a common property. If you only need coordinates and the event type has none in common with a typed shape, use `// eslint-disable-next-line @typescript-eslint/no-explicit-any` and type the event as `any`.
+
+---
+
 ## Rules of Engagement
 - **Do** separate complex logic from components into custom hooks.
 - **Do** use `APP_CONFIG` for constants used within hooks.
