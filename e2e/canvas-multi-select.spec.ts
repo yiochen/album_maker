@@ -106,7 +106,16 @@ async function addTwoElementsOnSameSide(page: Page): Promise<void> {
 }
 
 /**
- * Focus the canvas for keyboard events.
+ * Focus the canvas viewport for keyboard events without disrupting Fabric selection.
+ */
+async function focusCanvasViewport(page: Page): Promise<void> {
+  await page.getByTestId('canvas-viewport').focus();
+}
+
+/**
+ * Focus the canvas for keyboard events by clicking the interaction layer.
+ * NOTE: This clears any existing multi-selection. Use focusCanvasViewport
+ * when you need to preserve selection state.
  */
 async function focusCanvas(page: Page): Promise<void> {
   const interactionLayer = page.getByTestId('interaction-layer');
@@ -182,7 +191,7 @@ test.describe('Canvas Multi-Select & Element Clipboard', () => {
       });
 
       await test.step('Press Delete and verify all removed', async () => {
-        await focusCanvas(appPage);
+        await focusCanvasViewport(appPage);
         await appPage.keyboard.press('Delete');
         await expect.poll(() => getCanvasObjectCount(appPage)).toBe(0);
         await expect(appPage.getByText('Drag images here')).toBeVisible();
@@ -249,7 +258,8 @@ test.describe('Canvas Multi-Select & Element Clipboard', () => {
       });
 
       await test.step('Copy and paste', async () => {
-        await focusCanvas(appPage);
+        // Use focusCanvasViewport to avoid clicking the canvas which would clear multi-selection
+        await focusCanvasViewport(appPage);
         await appPage.keyboard.press('ControlOrMeta+c');
         await appPage.keyboard.press('ControlOrMeta+v');
         await expect.poll(() => getCanvasObjectCount(appPage)).toBe(4);
