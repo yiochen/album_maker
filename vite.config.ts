@@ -44,6 +44,12 @@ function serviceWorkerPlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), serviceWorkerPlugin()],
+  css: {
+    devSourcemap: true,
+  },
+  build: {
+    sourcemap: true,
+  },
   server: {
     port: 5173,
     strictPort: true,  // Fail if port is in use instead of switching

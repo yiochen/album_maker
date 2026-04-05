@@ -44,3 +44,24 @@ If you only need coordinates and the event type truly has nothing in common with
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handler = (e: { target?: fabric.Object; e?: any }) => { ... };
 ```
+
+---
+
+## Object type strings
+
+### Instance `type` is all-lowercase, not camelCase
+The **static** class property is PascalCase (e.g. `ActiveSelection.type === 'ActiveSelection'`), but **instance** `type` values are lowercased by Fabric v7 at runtime:
+```typescript
+const sel = new fabric.ActiveSelection(objects, { canvas });
+sel.type; // 'activeselection'  (NOT 'activeSelection' or 'ActiveSelection')
+```
+Always compare against the lowercase form:
+```typescript
+// ✅ Correct
+if (obj.type === 'activeselection') { ... }
+
+// ❌ Wrong — silently never matches
+if (obj.type === 'activeSelection') { ... }
+if (obj.type === 'ActiveSelection') { ... }
+```
+This applies to all Fabric object types (`'group'`, `'rect'`, `'image'`, etc.).

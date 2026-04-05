@@ -4,7 +4,7 @@ import {
     useCurrentSpreadIndex, useSelectedPageSide, useSetCurrentSpreadIndex, useSetSelectedPageSide,
     useSelectedPages, useTogglePageSelection, useSetSelectedPages, useClearPageSelection,
     useClipboardPages, useClipboardMode, useSetClipboard, useClearClipboard,
-    useInsertionPoint, useSetInsertionPoint,
+    useInsertionPoint, useSetInsertionPoint, useClipboardType,
 } from '../states/uiStore';
 import { extractPages } from '../commands/spreadCommands';
 import { SpreadThumbnail } from './SpreadThumbnail';
@@ -45,6 +45,7 @@ export const PageNavigator: React.FC = () => {
     const insertPages = useInsertPages();
     const clipboardPages = useClipboardPages();
     const clipboardMode = useClipboardMode();
+    const clipboardType = useClipboardType();
     const setClipboard = useSetClipboard();
     const clearClipboard = useClearClipboard();
     const insertionPoint = useInsertionPoint();
@@ -250,8 +251,8 @@ export const PageNavigator: React.FC = () => {
                 return;
             }
 
-            // Paste: Cmd/Ctrl+V
-            if (isMod && e.key === 'v' && clipboardPages.length > 0) {
+            // Paste: Cmd/Ctrl+V (only for page clipboard)
+            if (isMod && e.key === 'v' && clipboardType === 'pages' && clipboardPages.length > 0) {
                 e.preventDefault();
                 const allPages = extractPages(spreads);
                 const atIndex = insertionPoint != null ? insertionPoint - 1 : allPages.length;
@@ -291,7 +292,7 @@ export const PageNavigator: React.FC = () => {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [selectedSpreadIndexSafe, spreads, deleteSpread, deletePages, selectedPages, clearPageSelection, currentSpreadIndex, setCurrentSpreadIndex,
-        setClipboard, clipboardPages, clipboardMode, clearClipboard, insertPages, insertionPoint, setInsertionPoint, preserveScroll]);
+        setClipboard, clipboardPages, clipboardMode, clipboardType, clearClipboard, insertPages, insertionPoint, setInsertionPoint, preserveScroll]);
 
     if (!settings) return null;
 

@@ -91,27 +91,46 @@ export const useCanvasInitialization = ({
             containerRef.current?.focus();
         });
 
-        // Hover preview: draw accent border when hovering over an unselected element
+        // Hover preview: draw accent border when hovering over an unselected element.
+        // We only clear+redraw the top canvas when the hover state actually changes,
+        // so we don't wipe out Fabric's own drawings (rubber-band rect, selection controls).
         let hoveredObj: fabric.Object | null = null;
+        let topContextDirty = false; // whether we need to clear+redraw
+
         canvas.on('mouse:over', (e: { target?: fabric.Object }) => {
             const target = e.target;
             if (!target || !target.selectable) return;
             if (canvas.getActiveObject() === target) return;
+            if (hoveredObj === target) return;
             hoveredObj = target;
+            topContextDirty = true;
             canvas.requestRenderAll();
         });
         canvas.on('mouse:out', (e: { target?: fabric.Object }) => {
             if (e.target && e.target === hoveredObj) {
                 hoveredObj = null;
+                topContextDirty = true;
                 canvas.requestRenderAll();
             }
         });
+        // Also mark dirty when selection changes — the hovered object may now be
+        // the active object, so we need to remove the hover highlight.
+        const markDirty = () => { topContextDirty = true; };
+        canvas.on('selection:created', markDirty);
+        canvas.on('selection:updated', markDirty);
+        canvas.on('selection:cleared', markDirty);
+
         canvas.on('after:render', () => {
+            // Only clear+redraw the top context when the hover/selection state changed.
+            // This avoids wiping Fabric's rubber-band rect and selection controls
+            // on frames where only the objects (lower canvas) were re-rendered.
+            if (!topContextDirty) return;
+            topContextDirty = false;
+
             const ctx = canvas.getTopContext();
-            // Clear previous hover drawing; fabric redraws active object controls on this context
             canvas.clearContext(ctx);
-            // Redraw active object controls (fabric normally does this, but we just cleared)
             canvas.drawControls(ctx);
+
             if (!hoveredObj || canvas.getActiveObject() === hoveredObj) return;
             const bound = hoveredObj.getBoundingRect();
             ctx.save();
@@ -128,6 +147,8 @@ export const useCanvasInitialization = ({
         // where pixel-based Fabric hit-testing is unreliable.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__FABRIC_CANVAS__ = canvas;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__FABRIC_MODULE__ = fabric;
 
         return () => {
             canvas.dispose();
@@ -135,6 +156,8 @@ export const useCanvasInitialization = ({
             clearSharedFabricCanvasIfMatch(canvas);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             delete (window as any).__FABRIC_CANVAS__;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            delete (window as any).__FABRIC_MODULE__;
         };
     }, [
         canvasElRef,

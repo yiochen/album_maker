@@ -298,6 +298,57 @@ export class MoveElementCommand implements Command<Album> {
     }
 }
 
+export class AddElementsCommand implements Command<Album> {
+    readonly type = 'ADD_ELEMENTS';
+
+    private newVersionId: string | null = null;
+    private oldVersionId: string | null = null;
+
+    constructor(
+        public readonly spreadId: string,
+        public readonly elements: PageElement[]
+    ) { }
+
+    execute(state: Album): Album {
+        if (!this.newVersionId) {
+            this.newVersionId = crypto.randomUUID();
+        }
+
+        return {
+            ...state,
+            spreads: state.spreads.map(s => {
+                if (s.id === this.spreadId) {
+                    if (!this.oldVersionId) this.oldVersionId = s.versionId;
+                    return {
+                        ...s,
+                        versionId: this.newVersionId!,
+                        elements: [...s.elements, ...this.elements]
+                    };
+                }
+                return s;
+            }),
+            updatedAt: Date.now(),
+        };
+    }
+
+    undo(state: Album): Album {
+        const idsToRemove = new Set(this.elements.map(e => e.id));
+        return {
+            ...state,
+            spreads: state.spreads.map(s =>
+                s.id === this.spreadId
+                    ? {
+                        ...s,
+                        versionId: this.oldVersionId || s.versionId,
+                        elements: s.elements.filter(e => !idsToRemove.has(e.id)),
+                    }
+                    : s
+            ),
+            updatedAt: Date.now(),
+        };
+    }
+}
+
 /**
  * Command to reorder an element within a spread's elements array (z-order change).
  * Moves an element from one index to another, shifting other elements accordingly.
