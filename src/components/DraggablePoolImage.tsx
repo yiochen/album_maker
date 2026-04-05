@@ -15,9 +15,11 @@ import type { PoolImage } from '../types';
 interface DraggablePoolImageProps {
     /** The image object to display and drag. */
     image: PoolImage;
+    /** Whether the image is already used on a spread. */
+    isUsed?: boolean;
 }
 
-export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({ image }) => {
+export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({ image, isUsed = false }) => {
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: image.id,
         data: image,
@@ -28,10 +30,11 @@ export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({ image })
             ref={setNodeRef}
             {...listeners}
             {...attributes}
-            className="pool-image"
+            className={`pool-image${isUsed ? ' pool-image-used' : ''}`}
             data-testid="pool-image"
+            data-used={isUsed ? 'true' : 'false'}
             style={{
-                opacity: isDragging ? 0.5 : 1,
+                opacity: isDragging ? 0.5 : undefined,
                 cursor: 'grab',
                 position: 'relative',
             }}
@@ -44,6 +47,11 @@ export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({ image })
                 data-width-px={image.width}
                 data-height-px={image.height}
             />
+            {isUsed && (
+                <div className="pool-image-used-badge" aria-hidden="true">
+                    Used
+                </div>
+            )}
             {image.importStage && image.importStage !== 'done' && (
                 <div
                     style={{

@@ -9,7 +9,8 @@ import {
   useUndo,
   useRedo,
   useCanUndo,
-  useCanRedo
+  useCanRedo,
+  useUsedImageKeys
 } from '../states/albumStore';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -61,6 +62,7 @@ export const AlbumEditor: React.FC = () => {
   const redo = useRedo();
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
+  const usedImageKeys = useUsedImageKeys();
 
   // UI State
   const currentSpreadIndex = useCurrentSpreadIndex();
@@ -134,6 +136,7 @@ export const AlbumEditor: React.FC = () => {
         return (
           <ImagePool
             images={album.imagePool}
+            usedImageKeys={usedImageKeys}
             onImport={addToPool}
           />
         );

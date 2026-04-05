@@ -15,6 +15,8 @@ import { processAndSaveUpload, HeifUnsupportedError } from '../services/imageUpl
 interface ImagePoolProps {
     /** List of images currently in the pool. */
     images: PoolImage[];
+    /** Set of source image keys currently placed on spreads. */
+    usedImageKeys?: Set<string>;
     /** Callback fired when new images are imported. */
     onImport: (images: PoolImage[]) => void;
     /** Callback fired when the pool close button is clicked. */
@@ -27,6 +29,7 @@ interface ImagePoolProps {
  */
 export const ImagePool: React.FC<ImagePoolProps> = ({
     images,
+    usedImageKeys,
     onImport,
     onClose,
 }) => {
@@ -215,7 +218,11 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                 ) : (
                     <div className="image-masonry" data-testid="image-grid">
                         {images.map(image => (
-                            <DraggablePoolImage key={image.id} image={image} />
+                            <DraggablePoolImage
+                                key={image.id}
+                                image={image}
+                                isUsed={usedImageKeys?.has(`${image.sourceId}/${image.sourceImageId}`) ?? false}
+                            />
                         ))}
                     </div>
                 )}

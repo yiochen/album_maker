@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import type { Album, Spread, PageElement, PoolImage, AlbumSettings } from '../types';
+import { isImageElement } from '../types';
 import {
     UpdateElementCommand,
     AddElementCommand,
@@ -393,6 +395,24 @@ export const useAlbumName = () => useAlbumStore(state => state.album?.name);
 
 /** Select album image pool */
 export const useAlbumImagePool = () => useAlbumStore(state => state.album?.imagePool || []);
+
+/** Select source image keys currently used by placed non-placeholder image elements */
+export const useUsedImageKeys = () => {
+    const spreads = useAlbumStore(state => state.album?.spreads ?? []);
+
+    return useMemo(() => {
+        const keys = new Set<string>();
+
+        for (const spread of spreads) {
+            for (const element of spread.elements) {
+                if (!isImageElement(element) || element.content.isPlaceholder) continue;
+                keys.add(`${element.content.sourceId}/${element.content.sourceImageId}`);
+            }
+        }
+
+        return keys;
+    }, [spreads]);
+};
 
 /** Select page width from settings */
 export const usePageWidth = () => useAlbumStore(state => state.album?.settings.pageWidth);
