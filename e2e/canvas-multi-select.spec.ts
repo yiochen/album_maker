@@ -40,7 +40,7 @@ async function getSelectedElementIds(page: Page): Promise<string[]> {
     if (!canvas) return [];
     const active = canvas.getActiveObject();
     if (!active) return [];
-    if (active.type === 'activeSelection') {
+    if (active.type === 'activeselection') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return active.getObjects().map((o: any) => o.data?.id).filter(Boolean);
     }

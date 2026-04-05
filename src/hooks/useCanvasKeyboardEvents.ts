@@ -126,7 +126,7 @@ export const useCanvasKeyboardEvents = ({ fabricCanvas }: UseCanvasKeyboardEvent
 
                 // Gather selected element IDs from Fabric
                 let selectedIds: string[];
-                if (activeObj.type === 'activeSelection') {
+                if (activeObj.type === 'activeselection') {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const objects = (activeObj as any).getObjects() as CustomFabricObject[];
                     selectedIds = objects.map(o => o.data?.id).filter((id): id is string => !!id);
@@ -209,7 +209,7 @@ export const useCanvasKeyboardEvents = ({ fabricCanvas }: UseCanvasKeyboardEvent
                 }
 
                 // Handle active selection (multi-selection)
-                if (activeObj && activeObj.type === 'activeSelection') {
+                if (activeObj && activeObj.type === 'activeselection') {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const objects = (activeObj as any).getObjects() as CustomFabricObject[];
                     const idsToDelete = objects.map(o => o.data?.id).filter((id): id is string => !!id);
