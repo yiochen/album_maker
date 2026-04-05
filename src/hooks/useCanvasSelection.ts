@@ -73,10 +73,15 @@ export const useCanvasSelection = ({
             }
         };
 
-        // When clicking on canvas background (no object), switch active page side to whichever half was clicked
-        const handleMouseDown = (e: { target?: fabric.Object | null; pointer?: { x: number; y: number } }) => {
-            if (!e.target && e.pointer && canvas.width) {
-                const clickedSide = e.pointer.x < canvas.width / 2 ? 'left' : 'right';
+        // When clicking on canvas background (no object), switch active page side to whichever half was clicked.
+        // Fabric v7 mouse:down may not expose pointer coords, so compute from the native event + canvas rect.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const handleMouseDown = (e: { target?: fabric.Object | null; e?: any }) => {
+            if (!e.target && e.e && canvas.width) {
+                const canvasEl = canvas.getElement();
+                const rect = canvasEl.getBoundingClientRect();
+                const canvasPixelX = (e.e.clientX - rect.left) * (canvas.width / rect.width);
+                const clickedSide = canvasPixelX < canvas.width / 2 ? 'left' : 'right';
                 setSelectedPageSide(clickedSide);
                 const newPageNum = currentSpreadIndex * 2 + (clickedSide === 'left' ? 1 : 2);
                 setSelectedPages(new Set([newPageNum]));
@@ -84,10 +89,12 @@ export const useCanvasSelection = ({
         };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const handleObjectMoving = (e: { target?: fabric.Object; pointer?: any }) => {
+        const handleObjectMoving = (e: { target?: fabric.Object; e?: any }) => {
             isDragging.current = true;
-            if (typeof e.pointer?.x === 'number') {
-                lastDragPointerX.current = e.pointer.x;
+            if (e.e && canvas.width) {
+                const canvasEl = canvas.getElement();
+                const rect = canvasEl.getBoundingClientRect();
+                lastDragPointerX.current = (e.e.clientX - rect.left) * (canvas.width / rect.width);
             }
         };
 
