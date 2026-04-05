@@ -106,29 +106,17 @@ export const useCanvasInitialization = ({
                 canvas.requestRenderAll();
             }
         });
-        // Track the last hover-highlight rect so we can erase it without
-        // clearing the entire top canvas (which would wipe the rubber-band selection).
-        let lastHoverRect: { left: number; top: number; width: number; height: number } | null = null;
-
         canvas.on('after:render', () => {
+            // During rubber-band drag, Fabric draws the selection rectangle on the
+            // top canvas. Skip our clear+redraw so we don't wipe it out.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if ((canvas as any)._groupSelector) return;
+
             const ctx = canvas.getTopContext();
-
-            // Erase only the previous hover highlight (with padding for stroke width)
-            if (lastHoverRect) {
-                const pad = 4;
-                ctx.clearRect(
-                    lastHoverRect.left - pad,
-                    lastHoverRect.top - pad,
-                    lastHoverRect.width + pad * 2,
-                    lastHoverRect.height + pad * 2,
-                );
-                lastHoverRect = null;
-            }
-
-            // Redraw active object controls (Fabric draws these on the top context)
+            // Clear previous hover drawing; fabric redraws active object controls on this context
+            canvas.clearContext(ctx);
+            // Redraw active object controls (fabric normally does this, but we just cleared)
             canvas.drawControls(ctx);
-
-            // Draw hover highlight for unselected objects
             if (!hoveredObj || canvas.getActiveObject() === hoveredObj) return;
             const bound = hoveredObj.getBoundingRect();
             ctx.save();
@@ -136,7 +124,6 @@ export const useCanvasInitialization = ({
             ctx.lineWidth = (hoveredObj as unknown as { borderLineWidth?: number }).borderLineWidth || 2;
             ctx.strokeRect(bound.left, bound.top, bound.width, bound.height);
             ctx.restore();
-            lastHoverRect = { left: bound.left, top: bound.top, width: bound.width, height: bound.height };
         });
 
         setFabricCanvas(canvas);
