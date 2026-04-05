@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject } from './fabricTypes';
 import { useSetSelectedPageId, useCurrentSpreadIndex, useSelectedPageSide, useSetSelectedPages, useSetSelectedElementIds } from '../states/uiStore';
@@ -41,11 +41,18 @@ export const useCanvasSelection = ({
     const spreads = useAlbumSpreads();
     const currentSpreadId = spreads[currentSpreadIndex]?.id;
 
+    // Guard to prevent re-entrant selection handler calls when we modify the
+    // Fabric selection programmatically (e.g. enforcing same-page-side constraint).
+    const isAdjustingSelectionRef = useRef(false);
+
     useEffect(() => {
         const canvas = fabricCanvas;
         if (!canvas) return;
 
         const handleSelection = (e: { selected: fabric.Object[] }) => {
+            // Skip if we're programmatically adjusting selection
+            if (isAdjustingSelectionRef.current) return;
+
             setHasSelection(true);
             const selected = e.selected || [];
             const canvasWidth = canvas.getWidth();
@@ -74,15 +81,22 @@ export const useCanvasSelection = ({
 
             // If we had to filter out cross-page objects, update the Fabric selection
             if (sameSideObjects.length < selected.length) {
-                // Need to recreate selection with only same-side objects
-                canvas.discardActiveObject();
-                if (sameSideObjects.length === 1) {
-                    canvas.setActiveObject(sameSideObjects[0]);
-                } else if (sameSideObjects.length > 1) {
-                    const sel = new fabric.ActiveSelection(sameSideObjects, { canvas });
-                    canvas.setActiveObject(sel);
-                }
-                canvas.requestRenderAll();
+                // Defer the selection adjustment to avoid re-entrant event handling
+                isAdjustingSelectionRef.current = true;
+                queueMicrotask(() => {
+                    try {
+                        canvas.discardActiveObject();
+                        if (sameSideObjects.length === 1) {
+                            canvas.setActiveObject(sameSideObjects[0]);
+                        } else if (sameSideObjects.length > 1) {
+                            const sel = new fabric.ActiveSelection(sameSideObjects, { canvas });
+                            canvas.setActiveObject(sel);
+                        }
+                        canvas.requestRenderAll();
+                    } finally {
+                        isAdjustingSelectionRef.current = false;
+                    }
+                });
             }
 
             const ids = sameSideObjects
@@ -102,6 +116,8 @@ export const useCanvasSelection = ({
         };
 
         const handleSelectionCleared = () => {
+            if (isAdjustingSelectionRef.current) return;
+
             setHasSelection(false);
             setSelectedElementIds([]);
             setSelectedPageId(null);

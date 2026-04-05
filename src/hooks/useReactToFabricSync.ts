@@ -33,16 +33,23 @@ export const useReactToFabricSync = ({
 
     const ppi = APP_CONFIG.PPI;
 
-    // We use refs for the callbacks and the spread to avoid stale closures in the 
+    // We use refs for the callbacks and the spread to avoid stale closures in the
     // event handlers while minimizing useEffect re-subscriptions.
     const spreadRef = useRef(spread);
     const onElementUpdateRef = useRef(onElementUpdate);
     const syncLockRef = useRef<{ promise: Promise<void> | null }>({ promise: null });
+    // Store selectedElementIds in a ref so selection restoration doesn't trigger re-renders.
+    // Selection is restored after renderSpread recreates Fabric objects.
+    const selectedElementIdsRef = useRef(selectedElementIds);
 
     useEffect(() => {
         spreadRef.current = spread;
         onElementUpdateRef.current = onElementUpdate;
     }, [spread, onElementUpdate]);
+
+    useEffect(() => {
+        selectedElementIdsRef.current = selectedElementIds;
+    }, [selectedElementIds]);
 
     const modelWidth = settings ? settings.pageWidth * 2 * ppi : 0;
     const modelHeight = settings ? settings.pageHeight * ppi : 0;
@@ -72,10 +79,11 @@ export const useReactToFabricSync = ({
                 }
             });
 
-            // Handle selection after sync
-            if (selectedElementIds.length > 0 && canvas instanceof fabric.Canvas) {
+            // Restore selection after sync (renderSpread destroys and recreates objects)
+            const ids = selectedElementIdsRef.current;
+            if (ids.length > 0 && canvas instanceof fabric.Canvas) {
                 const objects = canvas.getObjects();
-                const idSet = new Set(selectedElementIds);
+                const idSet = new Set(ids);
                 const matchedObjects = objects.filter(o => {
                     const id = (o as CustomFabricObject).data?.id;
                     return id && idSet.has(id);
@@ -91,7 +99,7 @@ export const useReactToFabricSync = ({
                     canvas.setActiveObject(sel);
                     canvas.requestRenderAll();
                 }
-            } else if (selectedElementIds.length === 0 && canvas instanceof fabric.Canvas) {
+            } else if (ids.length === 0 && canvas instanceof fabric.Canvas) {
                 canvas.discardActiveObject();
                 canvas.requestRenderAll();
             }
@@ -109,5 +117,7 @@ export const useReactToFabricSync = ({
         };
 
         sync();
-    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, settings, selectedElementIds]);
+        // NOTE: selectedElementIds is intentionally NOT in deps — it's read via ref
+        // to avoid a render loop (selection change → sync → setActiveObject → selection event → repeat)
+    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, settings]);
 };
