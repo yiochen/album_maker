@@ -17,27 +17,74 @@ interface DraggablePoolImageProps {
     image: PoolImage;
     /** Whether the image is already used on a spread. */
     isUsed?: boolean;
+    /** Whether the image is selected in the pool. */
+    isSelected?: boolean;
+    /** 1-based selection order when selected. */
+    selectionOrder?: number;
+    /** Click handler for pool selection. */
+    onClick?: (event: React.MouseEvent<HTMLDivElement>, image: PoolImage) => void;
 }
 
-export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({ image, isUsed = false }) => {
+export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({
+    image,
+    isUsed = false,
+    isSelected = false,
+    selectionOrder,
+    onClick,
+}) => {
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: image.id,
         data: image,
     });
+
+    const pointerDownRef = React.useRef<{ x: number; y: number; multi: boolean } | null>(null);
+
+    const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+        if (event.button !== 0) return;
+        pointerDownRef.current = {
+            x: event.clientX,
+            y: event.clientY,
+            multi: event.metaKey || event.ctrlKey,
+        };
+    };
+
+    const handleMouseUp = (event: React.MouseEvent<HTMLDivElement>) => {
+        if (event.button !== 0) return;
+        const pointerDown = pointerDownRef.current;
+        pointerDownRef.current = null;
+        if (!pointerDown) return;
+
+        const movedX = Math.abs(event.clientX - pointerDown.x);
+        const movedY = Math.abs(event.clientY - pointerDown.y);
+        const isClick = movedX < 4 && movedY < 4;
+        if (!isClick) return;
+
+        onClick?.(event, image);
+    };
+
+    const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+        if (event.ctrlKey || event.metaKey) {
+            event.preventDefault();
+        }
+    };
 
     return (
         <div
             ref={setNodeRef}
             {...listeners}
             {...attributes}
-            className={`pool-image${isUsed ? ' pool-image-used' : ''}`}
+            className={`pool-image${isUsed ? ' pool-image-used' : ''}${isSelected ? ' pool-image-selected' : ''}`}
             data-testid="pool-image"
             data-used={isUsed ? 'true' : 'false'}
+            data-selected={isSelected ? 'true' : 'false'}
             style={{
                 opacity: isDragging ? 0.5 : undefined,
                 cursor: 'grab',
                 position: 'relative',
             }}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onContextMenu={handleContextMenu}
         >
             <img
                 src={image.thumbnailUrl}
@@ -47,6 +94,11 @@ export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({ image, i
                 data-width-px={image.width}
                 data-height-px={image.height}
             />
+            {isSelected && selectionOrder !== undefined && (
+                <div className="pool-image-selection-badge" aria-hidden="true">
+                    {selectionOrder}
+                </div>
+            )}
             {isUsed && (
                 <div className="pool-image-used-badge" aria-hidden="true">
                     Used

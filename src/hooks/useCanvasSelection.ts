@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject } from './fabricTypes';
-import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex, useSetSelectedPages, useSetSelectedPageSide } from '../states/uiStore';
+import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex, useSetSelectedPages, useSetSelectedPageSide, useClearPoolImageSelection } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
 
 /**
@@ -25,6 +25,7 @@ export const useCanvasSelection = ({
     const setSelectedPageId = useSetSelectedPageId();
     const setSelectedPages = useSetSelectedPages();
     const setSelectedPageSide = useSetSelectedPageSide();
+    const clearPoolImageSelection = useClearPoolImageSelection();
     const isDragging = useRef(false);
     const lastDragPointerX = useRef(0);
 
@@ -77,6 +78,7 @@ export const useCanvasSelection = ({
         // Fabric v7 mouse:down may not expose pointer coords, so compute from the native event + canvas rect.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const handleMouseDown = (e: { target?: fabric.Object | null; e?: any }) => {
+            clearPoolImageSelection();
             if (!e.target && e.e && canvas.width) {
                 const canvasEl = canvas.getElement();
                 const rect = canvasEl.getBoundingClientRect();
@@ -126,7 +128,7 @@ export const useCanvasSelection = ({
             canvas.off('object:moving', handleObjectMoving);
             canvas.off('mouse:up', handleMouseUp);
         };
-    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId, currentSpreadIndex, setSelectedPages, setSelectedPageSide]);
+    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId, currentSpreadIndex, setSelectedPages, setSelectedPageSide, clearPoolImageSelection]);
 
     return {
         hasSelection,

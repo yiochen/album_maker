@@ -6,6 +6,7 @@ interface UIState {
   selectedElementId: string | null;
   selectedPageId: string | null;
   selectedPageSide: 'left' | 'right';
+  selectedPoolImageIds: string[];
   activeSidePanelTab: 'navigator' | 'images' | 'properties' | 'templates' | null;
   isSettingsOpen: boolean;
   isSnappingEnabled: boolean;
@@ -25,6 +26,9 @@ interface UIState {
   setSelectedElementId: (id: string | null) => void;
   setSelectedPageId: (id: string | null) => void;
   setSelectedPageSide: (side: 'left' | 'right') => void;
+  setSelectedPoolImageIds: (ids: string[]) => void;
+  togglePoolImageSelection: (imageId: string, multi: boolean) => void;
+  clearPoolImageSelection: () => void;
   setActiveSidePanelTab: (tab: 'navigator' | 'images' | 'properties' | 'templates' | null) => void;
   toggleSidePanel: (tab: 'navigator' | 'images' | 'properties' | 'templates') => void;
   toggleSettings: () => void;
@@ -46,6 +50,7 @@ export const useUIStore = create<UIState>((set) => ({
   selectedElementId: null,
   selectedPageId: null,
   selectedPageSide: 'left',
+  selectedPoolImageIds: [],
   activeSidePanelTab: 'navigator',
   isSettingsOpen: false,
   isSnappingEnabled: true,
@@ -62,6 +67,22 @@ export const useUIStore = create<UIState>((set) => ({
   setSelectedPageId: (id) => set({ selectedPageId: id }),
 
   setSelectedPageSide: (side) => set({ selectedPageSide: side }),
+
+  setSelectedPoolImageIds: (ids) => set({ selectedPoolImageIds: ids }),
+
+  togglePoolImageSelection: (imageId, multi) => set((state) => {
+    if (!multi) {
+      return { selectedPoolImageIds: [imageId] };
+    }
+
+    if (state.selectedPoolImageIds.includes(imageId)) {
+      return { selectedPoolImageIds: state.selectedPoolImageIds.filter(id => id !== imageId) };
+    }
+
+    return { selectedPoolImageIds: [...state.selectedPoolImageIds, imageId] };
+  }),
+
+  clearPoolImageSelection: () => set({ selectedPoolImageIds: [] }),
 
   setActiveSidePanelTab: (tab) => set({ activeSidePanelTab: tab }),
 
@@ -128,6 +149,21 @@ export const useSelectedPageSide = () => useUIStore(state => state.selectedPageS
 
 /** Select the setSelectedPageSide action */
 export const useSetSelectedPageSide = () => useUIStore(state => state.setSelectedPageSide);
+
+/** Select the currently selected image pool item ids */
+export const useSelectedPoolImageIds = () => useUIStore(state => state.selectedPoolImageIds);
+
+/** Select the number of selected image pool items */
+export const useSelectedPoolImageCount = () => useUIStore(state => state.selectedPoolImageIds.length);
+
+/** Select the setSelectedPoolImageIds action */
+export const useSetSelectedPoolImageIds = () => useUIStore(state => state.setSelectedPoolImageIds);
+
+/** Select the togglePoolImageSelection action */
+export const useTogglePoolImageSelection = () => useUIStore(state => state.togglePoolImageSelection);
+
+/** Select the clearPoolImageSelection action */
+export const useClearPoolImageSelection = () => useUIStore(state => state.clearPoolImageSelection);
 
 /** Select the active side panel tab */
 export const useActiveSidePanelTab = () => useUIStore(state => state.activeSidePanelTab);

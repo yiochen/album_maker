@@ -98,6 +98,57 @@ test.describe('Image Pool', () => {
     });
   });
 
+  test('shows template panel when a single image is selected', async ({ appPage }) => {
+    await test.step('Import images and select one', async () => {
+      await importDummyImages(appPage);
+      await appPage.getByTestId('pool-image').first().click();
+    });
+
+    await test.step('Verify single selection and template panel', async () => {
+      await expect(appPage.getByTestId('pool-image').first()).toHaveAttribute('data-selected', 'true');
+      await expect(appPage.getByTestId('image-pool-template-panel')).toBeVisible();
+      await expect(appPage.getByTestId('selected-image-template-panel')).toBeVisible();
+    });
+  });
+
+  test('supports cmd/ctrl multi-select and plain click resets to single selection', async ({ appPage, browserName }) => {
+    await test.step('Import images and multi-select two', async () => {
+      await importDummyImages(appPage);
+      const first = appPage.getByTestId('pool-image').nth(0);
+      const second = appPage.getByTestId('pool-image').nth(1);
+      const modifier = browserName === 'webkit' ? 'Meta' : 'Control';
+
+      await first.click();
+      await second.click({ modifiers: [modifier] });
+    });
+
+    await test.step('Verify two selected, then plain click resets to one', async () => {
+      const poolImages = appPage.getByTestId('pool-image');
+      await expect(poolImages.nth(0)).toHaveAttribute('data-selected', 'true');
+      await expect(poolImages.nth(1)).toHaveAttribute('data-selected', 'true');
+
+      await poolImages.nth(1).click();
+
+      await expect(poolImages.nth(0)).toHaveAttribute('data-selected', 'false');
+      await expect(poolImages.nth(1)).toHaveAttribute('data-selected', 'true');
+      await expect(appPage.getByTestId('image-pool-template-panel')).toBeVisible();
+    });
+  });
+
+  test('clears pool selection on canvas mouse down', async ({ appPage }) => {
+    await test.step('Import images and select one', async () => {
+      await importDummyImages(appPage);
+      await appPage.getByTestId('pool-image').first().click();
+      await expect(appPage.getByTestId('image-pool-template-panel')).toBeVisible();
+    });
+
+    await test.step('Mouse down on canvas clears pool selection', async () => {
+      await appPage.getByTestId('interaction-layer').click({ position: { x: 40, y: 40 } });
+      await expect(appPage.getByTestId('pool-image').first()).toHaveAttribute('data-selected', 'false');
+      await expect(appPage.getByTestId('image-pool-template-panel')).toHaveCount(0);
+    });
+  });
+
   test('is vertically scrollable when many images are imported', async ({ appPage }) => {
     await test.step('Import images', async () => {
       await importDummyImages(appPage);
