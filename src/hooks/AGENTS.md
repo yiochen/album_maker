@@ -63,6 +63,12 @@ The application uses a **normalized box model** for storage and a two-tier pixel
 - **`useAutoSave`**: Handles auto-saving album data to IndexedDB.
 - **Shared Infra Store Usage**: Hooks should use `editorInfraStore` to reference runtime Fabric and Tiptap instances instead of ad-hoc globals.
 
+## Fabric.js v7 API Gotchas
+
+See [`docs/fabricjs-gotchas.md`](../../docs/fabricjs-gotchas.md) for known v7 API differences that have caused bugs. **Read it before writing any canvas event handler or accessing Fabric object properties.**
+
+---
+
 ## Rules of Engagement
 - **Do** separate complex logic from components into custom hooks.
 - **Do** use `APP_CONFIG` for constants used within hooks.

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject } from './fabricTypes';
-import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex, useSelectedPageSide, useSetSelectedPages } from '../states/uiStore';
+import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex, useSetSelectedPages, useSetSelectedPageSide } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
 
 /**
@@ -24,7 +24,9 @@ export const useCanvasSelection = ({
     const setSelectedElementId = useSetSelectedElementId();
     const setSelectedPageId = useSetSelectedPageId();
     const setSelectedPages = useSetSelectedPages();
-    const selectedPageSide = useSelectedPageSide();
+    const setSelectedPageSide = useSetSelectedPageSide();
+    const isDragging = useRef(false);
+    const lastDragPointerX = useRef(0);
 
     // We need the current spread ID to set it when an element is selected
     const currentSpreadIndex = useCurrentSpreadIndex();
@@ -47,6 +49,14 @@ export const useCanvasSelection = ({
                     }
                     // Sync canvas uniformScaling with the selected object's setting
                     canvas.uniformScaling = obj.get('uniformScaling') !== false;
+                    // Switch active page side to whichever half the element's center is on
+                    if (canvas.width) {
+                        const objCenterX = (obj.left ?? 0) + (obj.width ?? 0) * (obj.scaleX ?? 1) / 2;
+                        const side = objCenterX < canvas.width / 2 ? 'left' : 'right';
+                        setSelectedPageSide(side);
+                        const newPageNum = currentSpreadIndex * 2 + (side === 'left' ? 1 : 2);
+                        setSelectedPages(new Set([newPageNum]));
+                    }
                 }
             } else {
                 setSelectedElementId(null);
@@ -63,11 +73,41 @@ export const useCanvasSelection = ({
             }
         };
 
-        // When clicking on canvas background (no object), reset page selection to just the current page
-        const handleMouseDown = (e: { target?: fabric.Object | null }) => {
-            if (!e.target) {
-                const currentPageNum = currentSpreadIndex * 2 + (selectedPageSide === 'left' ? 1 : 2);
-                setSelectedPages(new Set([currentPageNum]));
+        // When clicking on canvas background (no object), switch active page side to whichever half was clicked.
+        // Fabric v7 mouse:down may not expose pointer coords, so compute from the native event + canvas rect.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const handleMouseDown = (e: { target?: fabric.Object | null; e?: any }) => {
+            if (!e.target && e.e && canvas.width) {
+                const canvasEl = canvas.getElement();
+                const rect = canvasEl.getBoundingClientRect();
+                const canvasPixelX = (e.e.clientX - rect.left) * (canvas.width / rect.width);
+                const clickedSide = canvasPixelX < canvas.width / 2 ? 'left' : 'right';
+                setSelectedPageSide(clickedSide);
+                const newPageNum = currentSpreadIndex * 2 + (clickedSide === 'left' ? 1 : 2);
+                setSelectedPages(new Set([newPageNum]));
+            }
+        };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const handleObjectMoving = (e: { target?: fabric.Object; e?: any }) => {
+            isDragging.current = true;
+            if (e.e && canvas.width) {
+                const canvasEl = canvas.getElement();
+                const rect = canvasEl.getBoundingClientRect();
+                lastDragPointerX.current = (e.e.clientX - rect.left) * (canvas.width / rect.width);
+            }
+        };
+
+        // After a drag, switch active page side based on the last pointer position during the drag.
+        // mouse:up in Fabric v7 (TPointerEventInfo & { isClick }) does not expose pointer coords,
+        // so we track them from object:moving and consume here.
+        const handleMouseUp = () => {
+            if (isDragging.current && canvas.width) {
+                isDragging.current = false;
+                const side = lastDragPointerX.current < canvas.width / 2 ? 'left' : 'right';
+                setSelectedPageSide(side);
+                const newPageNum = currentSpreadIndex * 2 + (side === 'left' ? 1 : 2);
+                setSelectedPages(new Set([newPageNum]));
             }
         };
 
@@ -75,14 +115,18 @@ export const useCanvasSelection = ({
         canvas.on('selection:updated', handleSelection);
         canvas.on('selection:cleared', handleSelectionCleared);
         canvas.on('mouse:down', handleMouseDown);
+        canvas.on('object:moving', handleObjectMoving);
+        canvas.on('mouse:up', handleMouseUp);
 
         return () => {
             canvas.off('selection:created', handleSelection);
             canvas.off('selection:updated', handleSelection);
             canvas.off('selection:cleared', handleSelectionCleared);
             canvas.off('mouse:down', handleMouseDown);
+            canvas.off('object:moving', handleObjectMoving);
+            canvas.off('mouse:up', handleMouseUp);
         };
-    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId, currentSpreadIndex, selectedPageSide, setSelectedPages]);
+    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId, currentSpreadIndex, setSelectedPages, setSelectedPageSide]);
 
     return {
         hasSelection,
