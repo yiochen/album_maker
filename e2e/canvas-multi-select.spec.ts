@@ -72,27 +72,24 @@ async function selectElementById(page: Page, elementId: string): Promise<void> {
  * Waits for the ActiveSelection to be established.
  */
 async function selectMultipleElements(page: Page, elementIds: string[]): Promise<void> {
-  await page.evaluate((ids) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fabricModule = (window as any).__FABRIC_MODULE__;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const canvas = (window as any).__FABRIC_CANVAS__;
-    if (!canvas || !fabricModule) return;
-    const idSet = new Set(ids);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const objects = canvas.getObjects().filter((o: any) => o.data?.id && idSet.has(o.data.id));
-    if (objects.length === 0) return;
-    if (objects.length === 1) {
-      canvas.setActiveObject(objects[0]);
-    } else {
+  // Retry the selection in a poll, because a pending async renderSpread may
+  // destroy and recreate Fabric objects, wiping out our ActiveSelection.
+  // The retry ensures we re-select after the sync settles.
+  await expect.poll(async () => {
+    await page.evaluate((ids) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fabricModule = (window as any).__FABRIC_MODULE__;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const canvas = (window as any).__FABRIC_CANVAS__;
+      if (!canvas || !fabricModule) return;
+      const idSet = new Set(ids);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const objects = canvas.getObjects().filter((o: any) => o.data?.id && idSet.has(o.data.id));
+      if (objects.length < 2) return;
       const sel = new fabricModule.ActiveSelection(objects, { canvas });
       canvas.setActiveObject(sel);
-    }
-    canvas.requestRenderAll();
-  }, elementIds);
-
-  // Wait for the multi-selection to be reflected
-  await expect.poll(async () => {
+      canvas.requestRenderAll();
+    }, elementIds);
     return getSelectedElementIds(page).then(ids => ids.length);
   }, { timeout: 5000 }).toBe(elementIds.length);
 }
