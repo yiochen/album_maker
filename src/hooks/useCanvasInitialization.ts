@@ -147,6 +147,8 @@ export const useCanvasInitialization = ({
         // where pixel-based Fabric hit-testing is unreliable.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__FABRIC_CANVAS__ = canvas;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__FABRIC_MODULE__ = fabric;
 
         return () => {
             canvas.dispose();
@@ -154,6 +156,8 @@ export const useCanvasInitialization = ({
             clearSharedFabricCanvasIfMatch(canvas);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             delete (window as any).__FABRIC_CANVAS__;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            delete (window as any).__FABRIC_MODULE__;
         };
     }, [
         canvasElRef,
