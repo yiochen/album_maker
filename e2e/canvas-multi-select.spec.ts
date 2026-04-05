@@ -69,9 +69,9 @@ async function selectElementById(page: Page, elementId: string): Promise<void> {
 
 /**
  * Programmatically select multiple canvas elements by their IDs.
- * Requires __FABRIC_MODULE__ and __FABRIC_CANVAS__ to be exposed on window.
+ * Waits for the ActiveSelection to be established.
  */
-async function selectElementsByIds(page: Page, elementIds: string[]): Promise<void> {
+async function selectMultipleElements(page: Page, elementIds: string[]): Promise<void> {
   await page.evaluate((ids) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabricModule = (window as any).__FABRIC_MODULE__;
@@ -90,17 +90,20 @@ async function selectElementsByIds(page: Page, elementIds: string[]): Promise<vo
     }
     canvas.requestRenderAll();
   }, elementIds);
+
+  // Wait for the multi-selection to be reflected
+  await expect.poll(async () => {
+    return getSelectedElementIds(page).then(ids => ids.length);
+  }, { timeout: 5000 }).toBe(elementIds.length);
 }
 
 /**
- * Add two image placeholder elements to the canvas on the left page side.
+ * Add two image placeholder elements to the canvas.
+ * Both will be centered at x=0.5 (same page side).
  */
-async function addTwoElementsOnSameSide(page: Page): Promise<void> {
-  // Add first placeholder
+async function addTwoElements(page: Page): Promise<void> {
   await page.getByTestId('add-image-btn').click();
   await expect.poll(() => getCanvasObjectCount(page)).toBe(1);
-
-  // Add second placeholder
   await page.getByTestId('add-image-btn').click();
   await expect.poll(() => getCanvasObjectCount(page)).toBe(2);
 }
@@ -137,39 +140,28 @@ test.describe('Canvas Multi-Select & Element Clipboard', () => {
   test.describe('Multi-Selection', () => {
     test('selects multiple elements via programmatic ActiveSelection', async ({ appPage }) => {
       await test.step('Add two elements', async () => {
-        await addTwoElementsOnSameSide(appPage);
+        await addTwoElements(appPage);
+      });
+
+      await test.step('Select both and verify', async () => {
+        const ids = await getCanvasElementIds(appPage);
+        expect(ids).toHaveLength(2);
+        await selectMultipleElements(appPage, ids);
+      });
+    });
+
+    test('multi-selection is preserved after focus', async ({ appPage }) => {
+      await test.step('Add two elements', async () => {
+        await addTwoElements(appPage);
       });
 
       await test.step('Select both elements', async () => {
         const ids = await getCanvasElementIds(appPage);
-        expect(ids).toHaveLength(2);
-        await selectElementsByIds(appPage, ids);
+        await selectMultipleElements(appPage, ids);
       });
 
-      await test.step('Verify both are selected', async () => {
-        const selectedIds = await getSelectedElementIds(appPage);
-        expect(selectedIds).toHaveLength(2);
-      });
-    });
-
-    test('Ctrl+click adds element to selection', async ({ appPage }) => {
-      await test.step('Add two elements', async () => {
-        await addTwoElementsOnSameSide(appPage);
-      });
-
-      await test.step('Select first element', async () => {
-        const ids = await getCanvasElementIds(appPage);
-        await selectElementById(appPage, ids[0]);
-        const selected = await getSelectedElementIds(appPage);
-        expect(selected).toHaveLength(1);
-        expect(selected[0]).toBe(ids[0]);
-      });
-
-      await test.step('Ctrl+click second element to add to selection', async () => {
-        const ids = await getCanvasElementIds(appPage);
-        // Programmatically create a multi-selection with both objects
-        await selectElementsByIds(appPage, ids);
-
+      await test.step('Focus viewport and verify selection preserved', async () => {
+        await focusCanvasViewport(appPage);
         const selected = await getSelectedElementIds(appPage);
         expect(selected).toHaveLength(2);
       });
@@ -179,15 +171,12 @@ test.describe('Canvas Multi-Select & Element Clipboard', () => {
   test.describe('Delete Multi-Selection', () => {
     test('deletes all selected elements with Delete key', async ({ appPage }) => {
       await test.step('Add two elements', async () => {
-        await addTwoElementsOnSameSide(appPage);
+        await addTwoElements(appPage);
       });
 
       await test.step('Select both elements', async () => {
         const ids = await getCanvasElementIds(appPage);
-        expect(ids).toHaveLength(2);
-        await selectElementsByIds(appPage, ids);
-        const selected = await getSelectedElementIds(appPage);
-        expect(selected).toHaveLength(2);
+        await selectMultipleElements(appPage, ids);
       });
 
       await test.step('Press Delete and verify all removed', async () => {
@@ -200,7 +189,7 @@ test.describe('Canvas Multi-Select & Element Clipboard', () => {
 
     test('deletes single selected element with Delete key', async ({ appPage }) => {
       await test.step('Add two elements', async () => {
-        await addTwoElementsOnSameSide(appPage);
+        await addTwoElements(appPage);
       });
 
       await test.step('Select only first element', async () => {
@@ -242,23 +231,18 @@ test.describe('Canvas Multi-Select & Element Clipboard', () => {
         const allIds = await getCanvasElementIds(appPage);
         const selectedIds = await getSelectedElementIds(appPage);
         expect(selectedIds).toHaveLength(1);
-        // The selected element should be the new (pasted) one, not the original
         expect(allIds).toContain(selectedIds[0]);
       });
     });
 
     test('copy and paste multiple elements', async ({ appPage }) => {
       await test.step('Add two elements', async () => {
-        await addTwoElementsOnSameSide(appPage);
+        await addTwoElements(appPage);
       });
 
-      await test.step('Select both elements', async () => {
+      await test.step('Select both, copy, and paste', async () => {
         const ids = await getCanvasElementIds(appPage);
-        await selectElementsByIds(appPage, ids);
-      });
-
-      await test.step('Copy and paste', async () => {
-        // Use focusCanvasViewport to avoid clicking the canvas which would clear multi-selection
+        await selectMultipleElements(appPage, ids);
         await focusCanvasViewport(appPage);
         await appPage.keyboard.press('ControlOrMeta+c');
         await appPage.keyboard.press('ControlOrMeta+v');
@@ -303,7 +287,6 @@ test.describe('Canvas Multi-Select & Element Clipboard', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .map((o: any) => ({ left: Math.round(o.left), top: Math.round(o.top) }));
         });
-        // Each paste should offset, so positions should all be different
         const unique = new Set(positions.map((p: { left: number; top: number }) => `${p.left},${p.top}`));
         expect(unique.size).toBe(4);
       });
@@ -366,7 +349,6 @@ test.describe('Canvas Multi-Select & Element Clipboard', () => {
         const interactionLayer = appPage.getByTestId('interaction-layer');
         const box = await interactionLayer.boundingBox();
         if (!box) throw new Error('Interaction layer not visible');
-        // Click on the right 3/4 of the canvas (right page)
         await appPage.mouse.click(box.x + box.width * 0.75, box.y + box.height / 2);
 
         await appPage.keyboard.press('ControlOrMeta+v');
@@ -377,7 +359,6 @@ test.describe('Canvas Multi-Select & Element Clipboard', () => {
         const selectedIds = await getSelectedElementIds(appPage);
         expect(selectedIds).toHaveLength(1);
 
-        // Check that the pasted element's center is on the right half
         const isOnRight = await appPage.evaluate((pastedId) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const canvas = (window as any).__FABRIC_CANVAS__;
