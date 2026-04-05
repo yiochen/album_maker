@@ -138,7 +138,6 @@ export const useCanvasInitialization = ({
             ctx.lineWidth = (hoveredObj as unknown as { borderLineWidth?: number }).borderLineWidth || 2;
             ctx.strokeRect(bound.left, bound.top, bound.width, bound.height);
             ctx.restore();
-            drawnHoverObj = hoveredObj;
         });
 
         setFabricCanvas(canvas);
