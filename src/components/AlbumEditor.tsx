@@ -20,6 +20,7 @@ import {
   useSelectedPageSide,
   useSetSelectedPageId,
   useSetSelectedElementId,
+  useSetSelectedPageSide,
   useActiveSidePanelTab,
   useIsSettingsOpen,
   useIsSnappingEnabled,
@@ -33,6 +34,7 @@ import {
   useSelectedPoolImageCount,
   useTogglePoolImageSelection,
   useClearPoolImageSelection,
+  useSetSelectedPages,
 } from '../states/uiStore';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -76,6 +78,7 @@ export const AlbumEditor: React.FC = () => {
   const selectedPageSide = useSelectedPageSide();
   const setSelectedPageId = useSetSelectedPageId();
   const setSelectedElementId = useSetSelectedElementId();
+  const setSelectedPageSide = useSetSelectedPageSide();
   const activeSidePanelTab = useActiveSidePanelTab();
   const isSettingsOpen = useIsSettingsOpen();
   const isSnappingEnabled = useIsSnappingEnabled();
@@ -89,6 +92,7 @@ export const AlbumEditor: React.FC = () => {
   const selectedPoolImageCount = useSelectedPoolImageCount();
   const togglePoolImageSelection = useTogglePoolImageSelection();
   const clearPoolImageSelection = useClearPoolImageSelection();
+  const setSelectedPages = useSetSelectedPages();
 
   // Auto-save
   useAutoSave();
@@ -274,20 +278,24 @@ export const AlbumEditor: React.FC = () => {
                   selectedPageElementCount={selectedPageElementCount}
                   selectedPageLabel={selectedPageLabel}
                   selectedPageNumber={selectedPageNumber}
-                  onApply={(template) => {
-                    const nextElements = applyTemplateToSpreadSideWithImages(
-                      currentSpread.elements,
+                onApply={(template) => {
+                  const nextElements = applyTemplateToSpreadSideWithImages(
+                    currentSpread.elements,
                       template,
                       album.settings,
                       selectedPageSide,
                       selectedPoolImages
                     );
-                    updateSpread(currentSpread.id, { elements: nextElements });
-                    setSelectedPageId(currentSpread.id);
-                    setSelectedElementId(null);
-                    clearPoolImageSelection();
-                  }}
-                />
+                  updateSpread(currentSpread.id, { elements: nextElements });
+                  setSelectedPageId(currentSpread.id);
+                  setSelectedElementId(null);
+                  if (selectedPageSide === 'left') {
+                    setSelectedPageSide('right');
+                    setSelectedPages(new Set([currentSpreadIndex * 2 + 2]));
+                  }
+                  clearPoolImageSelection();
+                }}
+              />
               </div>
             </>
           )}

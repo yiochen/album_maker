@@ -263,6 +263,16 @@ test.describe('Image Pool', () => {
       expect(await getCanvasObjectCount(appPage)).toBe(1);
     });
 
+    test('advances active page from left to right after applying a selected-image template', async ({ appPage }) => {
+      await importDummyImages(appPage);
+      await expect(appPage.locator('.canvas-page-highlight-left')).toHaveCount(1);
+      await selectPoolImage(appPage, 0);
+
+      await applySelectedImageTemplate(appPage, 'full-page-image');
+
+      await expect(appPage.locator('.canvas-page-highlight-right')).toHaveCount(1);
+    });
+
     test('applies a 2-image template from selected images', async ({ appPage, browserName }) => {
       await openSelectedLayoutsPanelViaSelection(appPage, [0, 1], getModifier(browserName));
 
