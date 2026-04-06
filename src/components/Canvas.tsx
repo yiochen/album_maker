@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import * as fabric from 'fabric';
 import type { PoolImage, TextContent } from '../types';
 import { isTextElement } from '../types';
@@ -11,8 +11,23 @@ import { useCanvasViewportLayout } from '../hooks/useCanvasViewportLayout';
 import { DroppableCanvas } from './DroppableCanvas';
 import { TiptapTextEditor } from './canvas/TiptapTextEditor';
 import { TextEditingToolbar } from './canvas/TextEditingToolbar';
-import { useAlbumSpreads } from '../states/albumStore';
-import { useCurrentSpreadIndex, useSelectedPageSide } from '../states/uiStore';
+import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
+import { ArrowRightIcon } from './icons/ArrowRightIcon';
+import { FitIcon } from './icons/FitIcon';
+import { InsertAfterIcon } from './icons/InsertAfterIcon';
+import { InsertBeforeIcon } from './icons/InsertBeforeIcon';
+import { SkipBackIcon } from './icons/SkipBackIcon';
+import { SkipForwardIcon } from './icons/SkipForwardIcon';
+import { ZoomInIcon } from './icons/ZoomInIcon';
+import { ZoomOutIcon } from './icons/ZoomOutIcon';
+import { useAddSpreads, useAlbumSettings, useAlbumSpreads } from '../states/albumStore';
+import {
+    useCurrentSpreadIndex,
+    useSelectedPageSide,
+    useSetCurrentSpreadIndex,
+    useSetSelectedPageSide,
+    useSetSelectedPages,
+} from '../states/uiStore';
 import { useFabricCanvas, useTiptapEditor } from '../states/editorInfraStore';
 import { useDndDropContext } from '../contexts/DndDropContext';
 import { useTextEditorTransition } from '../hooks/useTextEditorTransition';
@@ -38,8 +53,13 @@ export const Canvas: React.FC<CanvasProps> = ({
     onImageDrop,
 }) => {
     const spreads = useAlbumSpreads();
+    const settings = useAlbumSettings();
+    const addSpreads = useAddSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
     const selectedPageSide = useSelectedPageSide();
+    const setCurrentSpreadIndex = useSetCurrentSpreadIndex();
+    const setSelectedPageSide = useSetSelectedPageSide();
+    const setSelectedPages = useSetSelectedPages();
     const fabricCanvas = useFabricCanvas();
     const tiptapEditor = useTiptapEditor();
     const {
@@ -49,6 +69,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         handleCommitDone,
     } = useTextEditorTransition();
     const currentSpread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
+    const maxSpreads = settings ? settings.maxPages / 2 : 20;
+    const canInsertSpread = spreads.length < maxSpreads;
 
     const { registerCanvasDropTarget } = useDndDropContext();
 
@@ -160,6 +182,54 @@ export const Canvas: React.FC<CanvasProps> = ({
         ? editingElement.content as TextContent
         : null;
 
+    const navigateToPage = useCallback((spreadIndex: number, side: 'left' | 'right') => {
+        const pageNumber = spreadIndex * 2 + (side === 'left' ? 1 : 2);
+        setCurrentSpreadIndex(spreadIndex);
+        setSelectedPageSide(side);
+        setSelectedPages(new Set([pageNumber]));
+    }, [setCurrentSpreadIndex, setSelectedPageSide, setSelectedPages]);
+
+    const handlePrevSpread = useCallback(() => {
+        if (currentSpreadIndex <= 0) return;
+        navigateToPage(currentSpreadIndex - 1, selectedPageSide);
+    }, [currentSpreadIndex, navigateToPage, selectedPageSide]);
+
+    const handlePrevPage = useCallback(() => {
+        if (currentSpreadIndex === 0 && selectedPageSide === 'left') return;
+        if (selectedPageSide === 'right') {
+            navigateToPage(currentSpreadIndex, 'left');
+            return;
+        }
+        navigateToPage(currentSpreadIndex - 1, 'right');
+    }, [currentSpreadIndex, navigateToPage, selectedPageSide]);
+
+    const handleNextPage = useCallback(() => {
+        if (currentSpreadIndex === spreads.length - 1 && selectedPageSide === 'right') return;
+        if (selectedPageSide === 'left') {
+            navigateToPage(currentSpreadIndex, 'right');
+            return;
+        }
+        navigateToPage(currentSpreadIndex + 1, 'left');
+    }, [currentSpreadIndex, navigateToPage, selectedPageSide, spreads.length]);
+
+    const handleNextSpread = useCallback(() => {
+        if (currentSpreadIndex >= spreads.length - 1) return;
+        navigateToPage(currentSpreadIndex + 1, selectedPageSide);
+    }, [currentSpreadIndex, navigateToPage, selectedPageSide, spreads.length]);
+
+    const handleInsertSpreadBefore = useCallback(() => {
+        if (!canInsertSpread) return;
+        addSpreads(1, currentSpreadIndex);
+        navigateToPage(currentSpreadIndex, 'left');
+    }, [addSpreads, canInsertSpread, currentSpreadIndex, navigateToPage]);
+
+    const handleInsertSpreadAfter = useCallback(() => {
+        if (!canInsertSpread) return;
+        const insertIndex = currentSpreadIndex + 1;
+        addSpreads(1, insertIndex);
+        navigateToPage(insertIndex, 'left');
+    }, [addSpreads, canInsertSpread, currentSpreadIndex, navigateToPage]);
+
     if (!currentSpread) return null;
 
     return (
@@ -253,32 +323,105 @@ export const Canvas: React.FC<CanvasProps> = ({
             )}
 
             <div className="canvas-controls">
-                <button
-                    className="btn btn-ghost btn-icon"
-                    onClick={() => setZoom(z => Math.max(25, z - 25))}
-                    disabled={zoom <= 25}
-                    title="Zoom out"
-                >
-                    -
-                </button>
-                <span className="zoom-display">{zoom}%</span>
-                <button
-                    className="btn btn-ghost btn-icon"
-                    onClick={() => setZoom(z => Math.min(200, z + 25))}
-                    disabled={zoom >= 200}
-                    title="Zoom in"
-                >
-                    +
-                </button>
-                <button
-                    className={`btn btn-ghost${isFitMode ? ' active' : ''}`}
-                    onClick={toggleFitMode}
-                    aria-pressed={isFitMode}
-                    title={isFitMode ? 'Disable fit mode' : 'Enable fit mode'}
-                    data-testid="fit-zoom-button"
-                >
-                    Fit
-                </button>
+                <div className="canvas-controls-section" aria-label="Navigation controls">
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={handlePrevSpread}
+                        disabled={currentSpreadIndex <= 0}
+                        title="Previous spread"
+                        aria-label="Previous spread"
+                        data-testid="canvas-control-prev-spread"
+                    >
+                        <SkipBackIcon />
+                    </button>
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={handlePrevPage}
+                        disabled={currentSpreadIndex === 0 && selectedPageSide === 'left'}
+                        title="Previous page"
+                        aria-label="Previous page"
+                        data-testid="canvas-control-prev-page"
+                    >
+                        <ArrowLeftIcon width="18" height="18" />
+                    </button>
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={handleNextPage}
+                        disabled={currentSpreadIndex === spreads.length - 1 && selectedPageSide === 'right'}
+                        title="Next page"
+                        aria-label="Next page"
+                        data-testid="canvas-control-next-page"
+                    >
+                        <ArrowRightIcon width="18" height="18" />
+                    </button>
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={handleNextSpread}
+                        disabled={currentSpreadIndex >= spreads.length - 1}
+                        title="Next spread"
+                        aria-label="Next spread"
+                        data-testid="canvas-control-next-spread"
+                    >
+                        <SkipForwardIcon />
+                    </button>
+                </div>
+                <div className="canvas-controls-divider" aria-hidden="true" />
+                <div className="canvas-controls-section" aria-label="Insert spread controls">
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={handleInsertSpreadBefore}
+                        disabled={!canInsertSpread}
+                        title="Insert spread before"
+                        aria-label="Insert spread before"
+                        data-testid="canvas-control-insert-spread-before"
+                    >
+                        <InsertBeforeIcon />
+                    </button>
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={handleInsertSpreadAfter}
+                        disabled={!canInsertSpread}
+                        title="Insert spread after"
+                        aria-label="Insert spread after"
+                        data-testid="canvas-control-insert-spread-after"
+                    >
+                        <InsertAfterIcon />
+                    </button>
+                </div>
+                <div className="canvas-controls-divider" aria-hidden="true" />
+                <div className="canvas-controls-section" aria-label="Zoom controls">
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={() => setZoom(z => Math.max(25, z - 25))}
+                        disabled={zoom <= 25}
+                        title="Zoom out"
+                        aria-label="Zoom out"
+                        data-testid="canvas-control-zoom-out"
+                    >
+                        <ZoomOutIcon />
+                    </button>
+                    <span className="zoom-display">{zoom}%</span>
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={() => setZoom(z => Math.min(200, z + 25))}
+                        disabled={zoom >= 200}
+                        title="Zoom in"
+                        aria-label="Zoom in"
+                        data-testid="canvas-control-zoom-in"
+                    >
+                        <ZoomInIcon />
+                    </button>
+                    <button
+                        className={`btn btn-ghost btn-icon${isFitMode ? ' active' : ''}`}
+                        onClick={toggleFitMode}
+                        aria-pressed={isFitMode}
+                        title={isFitMode ? 'Disable fit mode' : 'Enable fit mode'}
+                        aria-label={isFitMode ? 'Disable fit mode' : 'Enable fit mode'}
+                        data-testid="fit-zoom-button"
+                    >
+                        <FitIcon />
+                    </button>
+                </div>
             </div>
         </section>
     );
