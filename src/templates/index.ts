@@ -4,4 +4,5 @@ export * from './paddedImageWithBottomLabelTemplate';
 export * from './twoUpVerticalTemplate';
 export * from './twoStackedImageTemplate';
 export * from './twoImageTopCaptionTemplate';
+export * from './creativeTemplates';
 export * from './templates';

@@ -25,7 +25,6 @@ import {
   useIsSettingsOpen,
   useIsSnappingEnabled,
   useSetCurrentSpreadIndex,
-  useSetActiveSidePanelTab,
   useToggleSidePanel,
   useSetSettingsOpen,
   useSetSnappingEnabled,
@@ -83,7 +82,6 @@ export const AlbumEditor: React.FC = () => {
   const isSettingsOpen = useIsSettingsOpen();
   const isSnappingEnabled = useIsSnappingEnabled();
   const setCurrentSpreadIndex = useSetCurrentSpreadIndex();
-  const setActiveSidePanelTab = useSetActiveSidePanelTab();
   const toggleSidePanel = useToggleSidePanel();
   const setSettingsOpen = useSetSettingsOpen();
   const setSnappingEnabled = useSetSnappingEnabled();
@@ -208,7 +206,6 @@ export const AlbumEditor: React.FC = () => {
               updateSpread(currentSpread.id, { elements: nextElements });
               setSelectedPageId(currentSpread.id);
               setSelectedElementId(null);
-              setActiveSidePanelTab('properties');
             }}
           />
         );
