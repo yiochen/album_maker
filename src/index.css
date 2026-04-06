@@ -750,6 +750,22 @@ body {
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
   z-index: var(--z-dropdown);
+  max-width: min(calc(100% - (var(--space-4) * 2)), 1000px);
+  flex-wrap: wrap;
+}
+
+.canvas-controls-section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.canvas-controls-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--color-border-subtle);
 }
 
 .zoom-display {
