@@ -95,7 +95,7 @@ export const DraggablePoolImage: React.FC<DraggablePoolImageProps> = ({
                 data-height-px={image.height}
             />
             {isSelected && selectionOrder !== undefined && (
-                <div className="pool-image-selection-badge" aria-hidden="true">
+                <div className="pool-image-selection-badge" data-testid="pool-image-selection-badge" aria-hidden="true">
                     {selectionOrder}
                 </div>
             )}

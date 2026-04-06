@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import type { PageElement } from '../types';
 import {
   useAlbum,
@@ -95,6 +95,12 @@ export const AlbumEditor: React.FC = () => {
 
   // Keyboard shortcuts
   useKeyboardShortcuts();
+
+  useEffect(() => {
+    if (activeSidePanelTab !== 'images') {
+      clearPoolImageSelection();
+    }
+  }, [activeSidePanelTab, clearPoolImageSelection]);
 
   // Element actions (drop, update, delete)
   const { handleImageDrop, handleAddImage, handleAddText, handleElementUpdate, handleElementDelete } = useElementActions();

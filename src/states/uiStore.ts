@@ -72,6 +72,9 @@ export const useUIStore = create<UIState>((set) => ({
 
   togglePoolImageSelection: (imageId, multi) => set((state) => {
     if (!multi) {
+      if (state.selectedPoolImageIds.length === 1 && state.selectedPoolImageIds[0] === imageId) {
+        return { selectedPoolImageIds: [] };
+      }
       return { selectedPoolImageIds: [imageId] };
     }
 
