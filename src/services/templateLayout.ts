@@ -1,6 +1,7 @@
 import type {
   AlbumSettings,
   PageElement,
+  PoolImage,
   TemplateContent,
   TemplateDefinition,
   TemplateLeafNode,
@@ -131,7 +132,8 @@ function templateContentToElement(
   leafRect: LayoutRect,
   pageWidthInches: number,
   pageHeightInches: number,
-  side: PageSide
+  side: PageSide,
+  boundImage?: PoolImage
 ): PageElement | null {
   const x1Page = leafRect.x / pageWidthInches;
   const y1 = leafRect.y / pageHeightInches;
@@ -143,26 +145,30 @@ function templateContentToElement(
   const x2 = xOffset + (x2Page * 0.5);
 
   if (content === null || content.type === 'image') {
-    const aspectRatio = content?.aspectRatio ?? null;
-    const imageSrc = content?.imageSrc;
+    const aspectRatio = boundImage
+      ? (boundImage.width && boundImage.height ? boundImage.width / boundImage.height : 1)
+      : (content?.aspectRatio ?? null);
+    const imageSrc = boundImage?.fullUrl ?? content?.imageSrc;
     const isPlaceholder = !imageSrc;
     return {
       id: crypto.randomUUID(),
       type: 'image',
       content: {
-        fullUrl: imageSrc ?? '',
-        previewUrl: imageSrc ?? '',
-        thumbnailUrl: imageSrc ?? '',
-        sourceId: isPlaceholder ? 'placeholder' : 'template',
-        sourceImageId: isPlaceholder ? `placeholder-${Date.now()}-${crypto.randomUUID()}` : `template-${crypto.randomUUID()}`,
+        fullUrl: boundImage?.fullUrl ?? imageSrc ?? '',
+        previewUrl: boundImage?.previewUrl ?? imageSrc ?? '',
+        thumbnailUrl: boundImage?.thumbnailUrl ?? imageSrc ?? '',
+        originalWidth: boundImage?.width,
+        originalHeight: boundImage?.height,
+        sourceId: boundImage?.sourceId ?? (isPlaceholder ? 'placeholder' : 'template'),
+        sourceImageId: boundImage?.sourceImageId ?? (isPlaceholder ? `placeholder-${Date.now()}-${crypto.randomUUID()}` : `template-${crypto.randomUUID()}`),
         contentTransform: {
           zoom: 1,
           panX: 0.5,
           panY: 0.5,
         },
         originalAspectRatio: aspectRatio ?? 1,
-        lockAspectRatio: aspectRatio !== null,
-        isPlaceholder,
+        lockAspectRatio: boundImage ? true : aspectRatio !== null,
+        isPlaceholder: boundImage ? false : isPlaceholder,
       },
       box: { x1, y1, x2, y2 },
     };
@@ -229,6 +235,42 @@ export function applyTemplateToSpreadSide(
 
   const generated = leafLayouts
     .map(({ node, rect }) => templateContentToElement(node.content, rect, pageWidthInches, pageHeightInches, side))
+    .filter((el): el is PageElement => el !== null);
+
+  const retained = spreadElements.filter(el => !isNodeInSide(el, side));
+  return [...retained, ...generated];
+}
+
+export function applyTemplateToSpreadSideWithImages(
+  spreadElements: PageElement[],
+  template: TemplateDefinition,
+  settings: AlbumSettings,
+  side: PageSide,
+  selectedImages: PoolImage[]
+): PageElement[] {
+  const pageWidthInches = albumLengthToInches(settings.pageWidth, settings.unit);
+  const pageHeightInches = albumLengthToInches(settings.pageHeight, settings.unit);
+  const margin = toInches(template.pageContext.defaultMargin);
+
+  const rootRect: LayoutRect = {
+    x: margin,
+    y: margin,
+    width: Math.max(0, pageWidthInches - margin * 2),
+    height: Math.max(0, pageHeightInches - margin * 2),
+  };
+
+  const leafLayouts: LayoutLeaf[] = [];
+  collectLeafLayouts(template.root, rootRect, leafLayouts);
+
+  let imageIndex = 0;
+  const generated = leafLayouts
+    .map(({ node, rect }) => {
+      const boundImage = node.content === null || node.content.type === 'image'
+        ? selectedImages[imageIndex++]
+        : undefined;
+
+      return templateContentToElement(node.content, rect, pageWidthInches, pageHeightInches, side, boundImage);
+    })
     .filter((el): el is PageElement => el !== null);
 
   const retained = spreadElements.filter(el => !isNodeInSide(el, side));

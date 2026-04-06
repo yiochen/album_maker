@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import type React from 'react';
 
 /**
  * Props for useCanvasZoom.
@@ -23,10 +24,11 @@ export const useCanvasZoom = ({
     containerRef,
 }: UseCanvasZoomProps) => {
     const [zoom, setZoom] = useState(25);
+    const [isFitMode, setIsFitMode] = useState(true);
     const isZoomInitialized = useRef(false);
 
     // Auto-Fit Logic
-    const fitToViewport = useCallback(() => {
+    const calculateFitZoom = useCallback(() => {
         if (!containerRef.current) return;
         const viewport = containerRef.current;
         const styles = window.getComputedStyle(viewport);
@@ -48,25 +50,74 @@ export const useCanvasZoom = ({
         setZoom(zoomPercent);
     }, [canvasWidth, canvasHeight, containerRef]);
 
+    const fitToViewport = useCallback(() => {
+        setIsFitMode(true);
+        calculateFitZoom();
+    }, [calculateFitZoom]);
+
+    const toggleFitMode = useCallback(() => {
+        setIsFitMode((prev) => {
+            const next = !prev;
+            if (next) {
+                calculateFitZoom();
+            }
+            return next;
+        });
+    }, [calculateFitZoom]);
+
+    const setZoomPercent = useCallback((value: React.SetStateAction<number>) => {
+        setIsFitMode(false);
+        setZoom(value);
+    }, []);
+
     useEffect(() => {
         if (!isZoomInitialized.current && canvasWidth > 0) {
             const timer = setTimeout(() => {
-                fitToViewport();
+                calculateFitZoom();
                 isZoomInitialized.current = true;
             }, 100);
             return () => clearTimeout(timer);
         }
-    }, [fitToViewport, canvasWidth]);
+    }, [calculateFitZoom, canvasWidth]);
 
     useEffect(() => {
         let timeout: ReturnType<typeof setTimeout>;
         const handleResize = () => {
             clearTimeout(timeout);
-            timeout = setTimeout(fitToViewport, 100);
+            timeout = setTimeout(() => {
+                if (isFitMode) {
+                    calculateFitZoom();
+                }
+            }, 100);
         };
         window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, [fitToViewport]);
+        return () => {
+            clearTimeout(timeout);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [calculateFitZoom, isFitMode]);
 
-    return { zoom, setZoom, fitToViewport };
+    useEffect(() => {
+        const viewport = containerRef.current;
+        if (!viewport) return;
+
+        let timeout: ReturnType<typeof setTimeout>;
+        const observer = new ResizeObserver(() => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                if (isZoomInitialized.current && isFitMode) {
+                    calculateFitZoom();
+                }
+            }, 100);
+        });
+
+        observer.observe(viewport);
+
+        return () => {
+            clearTimeout(timeout);
+            observer.disconnect();
+        };
+    }, [containerRef, calculateFitZoom, isFitMode]);
+
+    return { zoom, setZoom: setZoomPercent, fitToViewport, toggleFitMode, isFitMode };
 };

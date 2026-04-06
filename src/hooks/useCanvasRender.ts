@@ -47,7 +47,7 @@ export const useCanvasRender = ({
     const canvasWidth = toCanvasPx(modelWidth);
     const canvasHeight = toCanvasPx(modelHeight);
 
-    const { zoom, setZoom, fitToViewport } = useCanvasZoom({
+    const { zoom, setZoom, fitToViewport, toggleFitMode, isFitMode } = useCanvasZoom({
         canvasWidth,
         canvasHeight,
         containerRef,
@@ -75,6 +75,8 @@ export const useCanvasRender = ({
         zoom,
         setZoom,
         fitToViewport,
+        toggleFitMode,
+        isFitMode,
         snapLinesRef,
     };
 };

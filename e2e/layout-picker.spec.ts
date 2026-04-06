@@ -50,6 +50,22 @@ test.describe('Layout Picker', () => {
     });
   });
 
+  test('does not advance active page when applying from the Templates tab', async ({ appPage }) => {
+    await test.step('Apply a template from the standalone Templates tab', async () => {
+      await expect(appPage.locator('.canvas-page-highlight-left')).toHaveCount(1);
+      await openLayoutsTab(appPage);
+      const grid = appPage.getByTestId('layout-picker-grid');
+      const firstOption = grid.locator('button:not([disabled])').first();
+      await expect(firstOption).toBeVisible();
+      await firstOption.click();
+    });
+
+    await test.step('Verify active page side stays on the left page', async () => {
+      await expect(appPage.locator('.canvas-page-highlight-left')).toHaveCount(1);
+      await expect(appPage.locator('.canvas-page-highlight-right')).toHaveCount(0);
+    });
+  });
+
   test('displays template options in the grid', async ({ appPage }) => {
     await test.step('Open layouts and verify template options', async () => {
       await openLayoutsTab(appPage);

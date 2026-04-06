@@ -50,11 +50,27 @@ async function getZoomSnapshot(page: Page): Promise<ZoomSnapshot> {
   });
 }
 
+async function ensureFixedZoomMode(page: Page): Promise<number> {
+  const fitButton = page.getByTestId('fit-zoom-button');
+  await expect(fitButton).toBeVisible();
+  if ((await fitButton.getAttribute('aria-pressed')) === 'true') {
+    await fitButton.click();
+    await expect(fitButton).toHaveAttribute('aria-pressed', 'false');
+  }
+
+  const zoomText = await page.locator('.zoom-display').textContent();
+  return parseInt(zoomText ?? '100', 10);
+}
+
 /**
  * Click the zoom-in button and wait for the display and Fabric state to update.
  * Returns the new zoom percentage.
  */
-async function zoomInAndWait(page: Page, currentZoom: number): Promise<number> {
+async function zoomInAndWait(page: Page): Promise<number> {
+  const currentZoom = parseInt(
+    await page.locator('.zoom-display').textContent() ?? '100',
+    10
+  );
   const nextZoom = Math.min(200, currentZoom + 25);
   await page.getByTitle('Zoom in').click();
   await expect(page.locator('.zoom-display')).toHaveText(`${nextZoom}%`, { timeout: 3000 });
@@ -109,6 +125,7 @@ test.describe('Canvas Zoom Compensation', () => {
       let snap1!: ZoomSnapshot;
 
       await test.step('Verify invariant at initial zoom', async () => {
+        await ensureFixedZoomMode(appPage);
         await expect(async () => {
           snap1 = await getZoomSnapshot(appPage);
           expect(snap1.seamStrokeWidth).not.toBeNull();
@@ -119,7 +136,7 @@ test.describe('Canvas Zoom Compensation', () => {
       });
 
       await test.step('Zoom in one step', async () => {
-        await zoomInAndWait(appPage, snap1.zoomPercent);
+        await zoomInAndWait(appPage);
       });
 
       await test.step('Verify invariant still holds and canvas value changed', async () => {
@@ -139,6 +156,7 @@ test.describe('Canvas Zoom Compensation', () => {
       let snap1!: ZoomSnapshot;
 
       await test.step('Verify invariant at initial zoom', async () => {
+        await ensureFixedZoomMode(appPage);
         await expect(async () => {
           snap1 = await getZoomSnapshot(appPage);
           expect(snap1.selectionLineWidth).not.toBeNull();
@@ -148,7 +166,7 @@ test.describe('Canvas Zoom Compensation', () => {
       });
 
       await test.step('Zoom in one step', async () => {
-        await zoomInAndWait(appPage, snap1.zoomPercent);
+        await zoomInAndWait(appPage);
       });
 
       await test.step('Verify invariant still holds and canvas value changed', async () => {
@@ -171,6 +189,7 @@ test.describe('Canvas Zoom Compensation', () => {
       let snap1!: ZoomSnapshot;
 
       await test.step('Verify invariant at initial zoom', async () => {
+        await ensureFixedZoomMode(appPage);
         await expect(async () => {
           snap1 = await getZoomSnapshot(appPage);
           expect(snap1.cornerSize).not.toBeNull();
@@ -180,7 +199,7 @@ test.describe('Canvas Zoom Compensation', () => {
       });
 
       await test.step('Zoom in one step', async () => {
-        await zoomInAndWait(appPage, snap1.zoomPercent);
+        await zoomInAndWait(appPage);
       });
 
       await test.step('Verify invariant still holds and canvas value changed', async () => {
@@ -197,6 +216,7 @@ test.describe('Canvas Zoom Compensation', () => {
       let snap1!: ZoomSnapshot;
 
       await test.step('Verify invariant at initial zoom', async () => {
+        await ensureFixedZoomMode(appPage);
         await expect(async () => {
           snap1 = await getZoomSnapshot(appPage);
           expect(snap1.borderLineWidth).not.toBeNull();
@@ -206,7 +226,7 @@ test.describe('Canvas Zoom Compensation', () => {
       });
 
       await test.step('Zoom in one step', async () => {
-        await zoomInAndWait(appPage, snap1.zoomPercent);
+        await zoomInAndWait(appPage);
       });
 
       await test.step('Verify invariant still holds and canvas value changed', async () => {

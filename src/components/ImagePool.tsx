@@ -15,8 +15,14 @@ import { processAndSaveUpload, HeifUnsupportedError } from '../services/imageUpl
 interface ImagePoolProps {
     /** List of images currently in the pool. */
     images: PoolImage[];
+    /** Set of source image keys currently placed on spreads. */
+    usedImageKeys?: Set<string>;
+    /** Selected image ids in click order. */
+    selectedImageIds: string[];
     /** Callback fired when new images are imported. */
     onImport: (images: PoolImage[]) => void;
+    /** Callback fired when an image is clicked. */
+    onImageClick: (imageId: string, multi: boolean) => void;
     /** Callback fired when the pool close button is clicked. */
     onClose?: () => void;
 }
@@ -27,7 +33,10 @@ interface ImagePoolProps {
  */
 export const ImagePool: React.FC<ImagePoolProps> = ({
     images,
+    usedImageKeys,
+    selectedImageIds,
     onImport,
+    onImageClick,
     onClose,
 }) => {
     const [activeSourceId, setActiveSourceId] = useState<string>('google-photos');
@@ -42,6 +51,7 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
     const errorMessage = uploadErrorMessage ?? importErrorMessage;
     const hasUploadError = !!uploadErrorMessage;
     const hasImportError = !!importErrorMessage;
+    const selectedImageIdSet = new Set(selectedImageIds);
 
     const handleImportClick = () => {
         setUploadErrorMessage(null);
@@ -215,7 +225,14 @@ export const ImagePool: React.FC<ImagePoolProps> = ({
                 ) : (
                     <div className="image-masonry" data-testid="image-grid">
                         {images.map(image => (
-                            <DraggablePoolImage key={image.id} image={image} />
+                            <DraggablePoolImage
+                                key={image.id}
+                                image={image}
+                                isUsed={usedImageKeys?.has(`${image.sourceId}/${image.sourceImageId}`) ?? false}
+                                isSelected={selectedImageIdSet.has(image.id)}
+                                selectionOrder={selectedImageIds.indexOf(image.id) >= 0 ? selectedImageIds.indexOf(image.id) + 1 : undefined}
+                                onClick={(event, clickedImage) => onImageClick(clickedImage.id, event.metaKey || event.ctrlKey)}
+                            />
                         ))}
                     </div>
                 )}

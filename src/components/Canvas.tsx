@@ -62,7 +62,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         canvasHeight,
         zoom,
         setZoom,
-        fitToViewport,
+        toggleFitMode,
+        isFitMode,
         snapLinesRef,
     } = useCanvasRender({
         canvasElRef,
@@ -269,7 +270,15 @@ export const Canvas: React.FC<CanvasProps> = ({
                 >
                     +
                 </button>
-                <button className="btn btn-ghost" onClick={fitToViewport}>Fit</button>
+                <button
+                    className={`btn btn-ghost${isFitMode ? ' active' : ''}`}
+                    onClick={toggleFitMode}
+                    aria-pressed={isFitMode}
+                    title={isFitMode ? 'Disable fit mode' : 'Enable fit mode'}
+                    data-testid="fit-zoom-button"
+                >
+                    Fit
+                </button>
             </div>
         </section>
     );
