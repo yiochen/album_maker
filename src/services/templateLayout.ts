@@ -38,7 +38,7 @@ function albumLengthToInches(value: number, unit: AlbumSettings['unit']): number
 }
 
 function toPt(style?: TemplateTextStyle): number {
-  if (!style?.fontSize) return 24;
+  if (!style?.fontSize) return 12;
   return toInches(style.fontSize) * 72;
 }
 
