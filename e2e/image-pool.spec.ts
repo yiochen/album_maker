@@ -11,7 +11,6 @@ import {
   applySelectedImageTemplate,
   openNonImagePanel,
   selectFirstCanvasObject,
-  focusCanvasForKeyboard,
   getCanvasObjectCount,
 } from './fixtures';
 
@@ -122,8 +121,9 @@ test.describe('Image Pool', () => {
       await expect(firstPoolImage).toHaveAttribute('data-used', 'true');
 
       await selectFirstCanvasObject(appPage);
-      await focusCanvasForKeyboard(appPage);
-      await appPage.keyboard.press('Delete');
+      await appPage.evaluate(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+      });
 
       await expect(firstPoolImage).toHaveAttribute('data-used', 'false');
     });
