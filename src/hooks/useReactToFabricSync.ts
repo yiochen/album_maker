@@ -5,7 +5,7 @@ import { isImageElement } from '../types';
 import { renderSpread } from '../utils/fabricRenderer';
 import { CustomFabricObject } from './fabricTypes';
 import { useAlbumSettings, useAlbumSpreads, useUpdateElement } from '../states/albumStore';
-import { useSelectedElementId, useCurrentSpreadIndex } from '../states/uiStore';
+import { useUIStore, useCurrentSpreadIndex } from '../states/uiStore';
 
 /**
  * Props for useReactToFabricSync.
@@ -28,21 +28,34 @@ export const useReactToFabricSync = ({
     const currentSpreadIndex = useCurrentSpreadIndex();
     const spread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
     const settings = useAlbumSettings();
-    const selectedElementId = useSelectedElementId();
     const onElementUpdate = useUpdateElement();
 
     const ppi = APP_CONFIG.PPI;
 
-    // We use refs for the callbacks and the spread to avoid stale closures in the 
+    // We use refs for the callbacks and the spread to avoid stale closures in the
     // event handlers while minimizing useEffect re-subscriptions.
     const spreadRef = useRef(spread);
     const onElementUpdateRef = useRef(onElementUpdate);
     const syncLockRef = useRef<{ promise: Promise<void> | null }>({ promise: null });
+    // Store selectedElementIds in a ref so selection restoration doesn't trigger re-renders.
+    // Uses zustand subscribe for synchronous updates (React effects are async and can be stale
+    // when read by a pending async renderSpread).
+    const selectedElementIdsRef = useRef<string[]>([]);
 
     useEffect(() => {
         spreadRef.current = spread;
         onElementUpdateRef.current = onElementUpdate;
     }, [spread, onElementUpdate]);
+
+    useEffect(() => {
+        // Synchronously update the ref whenever the store changes, outside of render.
+        const unsub = useUIStore.subscribe(
+            (state) => { selectedElementIdsRef.current = state.selectedElementIds; }
+        );
+        // Initialize with current value
+        selectedElementIdsRef.current = useUIStore.getState().selectedElementIds;
+        return unsub;
+    }, []);
 
     const modelWidth = settings ? settings.pageWidth * 2 * ppi : 0;
     const modelHeight = settings ? settings.pageHeight * ppi : 0;
@@ -72,14 +85,27 @@ export const useReactToFabricSync = ({
                 }
             });
 
-            // Handle selection after sync
-            if (selectedElementId && canvas instanceof fabric.Canvas) {
-                const obj = canvas.getObjects().find(o => (o as CustomFabricObject).data?.id === selectedElementId);
-                if (obj && canvas.getActiveObject() !== obj) {
-                    canvas.setActiveObject(obj);
+            // Restore selection after sync (renderSpread destroys and recreates objects)
+            const ids = selectedElementIdsRef.current;
+            if (ids.length > 0 && canvas instanceof fabric.Canvas) {
+                const objects = canvas.getObjects();
+                const idSet = new Set(ids);
+                const matchedObjects = objects.filter(o => {
+                    const id = (o as CustomFabricObject).data?.id;
+                    return id && idSet.has(id);
+                });
+
+                if (matchedObjects.length === 1) {
+                    if (canvas.getActiveObject() !== matchedObjects[0]) {
+                        canvas.setActiveObject(matchedObjects[0]);
+                        canvas.requestRenderAll();
+                    }
+                } else if (matchedObjects.length > 1) {
+                    const sel = new fabric.ActiveSelection(matchedObjects, { canvas });
+                    canvas.setActiveObject(sel);
                     canvas.requestRenderAll();
                 }
-            } else if (!selectedElementId && canvas instanceof fabric.Canvas) {
+            } else if (ids.length === 0 && canvas instanceof fabric.Canvas) {
                 canvas.discardActiveObject();
                 canvas.requestRenderAll();
             }
@@ -97,5 +123,7 @@ export const useReactToFabricSync = ({
         };
 
         sync();
-    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, settings, selectedElementId]);
+        // NOTE: selectedElementIds is intentionally NOT in deps — it's read via ref
+        // to avoid a render loop (selection change → sync → setActiveObject → selection event → repeat)
+    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, settings]);
 };

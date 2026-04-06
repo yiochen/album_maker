@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject } from './fabricTypes';
-import { useSetSelectedElementId, useSetSelectedPageId, useCurrentSpreadIndex, useSetSelectedPages, useSetSelectedPageSide, useClearPoolImageSelection } from '../states/uiStore';
+import { useSetSelectedPageId, useCurrentSpreadIndex, useSetSelectedPages, useSetSelectedPageSide, useSetSelectedElementIds, useClearPoolImageSelection } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
 
 /**
@@ -13,15 +13,26 @@ interface UseCanvasSelectionProps {
 }
 
 /**
+ * Determines which page side a Fabric object belongs to based on its center x
+ * relative to the canvas midpoint.
+ */
+function getObjectPageSide(obj: fabric.Object, canvasWidth: number): 'left' | 'right' {
+    const center = obj.getCenterPoint();
+    return center.x < canvasWidth / 2 ? 'left' : 'right';
+}
+
+/**
  * Hook to handle object selection events on the canvas.
  *
- * It syncs the selection state from Fabric.js to the global UI store (selectedElementId, selectedPageId).
+ * It syncs the selection state from Fabric.js to the global UI store (selectedElementIds, selectedPageId).
+ * Multi-selection is constrained to a single page side (left or right).
+ * Auto-switches the active page side based on element clicks, background clicks, and drags.
  */
 export const useCanvasSelection = ({
     fabricCanvas,
 }: UseCanvasSelectionProps) => {
     const [hasSelection, setHasSelection] = useState(false);
-    const setSelectedElementId = useSetSelectedElementId();
+    const setSelectedElementIds = useSetSelectedElementIds();
     const setSelectedPageId = useSetSelectedPageId();
     const setSelectedPages = useSetSelectedPages();
     const setSelectedPageSide = useSetSelectedPageSide();
@@ -34,40 +45,90 @@ export const useCanvasSelection = ({
     const spreads = useAlbumSpreads();
     const currentSpreadId = spreads[currentSpreadIndex]?.id;
 
+    // Guard to prevent re-entrant selection handler calls when we modify the
+    // Fabric selection programmatically (e.g. enforcing same-page-side constraint).
+    const isAdjustingSelectionRef = useRef(false);
+
     useEffect(() => {
         const canvas = fabricCanvas;
         if (!canvas) return;
 
         const handleSelection = (e: { selected: fabric.Object[] }) => {
+            // Skip if we're programmatically adjusting selection
+            if (isAdjustingSelectionRef.current) return;
+
             setHasSelection(true);
             const selected = e.selected || [];
-            if (selected.length === 1) {
-                const obj = selected[0] as CustomFabricObject;
-                if (obj.data?.id) {
-                    setSelectedElementId(obj.data.id);
-                    if (currentSpreadId) {
-                        setSelectedPageId(currentSpreadId);
-                    }
-                    // Sync canvas uniformScaling with the selected object's setting
-                    canvas.uniformScaling = obj.get('uniformScaling') !== false;
-                    // Switch active page side to whichever half the element's center is on
-                    if (canvas.width) {
-                        const objCenterX = (obj.left ?? 0) + (obj.width ?? 0) * (obj.scaleX ?? 1) / 2;
-                        const side = objCenterX < canvas.width / 2 ? 'left' : 'right';
-                        setSelectedPageSide(side);
-                        const newPageNum = currentSpreadIndex * 2 + (side === 'left' ? 1 : 2);
-                        setSelectedPages(new Set([newPageNum]));
-                    }
-                }
-            } else {
-                setSelectedElementId(null);
+            const canvasWidth = canvas.getWidth();
+
+            // Filter to only selectable objects with data IDs
+            const validObjects = selected.filter(obj => {
+                const custom = obj as CustomFabricObject;
+                return custom.data?.id;
+            });
+
+            if (validObjects.length === 0) {
+                setSelectedElementIds([]);
                 setSelectedPageId(null);
+                return;
+            }
+
+            // Enforce single-page-side constraint:
+            // Determine the page side of the last selected object (the one just clicked)
+            const lastObj = validObjects[validObjects.length - 1];
+            const targetSide = getObjectPageSide(lastObj, canvasWidth);
+
+            // Keep only objects on the same page side
+            const sameSideObjects = validObjects.filter(
+                obj => getObjectPageSide(obj, canvasWidth) === targetSide
+            );
+
+            // If we had to filter out cross-page objects, update the Fabric selection
+            if (sameSideObjects.length < selected.length) {
+                // Defer the selection adjustment to avoid re-entrant event handling
+                isAdjustingSelectionRef.current = true;
+                queueMicrotask(() => {
+                    try {
+                        canvas.discardActiveObject();
+                        if (sameSideObjects.length === 1) {
+                            canvas.setActiveObject(sameSideObjects[0]);
+                        } else if (sameSideObjects.length > 1) {
+                            const sel = new fabric.ActiveSelection(sameSideObjects, { canvas });
+                            canvas.setActiveObject(sel);
+                        }
+                        canvas.requestRenderAll();
+                    } finally {
+                        isAdjustingSelectionRef.current = false;
+                    }
+                });
+            }
+
+            const ids = sameSideObjects
+                .map(obj => (obj as CustomFabricObject).data?.id)
+                .filter((id): id is string => !!id);
+
+            setSelectedElementIds(ids);
+
+            if (ids.length >= 1 && currentSpreadId) {
+                setSelectedPageId(currentSpreadId);
+            }
+
+            // Switch active page side to whichever half the selected elements are on
+            setSelectedPageSide(targetSide);
+            const newPageNum = currentSpreadIndex * 2 + (targetSide === 'left' ? 1 : 2);
+            setSelectedPages(new Set([newPageNum]));
+
+            // Sync canvas uniformScaling with the selected object's setting (single selection only)
+            if (sameSideObjects.length === 1) {
+                canvas.uniformScaling = sameSideObjects[0].get('uniformScaling') !== false;
             }
         };
 
         const handleSelectionCleared = () => {
+            if (isAdjustingSelectionRef.current) return;
+
             setHasSelection(false);
-            setSelectedElementId(null);
+            setSelectedElementIds([]);
             setSelectedPageId(null);
             if (canvas) {
                 canvas.uniformScaling = true;
@@ -128,7 +189,7 @@ export const useCanvasSelection = ({
             canvas.off('object:moving', handleObjectMoving);
             canvas.off('mouse:up', handleMouseUp);
         };
-    }, [fabricCanvas, setSelectedElementId, setSelectedPageId, currentSpreadId, currentSpreadIndex, setSelectedPages, setSelectedPageSide, clearPoolImageSelection]);
+    }, [fabricCanvas, setSelectedElementIds, setSelectedPageId, currentSpreadId, currentSpreadIndex, setSelectedPages, setSelectedPageSide, clearPoolImageSelection]);
 
     return {
         hasSelection,

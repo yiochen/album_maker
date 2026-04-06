@@ -5,6 +5,7 @@ import { isImageElement } from '../types';
 import {
     UpdateElementCommand,
     AddElementCommand,
+    AddElementsCommand,
     DeleteElementCommand,
     MoveElementCommand,
     ReorderElementCommand
@@ -51,6 +52,7 @@ interface AlbumState {
     reorderSpreads: (fromIndex: number, toIndex: number) => void;
     updateSpread: (spreadId: string, updates: Partial<Spread>) => void;
     addElement: (spreadId: string, element: PageElement) => void;
+    addElements: (spreadId: string, elements: PageElement[]) => void;
     updateElement: (spreadId: string, elementId: string, updates: Partial<PageElement>, groupId?: string) => void;
     updateElementTransient: (spreadId: string, elementId: string, updates: Partial<PageElement>) => void;
     deleteElement: (spreadId: string, elementId: string) => void;
@@ -197,6 +199,12 @@ export const useAlbumStore = create<AlbumState>((set, get) => {
 
         addElement: (spreadId: string, element: PageElement) => {
             commandManager.execute(new AddElementCommand(spreadId, element));
+            syncState();
+        },
+
+        addElements: (spreadId: string, elements: PageElement[]) => {
+            if (elements.length === 0) return;
+            commandManager.execute(new AddElementsCommand(spreadId, elements));
             syncState();
         },
 
@@ -428,6 +436,9 @@ export const useCanRedo = () => useAlbumStore(state => state.canRedo);
 
 /** Select addElement action */
 export const useAddElement = () => useAlbumStore(state => state.addElement);
+
+/** Select addElements (batch) action */
+export const useAddElements = () => useAlbumStore(state => state.addElements);
 
 /** Select updateElement action */
 export const useUpdateElement = () => useAlbumStore(state => state.updateElement);

@@ -1,9 +1,12 @@
 import { create } from 'zustand';
 import type { LogicalPage } from '../commands/spreadCommands';
+import type { PageElement } from '../types';
 
 interface UIState {
   currentSpreadIndex: number;
   selectedElementId: string | null;
+  /** Array of all currently selected element IDs on the canvas. */
+  selectedElementIds: string[];
   selectedPageId: string | null;
   selectedPageSide: 'left' | 'right';
   selectedPoolImageIds: string[];
@@ -14,16 +17,25 @@ interface UIState {
   editingTextElementId: string | null;
   /** Set of 1-based page numbers that are selected for batch operations. */
   selectedPages: Set<number>;
+  /** Discriminator for the shared clipboard: 'pages' for page clipboard, 'elements' for element clipboard. */
+  clipboardType: 'pages' | 'elements' | null;
   /** Pages stored in the internal clipboard. */
   clipboardPages: LogicalPage[];
   /** Whether the clipboard was populated via copy or cut. */
   clipboardMode: 'copy' | 'cut' | null;
   /** 1-based page index where paste inserts before. null = append to end. */
   insertionPoint: number | null;
+  /** Elements stored in the element clipboard. */
+  clipboardElements: PageElement[];
+  /** Spread ID where the clipboard elements were copied from. */
+  clipboardSourceSpreadId: string | null;
+  /** Page side ('left'/'right') where the clipboard elements were copied from. */
+  clipboardSourcePageSide: 'left' | 'right' | null;
 
   // Actions
   setCurrentSpreadIndex: (index: number) => void;
   setSelectedElementId: (id: string | null) => void;
+  setSelectedElementIds: (ids: string[]) => void;
   setSelectedPageId: (id: string | null) => void;
   setSelectedPageSide: (side: 'left' | 'right') => void;
   setSelectedPoolImageIds: (ids: string[]) => void;
@@ -43,11 +55,14 @@ interface UIState {
   setClipboard: (pages: LogicalPage[], mode: 'copy' | 'cut') => void;
   clearClipboard: () => void;
   setInsertionPoint: (pageIndex: number | null) => void;
+  setElementClipboard: (elements: PageElement[], spreadId: string, pageSide: 'left' | 'right') => void;
+  clearElementClipboard: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
   currentSpreadIndex: 0,
   selectedElementId: null,
+  selectedElementIds: [],
   selectedPageId: null,
   selectedPageSide: 'left',
   selectedPoolImageIds: [],
@@ -56,13 +71,25 @@ export const useUIStore = create<UIState>((set) => ({
   isSnappingEnabled: true,
   editingTextElementId: null,
   selectedPages: new Set<number>(),
+  clipboardType: null,
   clipboardPages: [],
   clipboardMode: null,
   insertionPoint: null,
+  clipboardElements: [],
+  clipboardSourceSpreadId: null,
+  clipboardSourcePageSide: null,
 
   setCurrentSpreadIndex: (index) => set({ currentSpreadIndex: index }),
 
-  setSelectedElementId: (id) => set({ selectedElementId: id }),
+  setSelectedElementId: (id) => set({
+    selectedElementId: id,
+    selectedElementIds: id ? [id] : [],
+  }),
+
+  setSelectedElementIds: (ids) => set({
+    selectedElementIds: ids,
+    selectedElementId: ids.length === 1 ? ids[0] : null,
+  }),
 
   setSelectedPageId: (id) => set({ selectedPageId: id }),
 
@@ -103,7 +130,7 @@ export const useUIStore = create<UIState>((set) => ({
 
   setEditingTextElementId: (id) => set({ editingTextElementId: id }),
 
-  resetSelection: () => set({ selectedElementId: null, selectedPageId: null, editingTextElementId: null }),
+  resetSelection: () => set({ selectedElementId: null, selectedElementIds: [], selectedPageId: null, editingTextElementId: null }),
 
   togglePageSelection: (pageNum) => set((state) => {
     const next = new Set(state.selectedPages);
@@ -119,11 +146,41 @@ export const useUIStore = create<UIState>((set) => ({
 
   clearPageSelection: () => set({ selectedPages: new Set<number>() }),
 
-  setClipboard: (pages, mode) => set({ clipboardPages: pages, clipboardMode: mode }),
+  setClipboard: (pages, mode) => set({
+    clipboardPages: pages,
+    clipboardMode: mode,
+    clipboardType: 'pages',
+    clipboardElements: [],
+    clipboardSourceSpreadId: null,
+    clipboardSourcePageSide: null,
+  }),
 
-  clearClipboard: () => set({ clipboardPages: [], clipboardMode: null }),
+  clearClipboard: () => set({
+    clipboardPages: [],
+    clipboardMode: null,
+    clipboardType: null,
+    clipboardElements: [],
+    clipboardSourceSpreadId: null,
+    clipboardSourcePageSide: null,
+  }),
 
   setInsertionPoint: (pageIndex) => set({ insertionPoint: pageIndex }),
+
+  setElementClipboard: (elements, spreadId, pageSide) => set({
+    clipboardElements: elements,
+    clipboardSourceSpreadId: spreadId,
+    clipboardSourcePageSide: pageSide,
+    clipboardType: 'elements',
+    clipboardPages: [],
+    clipboardMode: null,
+  }),
+
+  clearElementClipboard: () => set({
+    clipboardElements: [],
+    clipboardSourceSpreadId: null,
+    clipboardSourcePageSide: null,
+    clipboardType: null,
+  }),
 }));
 
 // ============ Selector Helper Hooks ============
@@ -233,3 +290,27 @@ export const useInsertionPoint = () => useUIStore(state => state.insertionPoint)
 
 /** Select the setInsertionPoint action */
 export const useSetInsertionPoint = () => useUIStore(state => state.setInsertionPoint);
+
+/** Select the array of selected element IDs */
+export const useSelectedElementIds = () => useUIStore(state => state.selectedElementIds);
+
+/** Select the setSelectedElementIds action */
+export const useSetSelectedElementIds = () => useUIStore(state => state.setSelectedElementIds);
+
+/** Select the clipboard type discriminator */
+export const useClipboardType = () => useUIStore(state => state.clipboardType);
+
+/** Select the element clipboard contents */
+export const useClipboardElements = () => useUIStore(state => state.clipboardElements);
+
+/** Select the spread ID where clipboard elements were copied from */
+export const useClipboardSourceSpreadId = () => useUIStore(state => state.clipboardSourceSpreadId);
+
+/** Select the page side where clipboard elements were copied from */
+export const useClipboardSourcePageSide = () => useUIStore(state => state.clipboardSourcePageSide);
+
+/** Select the setElementClipboard action */
+export const useSetElementClipboard = () => useUIStore(state => state.setElementClipboard);
+
+/** Select the clearElementClipboard action */
+export const useClearElementClipboard = () => useUIStore(state => state.clearElementClipboard);
