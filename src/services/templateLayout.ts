@@ -8,6 +8,7 @@ import type {
   TemplateNode,
   TemplateTextStyle,
   PhysicalUnit,
+  Alignment,
 } from '../types';
 
 interface LayoutRect {
@@ -23,6 +24,10 @@ interface LayoutLeaf {
 }
 
 type PageSide = 'left' | 'right';
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
 
 function toInches(unit: PhysicalUnit): number {
   return unit.unit === 'mm' ? unit.value / 25.4 : unit.value;
@@ -127,6 +132,34 @@ function collectLeafLayouts(node: TemplateNode, rect: LayoutRect, out: LayoutLea
   }
 }
 
+function fitRectToAspectRatio(rect: LayoutRect, aspectRatio: number, alignment: Alignment): LayoutRect {
+  if (!Number.isFinite(aspectRatio) || aspectRatio <= 0 || rect.width <= 0 || rect.height <= 0) {
+    return rect;
+  }
+
+  const rectAspectRatio = rect.width / rect.height;
+  let width = rect.width;
+  let height = rect.height;
+
+  if (rectAspectRatio > aspectRatio) {
+    width = rect.height * aspectRatio;
+  } else {
+    height = rect.width / aspectRatio;
+  }
+
+  const extraX = rect.width - width;
+  const extraY = rect.height - height;
+  const horizontalBias = alignment === 'left' ? 0 : alignment === 'right' ? 1 : 0.5;
+  const verticalBias = alignment === 'top' ? 0 : alignment === 'bottom' ? 1 : 0.5;
+
+  return {
+    x: rect.x + (extraX * clamp(horizontalBias, 0, 1)),
+    y: rect.y + (extraY * clamp(verticalBias, 0, 1)),
+    width,
+    height,
+  };
+}
+
 function templateContentToElement(
   content: TemplateContent | null,
   leafRect: LayoutRect,
@@ -135,19 +168,20 @@ function templateContentToElement(
   side: PageSide,
   boundImage?: PoolImage
 ): PageElement | null {
-  const x1Page = leafRect.x / pageWidthInches;
-  const y1 = leafRect.y / pageHeightInches;
-  const x2Page = (leafRect.x + leafRect.width) / pageWidthInches;
-  const y2 = (leafRect.y + leafRect.height) / pageHeightInches;
-
-  const xOffset = side === 'left' ? 0 : 0.5;
-  const x1 = xOffset + (x1Page * 0.5);
-  const x2 = xOffset + (x2Page * 0.5);
-
   if (content === null || content.type === 'image') {
     const aspectRatio = boundImage
       ? (boundImage.width && boundImage.height ? boundImage.width / boundImage.height : 1)
       : (content?.aspectRatio ?? null);
+    const fittedRect = aspectRatio === null
+      ? leafRect
+      : fitRectToAspectRatio(leafRect, aspectRatio, content?.boxAlignment ?? 'center');
+    const x1Page = fittedRect.x / pageWidthInches;
+    const y1 = fittedRect.y / pageHeightInches;
+    const x2Page = (fittedRect.x + fittedRect.width) / pageWidthInches;
+    const y2 = (fittedRect.y + fittedRect.height) / pageHeightInches;
+    const xOffset = side === 'left' ? 0 : 0.5;
+    const x1 = xOffset + (x1Page * 0.5);
+    const x2 = xOffset + (x2Page * 0.5);
     const imageSrc = boundImage?.fullUrl ?? content?.imageSrc;
     const isPlaceholder = !imageSrc;
     return {
@@ -173,6 +207,14 @@ function templateContentToElement(
       box: { x1, y1, x2, y2 },
     };
   }
+
+  const x1Page = leafRect.x / pageWidthInches;
+  const y1 = leafRect.y / pageHeightInches;
+  const x2Page = (leafRect.x + leafRect.width) / pageWidthInches;
+  const y2 = (leafRect.y + leafRect.height) / pageHeightInches;
+  const xOffset = side === 'left' ? 0 : 0.5;
+  const x1 = xOffset + (x1Page * 0.5);
+  const x2 = xOffset + (x2Page * 0.5);
 
   return {
     id: crypto.randomUUID(),
