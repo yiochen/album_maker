@@ -54,6 +54,10 @@ export interface ImageContent {
   fullUrl: string;
   previewUrl: string;
   thumbnailUrl: string;
+  border?: {
+    widthPt: number;
+    color: string;
+  };
   /** Original source image width in pixels (full resolution). */
   originalWidth?: number;
   /** Original source image height in pixels (full resolution). */

@@ -34,6 +34,7 @@ import {
   useTogglePoolImageSelection,
   useClearPoolImageSelection,
   useSetSelectedPages,
+  useSetActiveSidePanelTab,
 } from '../states/uiStore';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -91,6 +92,7 @@ export const AlbumEditor: React.FC = () => {
   const togglePoolImageSelection = useTogglePoolImageSelection();
   const clearPoolImageSelection = useClearPoolImageSelection();
   const setSelectedPages = useSetSelectedPages();
+  const setActiveSidePanelTab = useSetActiveSidePanelTab();
 
   // Auto-save
   useAutoSave();
@@ -206,6 +208,7 @@ export const AlbumEditor: React.FC = () => {
               updateSpread(currentSpread.id, { elements: nextElements });
               setSelectedPageId(currentSpread.id);
               setSelectedElementId(null);
+              setActiveSidePanelTab('properties');
             }}
           />
         );

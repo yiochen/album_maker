@@ -2,6 +2,48 @@ import { APP_CONFIG } from '../config';
 import type { Unit, NormalizedRect, ImageContent } from '../types';
 import { applyCoverTransform } from './imageUtils';
 
+const DEFAULT_IMAGE_BORDER = {
+    widthPt: 0,
+    color: '#ffffff',
+} as const;
+
+export function getImageBorder(content: ImageContent): { widthPt: number; color: string } {
+    const widthPt = Math.min(72, Math.max(0, content.border?.widthPt ?? DEFAULT_IMAGE_BORDER.widthPt));
+    const color = content.border?.color ?? DEFAULT_IMAGE_BORDER.color;
+    return { widthPt, color };
+}
+
+export function ptToPx(pt: number, ppi: number = APP_CONFIG.PPI): number {
+    return (pt * ppi) / 72;
+}
+
+export function borderPtToCanvasPx(pt: number): number {
+    return ptToPx(pt, APP_CONFIG.SCREEN_PPI);
+}
+
+export function borderPtToModelPx(pt: number): number {
+    return ptToPx(pt, APP_CONFIG.PPI);
+}
+
+export function computeInsetRect<T extends { left: number; top: number; width: number; height: number }>(
+    rect: T,
+    insetPx: number,
+) {
+    const maxInset = Math.floor(Math.min(rect.width, rect.height) / 2);
+    const safeInset = Math.max(0, Math.min(insetPx, maxInset));
+    const width = Math.max(0, rect.width - safeInset * 2);
+    const height = Math.max(0, rect.height - safeInset * 2);
+
+    return {
+        ...rect,
+        left: rect.left + safeInset,
+        top: rect.top + safeInset,
+        width,
+        height,
+        insetPx: safeInset,
+    };
+}
+
 /**
  * Converts pixels to the specified unit (inch or cm).
  * @param px - The value in pixels.

@@ -972,6 +972,25 @@ body {
   outline: none;
 }
 
+.property-color-input {
+  width: 44px;
+  height: 36px;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.property-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.property-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+}
+
 .image-action-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -7,7 +7,8 @@ import {
     pxToUnit,
     calculateNewBoxPosition,
     calculateNewBoxSize,
-    calculateNewZoomTransform
+    calculateNewZoomTransform,
+    getImageBorder,
 } from '../../utils/propertyUtils';
 import { PropertySection } from '../common/PropertySection';
 import { PanelPropertyRow } from '../common/PanelPropertyRow';
@@ -58,6 +59,7 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
 
     const imageContent = element.content;
     const currentZoom = imageContent.contentTransform?.zoom ?? 1;
+    const imageBorder = getImageBorder(imageContent);
 
     const ppi = APP_CONFIG.PPI;
     const spreadWidth = settings.pageWidth * 2 * ppi;
@@ -163,6 +165,31 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
         onUpdate({ content: { ...imageContent, contentTransform: newCt } });
     };
 
+    const handleBorderWidthChange = (value: string) => {
+        const widthPt = Math.max(0, Math.min(72, parseFloat(value) || 0));
+        onUpdate({
+            content: {
+                ...imageContent,
+                border: {
+                    color: imageBorder.color,
+                    widthPt,
+                },
+            },
+        });
+    };
+
+    const handleBorderColorChange = (value: string) => {
+        onUpdate({
+            content: {
+                ...imageContent,
+                border: {
+                    color: value,
+                    widthPt: imageBorder.widthPt,
+                },
+            },
+        });
+    };
+
     return (
         <>
             <PropertySection title={`Size (${settings.unit})`}>
@@ -215,6 +242,30 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
                         onChange={(val) => handlePositionChange('y', val)}
                         step={0.1}
                         immediate={true}
+                    />
+                </PanelPropertyRow>
+            </PropertySection>
+
+            <PropertySection title="Border">
+                <PanelPropertyRow label="Width (pt)">
+                    <NumberInput
+                        className="property-input"
+                        value={imageBorder.widthPt}
+                        onChange={handleBorderWidthChange}
+                        step={0.5}
+                        min={0}
+                        max={72}
+                        precision={1}
+                        data-testid="image-border-width-input"
+                    />
+                </PanelPropertyRow>
+                <PanelPropertyRow label="Color">
+                    <input
+                        type="color"
+                        className="property-color-input"
+                        value={imageBorder.color}
+                        onChange={(e) => handleBorderColorChange(e.target.value)}
+                        data-testid="image-border-color-input"
                     />
                 </PanelPropertyRow>
             </PropertySection>
