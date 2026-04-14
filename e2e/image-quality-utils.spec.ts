@@ -2,6 +2,7 @@ import { test, expect } from 'playwright/test';
 import { computeEffectivePrintPpi, isFrameTooSmallForBadge } from '../src/hooks/canvasImage/quality';
 import { computeLowResBadgeLayout } from '../src/hooks/canvasImage/badgeLayout';
 import { getImageUrlForPpi } from '../src/utils/imageSourceSelection';
+import { borderPtToCanvasPx, borderPtToModelPx, computeInsetRect, getImageBorder } from '../src/utils/propertyUtils';
 import type { ImageContent } from '../src/types';
 
 test.describe('Image Quality Helpers', () => {
@@ -73,6 +74,63 @@ test.describe('Image Quality Helpers', () => {
       expect(getImageUrlForPpi(content, 30)).toBe('thumb');
       expect(getImageUrlForPpi(content, 96)).toBe('preview');
       expect(getImageUrlForPpi(content, 300)).toBe('full');
+    });
+  });
+
+  test('converts border pt units and computes inset rects', async () => {
+    await test.step('Convert points to screen/model pixels and clamp inset rectangles', async () => {
+      expect(borderPtToCanvasPx(1)).toBeCloseTo(96 / 72, 5);
+      expect(borderPtToModelPx(1)).toBeCloseTo(300 / 72, 5);
+
+      expect(computeInsetRect({ left: 10, top: 20, width: 100, height: 50 }, 8)).toEqual({
+        left: 18,
+        top: 28,
+        width: 84,
+        height: 34,
+        insetPx: 8,
+      });
+      expect(computeInsetRect({ left: 0, top: 0, width: 20, height: 10 }, 99)).toEqual({
+        left: 5,
+        top: 5,
+        width: 10,
+        height: 0,
+        insetPx: 5,
+      });
+    });
+  });
+
+  test('applies default border values and quality uses inner viewport dimensions', async () => {
+    await test.step('Resolve border defaults and compare effective print PPI', async () => {
+      expect(getImageBorder({
+        fullUrl: 'full',
+        previewUrl: 'preview',
+        thumbnailUrl: 'thumb',
+        sourceId: 'dummy',
+        sourceImageId: '1',
+      } as ImageContent)).toEqual({
+        widthPt: 0,
+        color: '#ffffff',
+      });
+
+      const withoutBorder = computeEffectivePrintPpi({
+        sourceWidth: 2400,
+        sourceHeight: 1600,
+        frameWidthPx: 800,
+        frameHeightPx: 400,
+        zoom: 1,
+        screenPpi: 96,
+      });
+      const withBorder = computeEffectivePrintPpi({
+        sourceWidth: 2400,
+        sourceHeight: 1600,
+        frameWidthPx: 700,
+        frameHeightPx: 300,
+        zoom: 1,
+        screenPpi: 96,
+      });
+
+      expect(withBorder).not.toBeNull();
+      expect((withBorder ?? 0)).toBeGreaterThan(withoutBorder ?? 0);
     });
   });
 });

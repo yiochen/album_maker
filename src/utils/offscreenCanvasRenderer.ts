@@ -1,5 +1,6 @@
 import { Spread, AlbumSettings, TextContent, ImagePageElement } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from './imageUtils';
+import { computeInsetRect, getImageBorder, ptToPx } from './propertyUtils';
 import { OffscreenRenderOptions } from './rendererTypes';
 import { decomposeForRendering, IDENTITY, getOrientedDimensions } from './orientationMatrix';
 import { getImageUrlForPpi } from './imageSourceSelection';
@@ -129,6 +130,40 @@ function renderTextElement(
     ctx.restore();
 }
 
+function renderPlaceholderElement(
+    ctx: OffscreenCanvasRenderingContext2D,
+    box: { left: number; top: number; width: number; height: number },
+): void {
+    ctx.save();
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(box.left, box.top, box.width, box.height);
+
+    const strokeWidth = Math.max(1, Math.round(Math.min(box.width, box.height) * 0.006));
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = strokeWidth;
+    ctx.setLineDash([strokeWidth * 6, strokeWidth * 6]);
+    ctx.strokeRect(
+        box.left + strokeWidth / 2,
+        box.top + strokeWidth / 2,
+        Math.max(0, box.width - strokeWidth),
+        Math.max(0, box.height - strokeWidth),
+    );
+    ctx.setLineDash([]);
+
+    const plusWidth = Math.max(24, Math.min(40, box.width * 0.18));
+    const plusHeight = Math.max(24, Math.min(40, box.height * 0.18));
+    const barThickness = Math.max(3, Math.min(6, Math.min(box.width, box.height) * 0.02));
+    const centerX = box.left + box.width / 2;
+    const centerY = box.top + box.height / 2;
+    const halfH = plusWidth / 2;
+    const halfV = plusHeight / 2;
+
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(centerX - halfH, centerY - barThickness / 2, plusWidth, barThickness);
+    ctx.fillRect(centerX - barThickness / 2, centerY - halfV, barThickness, plusHeight);
+    ctx.restore();
+}
+
 /**
  * Renders a spread onto an OffscreenCanvas using native 2D Canvas API.
  * Optimized for performance and Web Worker compatibility (no Fabric.js or DOM dependencies).
@@ -175,9 +210,28 @@ export async function renderSpread(
         }
 
         if (element.type !== 'image') continue;
-        if (element.content.isPlaceholder) continue;
 
         try {
+            const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
+            const border = getImageBorder(element.content);
+            const hasBorder = border.widthPt > 0;
+            const borderWidthPx = hasBorder ? ptToPx(border.widthPt, ppi) : 0;
+            const innerBox = computeInsetRect(box, borderWidthPx);
+
+            if (hasBorder) {
+                ctx.fillStyle = border.color;
+                ctx.fillRect(box.left, box.top, box.width, box.height);
+            }
+
+            if (innerBox.width <= 0 || innerBox.height <= 0) {
+                continue;
+            }
+
+            if (element.content.isPlaceholder) {
+                renderPlaceholderElement(ctx, innerBox);
+                continue;
+            }
+
             const bitmap = preloadedBitmaps.get(element.id);
             if (!bitmap) continue;
 
@@ -187,13 +241,10 @@ export async function renderSpread(
             // Get effective dimensions after rotation/flip for cover calculation
             const oriented = getOrientedDimensions(bitmap.width, bitmap.height, orientation);
 
-            // Calculate the container rect on the spread
-            const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
-
             // Calculate image transform within that box (Cover fit)
             const transform = applyCoverTransform(
-                box.width,
-                box.height,
+                innerBox.width,
+                innerBox.height,
                 oriented.width,
                 oriented.height,
                 {
@@ -207,7 +258,7 @@ export async function renderSpread(
 
             // 1. Clip to the frame box
             ctx.beginPath();
-            ctx.rect(box.left, box.top, box.width, box.height);
+            ctx.rect(innerBox.left, innerBox.top, innerBox.width, innerBox.height);
             ctx.clip();
 
             // 2. Handle Orientation/Transform
@@ -216,8 +267,8 @@ export async function renderSpread(
 
             // Move coordinate system to the center of the rendered image area within the frame
             ctx.translate(
-                box.left + transform.left + transform.width / 2,
-                box.top + transform.top + transform.height / 2
+                innerBox.left + transform.left + transform.width / 2,
+                innerBox.top + transform.top + transform.height / 2
             );
 
             // Apply flip and rotation (order matters: flip then rotate to match decomposeForRendering)

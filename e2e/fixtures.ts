@@ -144,7 +144,7 @@ export async function getCanvasObjectCount(page: Page): Promise<number> {
     const fabricCanvas = (window as any).__FABRIC_CANVAS__;
     if (!fabricCanvas) return 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return fabricCanvas.getObjects().filter((o: any) => o.data?.id !== 'seam').length;
+    return fabricCanvas.getObjects().filter((o: any) => o.data?.id && o.data.id !== 'seam').length;
   });
 }
 

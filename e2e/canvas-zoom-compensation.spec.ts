@@ -31,10 +31,11 @@ async function getZoomSnapshot(page: Page): Promise<ZoomSnapshot> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const imageEl = canvas?.getObjects().find((o: any) => o.data?.id && o.data.id !== 'seam');
     const active = canvas?.getActiveObject();
-    // CanvasImageElement is a fabric.Group — getObjects() returns its children:
-    // [0] placeholderFrame, [1] placeholderPlusH, [2] placeholderPlusV, [3] innerImage, ...
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const children: any[] = imageEl?.getObjects?.() ?? [];
+    const placeholderFrame = children.find((child) => child?.stroke === '#94a3b8');
+    const plusH = children.find((child) => child?.fill === '#64748b' && typeof child?.width === 'number' && child.width > child.height);
+    const plusV = children.find((child) => child?.fill === '#64748b' && typeof child?.height === 'number' && child.height > child.width);
     return {
       zoomPercent,
       seamStrokeWidth: seam?.strokeWidth ?? null,
@@ -43,9 +44,9 @@ async function getZoomSnapshot(page: Page): Promise<ZoomSnapshot> {
       // borderLineWidth is a custom property patched onto Fabric objects by fabricRenderer.ts
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       borderLineWidth: (active as any)?.borderLineWidth ?? null,
-      placeholderStrokeWidth: children[0]?.strokeWidth ?? null,
-      plusHWidth: children[1]?.width ?? null,
-      plusVHeight: children[2]?.height ?? null,
+      placeholderStrokeWidth: placeholderFrame?.strokeWidth ?? null,
+      plusHWidth: plusH?.width ?? null,
+      plusVHeight: plusV?.height ?? null,
     };
   });
 }

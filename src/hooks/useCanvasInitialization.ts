@@ -119,12 +119,18 @@ export const useCanvasInitialization = ({
         canvas.on('selection:created', markDirty);
         canvas.on('selection:updated', markDirty);
         canvas.on('selection:cleared', markDirty);
+        canvas.on('object:moving', markDirty);
+        canvas.on('object:scaling', markDirty);
+        canvas.on('object:resizing', markDirty);
+        canvas.on('object:rotating', markDirty);
+        canvas.on('object:modified', markDirty);
 
         canvas.on('after:render', () => {
             // Only clear+redraw the top context when the hover/selection state changed.
             // This avoids wiping Fabric's rubber-band rect and selection controls
             // on frames where only the objects (lower canvas) were re-rendered.
-            if (!topContextDirty) return;
+            const hasActiveObject = !!canvas.getActiveObject();
+            if (!topContextDirty && !hasActiveObject) return;
             topContextDirty = false;
 
             const ctx = canvas.getTopContext();

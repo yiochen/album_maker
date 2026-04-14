@@ -1,6 +1,19 @@
 import { test, expect, importDummyImages, openPropertiesTab, dragFirstPoolImageToCanvas } from './fixtures';
 import type { Page } from 'playwright/test';
 
+async function getFirstCanvasImageState(page: Page) {
+  return page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabricCanvas = (window as any).__FABRIC_CANVAS__;
+    if (!fabricCanvas) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const image = fabricCanvas.getObjects().find((o: any) => o.data?.id !== 'seam');
+    if (!image) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return JSON.parse(JSON.stringify((image as any).pageElement.content));
+  });
+}
+
 async function importAndDropImage(page: Page) {
   await test.step('Import images to image pool', async () => {
     await importDummyImages(page);
@@ -130,6 +143,97 @@ test.describe('Canvas', () => {
         await appPage.keyboard.press('Delete');
         await expect(appPage.getByText('Drag images here')).toBeVisible();
       });
+    });
+
+    test('shows border controls for selected placeholder image', async ({ appPage }) => {
+      await appPage.getByTestId('add-image-btn').click();
+      await openPropertiesTab(appPage);
+      await expect(appPage.getByTestId('image-border-width-input')).toBeVisible();
+      await expect(appPage.getByTestId('image-border-color-input')).toBeVisible();
+    });
+
+    test('applies border to placeholder image', async ({ appPage }) => {
+      await appPage.getByTestId('add-image-btn').click();
+      await openPropertiesTab(appPage);
+
+      await appPage.getByTestId('image-border-width-input').fill('12');
+      await appPage.getByTestId('image-border-width-input').blur();
+      await appPage.getByTestId('image-border-color-input').fill('#112233');
+
+      await expect.poll(async () => {
+        const content = await getFirstCanvasImageState(appPage);
+        return content?.border;
+      }).toEqual({ widthPt: 12, color: '#112233' });
+    });
+
+    test('preserves placeholder border when assigning a photo', async ({ appPage }) => {
+      await appPage.getByTestId('add-image-btn').click();
+      await openPropertiesTab(appPage);
+
+      await appPage.getByTestId('image-border-width-input').fill('8');
+      await appPage.getByTestId('image-border-width-input').blur();
+      await appPage.getByTestId('image-border-color-input').fill('#224466');
+
+      await importDummyImages(appPage);
+      await dragFirstPoolImageToCanvas(appPage);
+
+      await expect.poll(async () => {
+        const content = await getFirstCanvasImageState(appPage);
+        return {
+          isPlaceholder: content?.isPlaceholder,
+          border: content?.border,
+        };
+      }).toEqual({
+        isPlaceholder: false,
+        border: { widthPt: 8, color: '#224466' },
+      });
+    });
+
+    test('updates real image border width and color', async ({ appPage }) => {
+      await dragFirstPoolImageToCanvas(appPage);
+      await openPropertiesTab(appPage);
+
+      await appPage.getByTestId('image-border-width-input').fill('10.5');
+      await appPage.getByTestId('image-border-width-input').blur();
+      await appPage.getByTestId('image-border-color-input').fill('#334455');
+
+      await expect.poll(async () => {
+        const content = await getFirstCanvasImageState(appPage);
+        return content?.border;
+      }).toEqual({ widthPt: 10.5, color: '#334455' });
+    });
+
+    test('undoes and redoes border edits', async ({ appPage }) => {
+      await dragFirstPoolImageToCanvas(appPage);
+      await openPropertiesTab(appPage);
+
+      await appPage.getByTestId('image-border-width-input').fill('9');
+      await appPage.getByTestId('image-border-width-input').blur();
+      await appPage.getByTestId('image-border-color-input').fill('#445566');
+
+      await appPage.getByTitle('Undo (Ctrl+Z)').first().click();
+      await expect.poll(async () => {
+        const content = await getFirstCanvasImageState(appPage);
+        return content?.border;
+      }).toEqual({ widthPt: 9, color: '#ffffff' });
+
+      await appPage.getByTitle('Undo (Ctrl+Z)').first().click();
+      await expect.poll(async () => {
+        const content = await getFirstCanvasImageState(appPage);
+        return content?.border;
+      }).toEqual({ widthPt: 0, color: '#ffffff' });
+
+      await appPage.getByTitle('Redo (Ctrl+Y)').first().click();
+      await expect.poll(async () => {
+        const content = await getFirstCanvasImageState(appPage);
+        return content?.border;
+      }).toEqual({ widthPt: 9, color: '#ffffff' });
+
+      await appPage.getByTitle('Redo (Ctrl+Y)').first().click();
+      await expect.poll(async () => {
+        const content = await getFirstCanvasImageState(appPage);
+        return content?.border;
+      }).toEqual({ widthPt: 9, color: '#445566' });
     });
   });
 

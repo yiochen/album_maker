@@ -13,6 +13,8 @@ import {
   selectFirstCanvasObject,
   getCanvasObjectCount,
 } from './fixtures';
+import { templates } from '../src/templates';
+import { countTemplateImageElements } from '../src/services/templateLayout';
 
 const getModifier = (browserName: string): 'Meta' | 'Control' => (
   browserName === 'webkit' ? 'Meta' : 'Control'
@@ -230,14 +232,16 @@ test.describe('Image Pool', () => {
 
       await expect(appPage.getByTestId('image-pool-template-panel')).toHaveAttribute('aria-hidden', 'false');
       await expect(appPage.getByTestId('selected-image-template-panel')).toBeVisible();
-      await expect(appPage.locator('[data-testid^="selected-image-layout-option-"]')).toHaveCount(3);
+      await expect(appPage.locator('[data-testid^="selected-image-layout-option-"]'))
+        .toHaveCount(templates.filter((template) => countTemplateImageElements(template) === 1).length);
     });
 
     test('two selected images show 2-image templates', async ({ appPage, browserName }) => {
       await openSelectedLayoutsPanelViaSelection(appPage, [0, 1], getModifier(browserName));
 
       await expect(appPage.getByTestId('selected-image-template-panel')).toBeVisible();
-      await expect(appPage.locator('[data-testid^="selected-image-layout-option-"]')).toHaveCount(3);
+      await expect(appPage.locator('[data-testid^="selected-image-layout-option-"]'))
+        .toHaveCount(templates.filter((template) => countTemplateImageElements(template) === 2).length);
     });
 
     test('selected-layout panel collapses when no selection remains', async ({ appPage }) => {
@@ -280,7 +284,14 @@ test.describe('Image Pool', () => {
 
       await expect(appPage.getByTestId('image-pool-template-panel')).toHaveAttribute('aria-hidden', 'true');
       await expect(appPage.getByText('Drag images here')).toHaveCount(0);
-      expect(await getCanvasObjectCount(appPage)).toBe(2);
+      expect(await appPage.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fabricCanvas = (window as any).__FABRIC_CANVAS__;
+        if (!fabricCanvas) return 0;
+        // CanvasImageElement instances are Fabric groups with data ids.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return fabricCanvas.getObjects().filter((o: any) => o.type === 'group' && o.data?.id).length;
+      })).toBe(2);
     });
   });
 });

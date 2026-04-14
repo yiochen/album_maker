@@ -16,6 +16,11 @@ import { useSetSelectedElementId, useSetSelectedPageId, useSetEditingTextElement
 import { calculateThumbnailSize } from '../utils/imageUtils';
 import { APP_CONFIG } from '../config';
 
+const DEFAULT_IMAGE_BORDER = {
+    widthPt: 0,
+    color: '#ffffff',
+} as const;
+
 /**
  * Pixel Coordinate System Notes:
  * - PageElement stores dimensions in MODEL PIXELS (at APP_CONFIG.PPI resolution)
@@ -59,6 +64,7 @@ export const useElementActions = () => {
                 if (target && isImageElement(target)) {
                     updateElement(spreadId, targetElementId, {
                         content: {
+                            ...target.content,
                             fullUrl: image.fullUrl,
                             previewUrl: image.previewUrl,
                             thumbnailUrl: image.thumbnailUrl,
@@ -74,6 +80,7 @@ export const useElementActions = () => {
                             originalAspectRatio: (image.width || 1) / (image.height || 1),
                             lockAspectRatio: true,
                             isPlaceholder: false,
+                            border: target.content.border ?? DEFAULT_IMAGE_BORDER,
                         },
                     });
                     setSelectedElementId(targetElementId);
@@ -113,6 +120,7 @@ export const useElementActions = () => {
                     fullUrl: image.fullUrl,
                     previewUrl: image.previewUrl,
                     thumbnailUrl: image.thumbnailUrl,
+                    border: DEFAULT_IMAGE_BORDER,
                     originalWidth: image.width,
                     originalHeight: image.height,
                     sourceId: image.sourceId,
@@ -158,6 +166,7 @@ export const useElementActions = () => {
                     fullUrl: '',
                     previewUrl: '',
                     thumbnailUrl: '',
+                    border: DEFAULT_IMAGE_BORDER,
                     sourceId: 'placeholder',
                     sourceImageId: `placeholder-${Date.now()}`,
                     contentTransform: {
