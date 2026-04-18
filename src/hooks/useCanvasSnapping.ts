@@ -14,6 +14,7 @@ import { calculateSnap, calculateResizeSnap, calculateAspectLockedResizeSnap, ge
 import type { SnapEdge } from '../types';
 import { CustomFabricObject } from './fabricTypes';
 import { CanvasImageElement } from './CanvasImageElement';
+import { CanvasShapeElement } from './CanvasShapeElement';
 import { CanvasTextElement } from './CanvasTextElement';
 import { getZoomCompensatedSizes } from '../utils/fabricRenderer';
 import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
@@ -159,8 +160,9 @@ export const useCanvasSnapping = ({
         const handleObjectScaling = (e: { target?: fabric.Object; transform?: any }) => {
             const obj = e.target;
             const isImage = obj instanceof CanvasImageElement;
+            const isShape = obj instanceof CanvasShapeElement;
             const isText = obj instanceof CanvasTextElement;
-            if ((!isImage && !isText) || !obj.data) return;
+            if ((!isImage && !isShape && !isText) || !obj.data) return;
 
             clearSnapLines();
             if (!isSnappingEnabledRef.current) return;

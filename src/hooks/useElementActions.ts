@@ -15,6 +15,8 @@ import { useAddElement, useUpdateElement, useDeleteElement, useAlbumSettings, us
 import { useSetSelectedElementId, useSetSelectedPageId, useSetEditingTextElementId } from '../states/uiStore';
 import { calculateThumbnailSize } from '../utils/imageUtils';
 import { APP_CONFIG } from '../config';
+import type { ShapePreset } from '../utils/shapePresets';
+import { normalizeShapeContent } from '../utils/shapeUtils';
 
 const DEFAULT_IMAGE_BORDER = {
     widthPt: 0,
@@ -262,10 +264,45 @@ export const useElementActions = () => {
         [addElement, setSelectedElementId, setSelectedPageId, setEditingTextElementId, settings]
     );
 
+    /**
+     * Adds a new preset shape element to the center of the current spread.
+     */
+    const handleAddShape = useCallback(
+        (spreadId: string, preset: ShapePreset) => {
+            if (!settings) return;
+
+            const spreadWidth = settings.pageWidth * 2 * ppi;
+            const spreadHeight = settings.pageHeight * ppi;
+            const squareSizePx = Math.min(spreadWidth, spreadHeight) * 0.25;
+            const normWidth = squareSizePx / spreadWidth;
+            const normHeight = squareSizePx / spreadHeight;
+
+            const box = {
+                x1: 0.5 - normWidth / 2,
+                y1: 0.5 - normHeight / 2,
+                x2: 0.5 + normWidth / 2,
+                y2: 0.5 + normHeight / 2,
+            };
+
+            const newElement: PageElement = {
+                id: crypto.randomUUID(),
+                type: 'shape',
+                content: normalizeShapeContent(preset.content),
+                box,
+            };
+
+            addElement(spreadId, newElement);
+            setSelectedElementId(newElement.id);
+            setSelectedPageId(spreadId);
+        },
+        [addElement, ppi, setSelectedElementId, setSelectedPageId, settings]
+    );
+
     return {
         handleImageDrop,
         handleAddImage,
         handleAddText,
+        handleAddShape,
         handleElementUpdate,
         handleElementDelete,
     };

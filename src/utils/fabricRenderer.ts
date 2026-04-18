@@ -1,7 +1,8 @@
 import * as fabric from 'fabric';
-import { Spread, AlbumSettings, isImageElement, isTextElement } from '../types';
+import { Spread, AlbumSettings, isImageElement, isShapeElement, isTextElement } from '../types';
 import { CanvasImageElement } from '../hooks/CanvasImageElement';
 import { CanvasTextElement } from '../hooks/CanvasTextElement';
+import { CanvasShapeElement } from '../hooks/CanvasShapeElement';
 import { CustomFabricObject, ExtendedFabricObject } from '../hooks/fabricTypes';
 import { APP_CONFIG } from '../config';
 import { FabricRenderOptions } from './rendererTypes';
@@ -229,6 +230,47 @@ export async function renderSpread(
                         uniformScaling: false,
                     });
 
+
+                canvas.add(canvasEl);
+                objectsById.set(element.id, canvasEl as unknown as CustomFabricObject);
+                canvasEl.applyLayout(canvas.width, canvas.height);
+            }
+        } else if (isShapeElement(element)) {
+            const existingShape = existingObj instanceof CanvasShapeElement ? existingObj : null;
+
+            if (existingShape) {
+                existingShape.pageElement = element;
+                existingShape.updateControlVisibility();
+                existingShape.set({
+                    ...SHARED_SELECTION_STYLE,
+                    selectable: isInteractive,
+                    hasControls: isInteractive,
+                    evented: isInteractive,
+                    uniformScaling: false,
+                    cornerSize: uiSizes.cornerSize,
+                    borderScaleFactor: uiSizes.borderScaleFactor,
+                    borderLineWidth: uiSizes.borderLineWidth,
+                });
+
+                if (!(existingShape as ExtendedFabricObject).preventLayoutSync) {
+                    existingShape.applyLayout(canvas.width, canvas.height);
+                }
+            } else {
+                if (existingObj) canvas.remove(existingObj);
+                if (existingObj && existingObj.data?.id) {
+                    objectsById.delete(existingObj.data.id);
+                }
+
+                const canvasEl = new CanvasShapeElement(element, {
+                    ...SHARED_SELECTION_STYLE,
+                    cornerSize: uiSizes.cornerSize,
+                    borderScaleFactor: uiSizes.borderScaleFactor,
+                    selectable: isInteractive,
+                    hasControls: isInteractive,
+                    evented: isInteractive,
+                    uniformScaling: false,
+                });
+                (canvasEl as unknown as { borderLineWidth: number }).borderLineWidth = uiSizes.borderLineWidth;
 
                 canvas.add(canvasEl);
                 objectsById.set(element.id, canvasEl as unknown as CustomFabricObject);

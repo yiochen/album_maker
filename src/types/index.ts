@@ -106,6 +106,30 @@ export interface ImageContent {
   originalAspectRatio?: number;
 }
 
+export type ShapeCommand =
+  | { op: 'moveTo'; x: number; y: number }
+  | { op: 'lineTo'; x: number; y: number }
+  | { op: 'curveTo'; c1x: number; c1y: number; c2x: number; c2y: number; x: number; y: number }
+  | { op: 'closePath' }
+  | { op: 'ellipse'; cx: number; cy: number; rx: number; ry: number };
+
+export interface ShapeBorder {
+  widthPt: number;
+  color: string;
+}
+
+export interface ShapeSubpath {
+  commands: ShapeCommand[];
+  closed: boolean;
+}
+
+export interface ShapeContent {
+  subpaths: ShapeSubpath[];
+  fill: string | null;
+  fillRule?: 'nonzero' | 'evenodd';
+  border?: ShapeBorder;
+}
+
 /**
  * Style properties for a text run or default text style.
  * All fields are optional when used as run overrides.
@@ -170,7 +194,7 @@ export interface NormalizedRect {
 export interface BasePageElement {
   id: string;
   type: string;
-  content: ImageContent | TextContent;
+  content: ImageContent | TextContent | ShapeContent;
   box: NormalizedRect;
 }
 
@@ -184,7 +208,12 @@ export interface TextPageElement extends BasePageElement {
   content: TextContent;
 }
 
-export type PageElement = ImagePageElement | TextPageElement;
+export interface ShapePageElement extends BasePageElement {
+  type: 'shape';
+  content: ShapeContent;
+}
+
+export type PageElement = ImagePageElement | TextPageElement | ShapePageElement;
 
 /** Type guard: narrows PageElement to image element */
 export function isImageElement(el: PageElement): el is ImagePageElement {
@@ -194,6 +223,11 @@ export function isImageElement(el: PageElement): el is ImagePageElement {
 /** Type guard: narrows PageElement to text element */
 export function isTextElement(el: PageElement): el is TextPageElement {
   return el.type === 'text';
+}
+
+/** Type guard: narrows PageElement to shape element */
+export function isShapeElement(el: PageElement): el is ShapePageElement {
+  return el.type === 'shape';
 }
 
 // Position and Size kept for legacy use or general purposes if needed, 
@@ -241,7 +275,7 @@ export interface AppState {
   album: Album;
   currentPageIndex: number;
   selectedElementId: string | null;
-  activeSidePanelTab: 'navigator' | 'images' | 'properties' | 'templates' | null;
+  activeSidePanelTab: 'navigator' | 'images' | 'shapes' | 'properties' | 'templates' | null;
   activeSourceId: string | null;
   isSnappingEnabled: boolean;
 }

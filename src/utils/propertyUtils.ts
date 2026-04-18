@@ -1,6 +1,7 @@
 import { APP_CONFIG } from '../config';
 import type { Unit, NormalizedRect, ImageContent } from '../types';
 import { applyCoverTransform } from './imageUtils';
+import { getShapeBorder as getShapeBorderBase, ptToPx } from './shapeUtils';
 
 const DEFAULT_IMAGE_BORDER = {
     widthPt: 0,
@@ -13,10 +14,6 @@ export function getImageBorder(content: ImageContent): { widthPt: number; color:
     return { widthPt, color };
 }
 
-export function ptToPx(pt: number, ppi: number = APP_CONFIG.PPI): number {
-    return (pt * ppi) / 72;
-}
-
 export function borderPtToCanvasPx(pt: number): number {
     return ptToPx(pt, APP_CONFIG.SCREEN_PPI);
 }
@@ -24,6 +21,9 @@ export function borderPtToCanvasPx(pt: number): number {
 export function borderPtToModelPx(pt: number): number {
     return ptToPx(pt, APP_CONFIG.PPI);
 }
+
+export { ptToPx };
+export const getShapeBorder = getShapeBorderBase;
 
 export function computeInsetRect<T extends { left: number; top: number; width: number; height: number }>(
     rect: T,

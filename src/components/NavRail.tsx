@@ -1,11 +1,12 @@
 import React from 'react';
 import { NavigatorIcon } from './icons/NavigatorIcon';
 import { ImageIcon } from './icons/ImageIcon';
+import { ShapesIcon } from './icons/ShapesIcon';
 import { SlidersIcon } from './icons/SlidersIcon';
 import { TemplatesIcon } from './icons/TemplatesIcon';
 import { ShareIcon } from './icons/ShareIcon';
 
-type PanelId = 'navigator' | 'images' | 'properties' | 'templates';
+type PanelId = 'navigator' | 'images' | 'shapes' | 'properties' | 'templates';
 
 interface NavRailProps {
   activePanel: PanelId | null;
@@ -16,6 +17,7 @@ interface NavRailProps {
 const navItems: { id: PanelId; label: string; icon: React.FC<React.SVGProps<SVGSVGElement>> }[] = [
   { id: 'navigator', label: 'Pages', icon: NavigatorIcon },
   { id: 'images', label: 'Images', icon: ImageIcon },
+  { id: 'shapes', label: 'Shapes', icon: ShapesIcon },
   { id: 'properties', label: 'Props', icon: SlidersIcon },
   { id: 'templates', label: 'Templates', icon: TemplatesIcon },
 ];

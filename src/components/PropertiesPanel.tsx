@@ -1,9 +1,10 @@
 import React from 'react';
 import type { Spread, PageElement, AlbumSettings } from '../types';
-import { isTextElement } from '../types';
+import { isShapeElement, isTextElement } from '../types';
 import { useReorderElement } from '../states/albumStore';
 import { SpreadProperties } from './properties/SpreadProperties';
 import { ElementProperties } from './properties/ElementProperties';
+import { ShapeElementProperties } from './properties/ShapeElementProperties';
 import { TextElementProperties } from './properties/TextElementProperties';
 
 /**
@@ -50,7 +51,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     {selectedElement
                         ? isTextElement(selectedElement)
                             ? 'Text Properties'
-                            : 'Image Properties'
+                            : isShapeElement(selectedElement)
+                                ? 'Shape Properties'
+                                : 'Image Properties'
                         : 'Spread Properties'}
                 </h2>
             </div>
@@ -59,6 +62,25 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 {selectedElement ? (
                     isTextElement(selectedElement) ? (
                         <TextElementProperties
+                            element={selectedElement}
+                            settings={settings}
+                            onUpdate={onElementUpdate}
+                            onDelete={onElementDelete}
+                            canBringForward={canBringForward}
+                            canSendBackward={canSendBackward}
+                            onBringForward={() => {
+                                if (canBringForward) {
+                                    reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex + 1);
+                                }
+                            }}
+                            onSendBackward={() => {
+                                if (canSendBackward) {
+                                    reorderElement(spread.id, selectedElement.id, elementIndex, elementIndex - 1);
+                                }
+                            }}
+                        />
+                    ) : isShapeElement(selectedElement) ? (
+                        <ShapeElementProperties
                             element={selectedElement}
                             settings={settings}
                             onUpdate={onElementUpdate}

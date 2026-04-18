@@ -10,7 +10,7 @@ interface UIState {
   selectedPageId: string | null;
   selectedPageSide: 'left' | 'right';
   selectedPoolImageIds: string[];
-  activeSidePanelTab: 'navigator' | 'images' | 'properties' | 'templates' | null;
+  activeSidePanelTab: 'navigator' | 'images' | 'shapes' | 'properties' | 'templates' | null;
   isSettingsOpen: boolean;
   isSnappingEnabled: boolean;
   /** ID of the text element currently in inline-editing mode, or null. */
@@ -41,8 +41,8 @@ interface UIState {
   setSelectedPoolImageIds: (ids: string[]) => void;
   togglePoolImageSelection: (imageId: string, multi: boolean) => void;
   clearPoolImageSelection: () => void;
-  setActiveSidePanelTab: (tab: 'navigator' | 'images' | 'properties' | 'templates' | null) => void;
-  toggleSidePanel: (tab: 'navigator' | 'images' | 'properties' | 'templates') => void;
+  setActiveSidePanelTab: (tab: 'navigator' | 'images' | 'shapes' | 'properties' | 'templates' | null) => void;
+  toggleSidePanel: (tab: 'navigator' | 'images' | 'shapes' | 'properties' | 'templates') => void;
   toggleSettings: () => void;
   setSettingsOpen: (isOpen: boolean) => void;
   toggleSnapping: () => void;

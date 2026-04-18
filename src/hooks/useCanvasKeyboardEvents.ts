@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
 import { CustomFabricObject } from './fabricTypes';
-import { PageElement } from '../types';
+import { PageElement, isImageElement, isShapeElement, isTextElement } from '../types';
 import {
     useCurrentSpreadIndex,
     useIsEditingText,
@@ -20,12 +20,53 @@ function elementPageSide(el: PageElement): 'left' | 'right' {
 
 /** Deep-clone elements with new IDs. */
 function cloneElements(elements: PageElement[]): PageElement[] {
-    return elements.map(el => ({
-        ...el,
-        id: crypto.randomUUID(),
-        box: { ...el.box },
-        content: { ...el.content },
-    })) as PageElement[];
+    return elements.map((el) => {
+        if (isImageElement(el)) {
+            return {
+                ...el,
+                id: crypto.randomUUID(),
+                box: { ...el.box },
+                content: {
+                    ...el.content,
+                    border: el.content.border ? { ...el.content.border } : undefined,
+                },
+            };
+        }
+
+        if (isTextElement(el)) {
+            return {
+                ...el,
+                id: crypto.randomUUID(),
+                box: { ...el.box },
+                content: {
+                    ...el.content,
+                    runs: el.content.runs.map((run) => ({
+                        ...run,
+                        style: run.style ? { ...run.style } : undefined,
+                    })),
+                    defaultStyle: { ...el.content.defaultStyle },
+                },
+            };
+        }
+
+        if (isShapeElement(el)) {
+            return {
+                ...el,
+                id: crypto.randomUUID(),
+                box: { ...el.box },
+                content: {
+                    ...el.content,
+                    border: el.content.border ? { ...el.content.border } : undefined,
+                    subpaths: el.content.subpaths.map((subpath) => ({
+                        ...subpath,
+                        commands: subpath.commands.map((command) => ({ ...command })),
+                    })),
+                },
+            };
+        }
+
+        return el;
+    });
 }
 
 /**
