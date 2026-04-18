@@ -1,10 +1,11 @@
 import React from 'react';
 
-type PanelId = 'navigator' | 'images' | 'properties' | 'templates' | null;
+type PanelId = 'navigator' | 'images' | 'shapes' | 'properties' | 'templates' | null;
 
 const panelTitles: Record<string, string> = {
   navigator: 'Pages',
   images: 'Images',
+  shapes: 'Shapes',
   properties: 'Properties',
   templates: 'Templates',
 };

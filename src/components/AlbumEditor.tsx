@@ -54,6 +54,7 @@ import { SidePanel } from './SidePanel';
 import { TopBar } from './TopBar';
 import { LayoutPicker } from './LayoutPicker';
 import { SelectedImageTemplatePanel } from './SelectedImageTemplatePanel';
+import { ShapePanel } from './ShapePanel';
 import { templates } from '../templates';
 import { applyTemplateToSpreadSide, applyTemplateToSpreadSideWithImages } from '../services/templateLayout';
 
@@ -107,7 +108,7 @@ export const AlbumEditor: React.FC = () => {
   }, [activeSidePanelTab, clearPoolImageSelection]);
 
   // Element actions (drop, update, delete)
-  const { handleImageDrop, handleAddImage, handleAddText, handleElementUpdate, handleElementDelete } = useElementActions();
+  const { handleImageDrop, handleAddImage, handleAddText, handleAddShape, handleElementUpdate, handleElementDelete } = useElementActions();
 
   // Album lifecycle (CRUD, import/export)
   const {
@@ -167,6 +168,15 @@ export const AlbumEditor: React.FC = () => {
             selectedImageIds={selectedPoolImageIds}
             onImport={addToPool}
             onImageClick={togglePoolImageSelection}
+          />
+        );
+      case 'shapes':
+        return (
+          <ShapePanel
+            onAddShape={(preset) => {
+              handleAddShape(currentSpread.id, preset);
+              setActiveSidePanelTab('properties');
+            }}
           />
         );
       case 'properties':

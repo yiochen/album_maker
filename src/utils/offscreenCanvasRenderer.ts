@@ -1,9 +1,10 @@
-import { Spread, AlbumSettings, TextContent, ImagePageElement } from '../types';
+import { Spread, AlbumSettings, TextContent, ImagePageElement, ShapeContent } from '../types';
 import { calculateGaplessRect, applyCoverTransform } from './imageUtils';
 import { computeInsetRect, getImageBorder, ptToPx } from './propertyUtils';
 import { OffscreenRenderOptions } from './rendererTypes';
 import { decomposeForRendering, IDENTITY, getOrientedDimensions } from './orientationMatrix';
 import { getImageUrlForPpi } from './imageSourceSelection';
+import { getCanvasFillRule, getShapeBorder, normalizeShapeContent, traceShapeSubpaths } from './shapeUtils';
 
 /**
  * Helper to load an image as an ImageBitmap in a worker environment.
@@ -164,6 +165,33 @@ function renderPlaceholderElement(
     ctx.restore();
 }
 
+function renderShapeElement(
+    ctx: OffscreenCanvasRenderingContext2D,
+    content: ShapeContent,
+    box: { left: number; top: number; width: number; height: number },
+    ppi: number,
+) {
+    const normalized = normalizeShapeContent(content);
+    const border = getShapeBorder(normalized);
+
+    ctx.save();
+    ctx.beginPath();
+    traceShapeSubpaths(ctx, normalized.subpaths, box);
+
+    if (normalized.fill) {
+        ctx.fillStyle = normalized.fill;
+        ctx.fill(getCanvasFillRule(normalized.fillRule));
+    }
+
+    if (border.widthPt > 0) {
+        ctx.strokeStyle = border.color;
+        ctx.lineWidth = ptToPx(border.widthPt, ppi);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
 /**
  * Renders a spread onto an OffscreenCanvas using native 2D Canvas API.
  * Optimized for performance and Web Worker compatibility (no Fabric.js or DOM dependencies).
@@ -206,6 +234,12 @@ export async function renderSpread(
             const content = element.content as TextContent;
             const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
             renderTextElement(ctx, content, box.left, box.top, box.width, box.height, ppi);
+            continue;
+        }
+
+        if (element.type === 'shape') {
+            const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
+            renderShapeElement(ctx, element.content, box, ppi);
             continue;
         }
 

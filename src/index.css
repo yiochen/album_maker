@@ -319,6 +319,82 @@ body {
   opacity: 1;
 }
 
+.shape-panel {
+  padding: var(--space-4);
+}
+
+.shape-panel-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.shape-preset-card {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-tertiary);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.shape-preset-card:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-text-tertiary);
+  transform: translateY(-1px);
+}
+
+.shape-preset-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.shape-preset-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  text-align: left;
+}
+
+.shape-preview-rect,
+.shape-preview-ellipse,
+.shape-preview-triangle {
+  display: block;
+  background: #9ca3af;
+  border: 2px solid #334155;
+}
+
+.shape-preview-rect {
+  width: 44px;
+  height: 32px;
+}
+
+.shape-preview-ellipse {
+  width: 44px;
+  height: 32px;
+  border-radius: 999px;
+}
+
+.shape-preview-triangle {
+  width: 0;
+  height: 0;
+  background: transparent;
+  border-left: 22px solid transparent;
+  border-right: 22px solid transparent;
+  border-bottom: 36px solid #9ca3af;
+  border-top: 0;
+}
+
 /* =============================================
    Top Bar
    ============================================= */
@@ -968,6 +1044,21 @@ body {
 }
 
 .property-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.property-select {
+  width: 140px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+.property-select:focus {
   border-color: var(--color-accent);
   outline: none;
 }

@@ -37,7 +37,7 @@ export async function openPropertiesTab(page: Page): Promise<void> {
 
 export async function openNonImagePanel(
   page: Page,
-  target: 'navigator' | 'properties' | 'templates'
+  target: 'navigator' | 'shapes' | 'properties' | 'templates'
 ): Promise<void> {
   await page.getByTestId(`nav-${target}`).click();
 }

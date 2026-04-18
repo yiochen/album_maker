@@ -6,8 +6,9 @@
  */
 import { useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
-import type { ImageContent, TextContent } from '../types';
+import type { ImageContent, ShapeContent, TextContent } from '../types';
 import { CanvasImageElement } from './CanvasImageElement';
+import { CanvasShapeElement } from './CanvasShapeElement';
 import { CanvasTextElement } from './CanvasTextElement';
 import { useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads, useUpdateElement } from '../states/albumStore';
@@ -62,6 +63,13 @@ export const useCanvasPersistence = ({
                         ...imageContent,
                         contentTransform: imageContent.contentTransform,
                     }
+                });
+            } else if (obj instanceof CanvasShapeElement) {
+                obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
+                const shapeContent = obj.pageElement.content as ShapeContent;
+                onElementUpdateRef.current(spread.id, obj.pageElement.id, {
+                    box: obj.pageElement.box,
+                    content: shapeContent,
                 });
             } else if (obj instanceof CanvasTextElement) {
                 const previousBox = obj.pageElement.box;
