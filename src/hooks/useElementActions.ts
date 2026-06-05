@@ -118,6 +118,7 @@ export const useElementActions = () => {
             const newElement: PageElement = {
                 id: crypto.randomUUID(),
                 type: 'image',
+                rotation: 0,
                 content: {
                     fullUrl: image.fullUrl,
                     previewUrl: image.previewUrl,
@@ -164,6 +165,7 @@ export const useElementActions = () => {
             const newElement: PageElement = {
                 id: crypto.randomUUID(),
                 type: 'image',
+                rotation: 0,
                 content: {
                     fullUrl: '',
                     previewUrl: '',
@@ -247,6 +249,7 @@ export const useElementActions = () => {
             const newElement: PageElement = {
                 id: crypto.randomUUID(),
                 type: 'text',
+                rotation: 0,
                 content: {
                     runs: [{ text: '' }],
                     defaultStyle,
@@ -287,6 +290,7 @@ export const useElementActions = () => {
             const newElement: PageElement = {
                 id: crypto.randomUUID(),
                 type: 'shape',
+                rotation: 0,
                 content: normalizeShapeContent(preset.content),
                 box,
             };

@@ -13,4 +13,5 @@ export interface ExtendedFabricObject extends fabric.Object {
      * user interactions like dragging, scaling, or resizing.
      */
     preventLayoutSync?: boolean;
+    interactionType?: 'move' | 'scale' | 'rotate' | null;
 }

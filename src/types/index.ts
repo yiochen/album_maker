@@ -196,6 +196,8 @@ export interface BasePageElement {
   type: string;
   content: ImageContent | TextContent | ShapeContent;
   box: NormalizedRect;
+  /** Clockwise rotation in degrees applied to the element frame. */
+  rotation?: number;
 }
 
 export interface ImagePageElement extends BasePageElement {

@@ -69,17 +69,25 @@ export const useCanvasInitialization = ({
         canvas.sendObjectToBack(seam);
 
         // Helper to track active interactions that should block React layout synchronization
-        const setPreventSync = (e: { target?: fabric.Object }) => {
-            if (e.target) (e.target as ExtendedFabricObject).preventLayoutSync = true;
+        const setPreventSync = (
+            interactionType: NonNullable<ExtendedFabricObject['interactionType']>
+        ) => (e: { target?: fabric.Object }) => {
+            if (!e.target) return;
+            const target = e.target as ExtendedFabricObject;
+            target.preventLayoutSync = true;
+            target.interactionType = interactionType;
         };
-        canvas.on('object:moving', setPreventSync);
-        canvas.on('object:scaling', setPreventSync);
-        canvas.on('object:resizing', setPreventSync);
-        canvas.on('object:rotating', setPreventSync);
+        canvas.on('object:moving', setPreventSync('move'));
+        canvas.on('object:scaling', setPreventSync('scale'));
+        canvas.on('object:resizing', setPreventSync('scale'));
+        canvas.on('object:rotating', setPreventSync('rotate'));
 
         // Cleanup interaction state on mouse up
         canvas.on('mouse:up', () => {
-            canvas.getObjects().forEach(o => (o as ExtendedFabricObject).preventLayoutSync = false);
+            canvas.getObjects().forEach(o => {
+                const target = o as ExtendedFabricObject;
+                target.preventLayoutSync = false;
+            });
             if (snapLinesRef.current) {
                 snapLinesRef.current.forEach(line => canvas.remove(line));
                 snapLinesRef.current.length = 0;
