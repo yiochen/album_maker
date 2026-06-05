@@ -1,4 +1,5 @@
 import type { NormalizedRect } from '../types';
+import { type ObjectGeometry, getFrameFromObjectGeometry } from './rotatedBounds';
 
 export interface BoxPixels {
     left: number;
@@ -57,4 +58,40 @@ export function computeNormalizedBoxFromPixels(
     }
 
     return nextBox;
+}
+
+export function createNormalizedBoxFromPixels(
+    boxPx: BoxPixels,
+    canvasWidth: number,
+    canvasHeight: number
+): NormalizedRect {
+    const left = boxPx.left;
+    const top = boxPx.top;
+    const right = left + boxPx.width;
+    const bottom = top + boxPx.height;
+
+    return {
+        x1: left / canvasWidth,
+        y1: top / canvasHeight,
+        x2: right / canvasWidth,
+        y2: bottom / canvasHeight,
+    };
+}
+
+export function computeNormalizedBoxFromObjectGeometry(
+    geometry: ObjectGeometry,
+    canvasWidth: number,
+    canvasHeight: number
+): NormalizedRect {
+    const frame = getFrameFromObjectGeometry(geometry);
+    return createNormalizedBoxFromPixels(
+        {
+            left: frame.left,
+            top: frame.top,
+            width: frame.width,
+            height: frame.height,
+        },
+        canvasWidth,
+        canvasHeight
+    );
 }

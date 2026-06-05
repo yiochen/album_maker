@@ -21,6 +21,7 @@ import {
     buildTextBoxFromOverlaySize,
     getTextEditorLayoutMetrics,
 } from '../../services/textEditorLayout';
+import { getRectCenter } from '../../utils/rotatedBounds';
 import { isTextElement } from '../../types';
 import type { TextContent, PageElement } from '../../types';
 
@@ -291,6 +292,7 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
     const top = box.y1 * canvasHeight;
     const width = (box.x2 - box.x1) * canvasWidth;
     const height = (box.y2 - box.y1) * canvasHeight;
+    const rotation = element.rotation ?? 0;
 
     const {
         zoomScale,
@@ -299,6 +301,14 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
         handleTouchArea,
         handleReservePadding,
     } = getTextEditorLayoutMetrics(canvasZoom);
+    const overlayWidth = width + editorPadding * 2 + handleReservePadding;
+    const overlayBoxHeight = (overlayHeight ?? height) + editorPadding * 2;
+    const center = getRectCenter({
+        left,
+        top,
+        width,
+        height,
+    });
 
     // The singleton editor's DOM node (editor.view.dom) is moved into this local 
     // container whenever a text element enters edit mode.
@@ -309,10 +319,10 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
             data-testid="tiptap-text-editor"
             style={{
                 position: 'absolute',
-                left: left - editorPadding,
-                top: top - editorPadding,
-                width: width + editorPadding * 2 + handleReservePadding,
-                height: (overlayHeight ?? height) + editorPadding * 2,
+                left: center.x - overlayWidth / 2,
+                top: center.y - overlayBoxHeight / 2,
+                width: overlayWidth,
+                height: overlayBoxHeight,
                 zIndex: 100,
                 boxSizing: 'border-box',
                 background: 'rgba(255, 255, 255, 0.98)',
@@ -324,6 +334,8 @@ export const TiptapTextEditor: React.FC<TiptapTextEditorProps> = ({
                 paddingBottom: editorPadding,
                 paddingLeft: editorPadding,
                 paddingRight: editorPadding + handleReservePadding,
+                transform: `rotate(${rotation}deg)`,
+                transformOrigin: 'center center',
                 transition: 'border-color 0.2s',
             }}
             onMouseDown={(e) => e.stopPropagation()}

@@ -1,4 +1,12 @@
 import type { SnapEdge, Position, Size } from '../types';
+import {
+    getRotatedRectBounds,
+    getRotatedRectSnapDelta,
+    normalizeRotation,
+    type RotatedRectBounds,
+    type RotatedRectFrame,
+    type SnapBoundary,
+} from './rotatedBounds';
 
 // Snap threshold in percentage
 const SNAP_THRESHOLD = 2;
@@ -12,6 +20,11 @@ export interface SnapTarget {
 export interface SnapResult {
     position: Position;
     snappedEdges: SnapEdge[];
+}
+
+export interface SnapGeometry {
+    frame: RotatedRectFrame;
+    bounds: RotatedRectBounds;
 }
 
 export interface SnapLine {
@@ -50,6 +63,13 @@ export const SNAP_TARGETS: SnapTarget[] = [
 const VERTICAL_TARGETS = SNAP_TARGETS.filter(t => t.orientation === 'vertical');
 const HORIZONTAL_TARGETS = SNAP_TARGETS.filter(t => t.orientation === 'horizontal');
 
+export function buildSnapGeometry(frame: RotatedRectFrame): SnapGeometry {
+    return {
+        frame,
+        bounds: getRotatedRectBounds(frame),
+    };
+}
+
 /**
  * Calculate snapped position for an element
  * @param position Current element position (top-left corner in %)
@@ -57,65 +77,66 @@ const HORIZONTAL_TARGETS = SNAP_TARGETS.filter(t => t.orientation === 'horizonta
  * @param threshold Snap threshold in %
  */
 export function calculateSnap(
-    position: Position,
-    size: Size,
+    geometry: SnapGeometry,
     threshold: number = SNAP_THRESHOLD
 ): SnapResult {
     const snappedEdges: SnapEdge[] = [];
 
-    let newX = position.x;
-    let newY = position.y;
+    let newX = geometry.frame.left;
+    let newY = geometry.frame.top;
 
-    // Element edges - pre-compute once
-    const left = position.x;
-    const right = position.x + size.width;
-    const top = position.y;
-    const bottom = position.y + size.height;
-    const centerX = position.x + size.width / 2;
-    const centerY = position.y + size.height / 2;
+    const isRotated = Math.abs(normalizeRotation(geometry.frame.angle)) > 1e-4;
+    const rotatedEdgeThreshold = isRotated ? threshold * 0.5 : threshold;
 
-    // Check vertical snaps (for X position) - use pre-filtered array
+    const xCandidates: Array<{ boundary: SnapBoundary; value: number; candidateThreshold: number }> = [
+        { boundary: 'left', value: geometry.bounds.left, candidateThreshold: rotatedEdgeThreshold },
+        { boundary: 'right', value: geometry.bounds.right, candidateThreshold: rotatedEdgeThreshold },
+        { boundary: 'centerX', value: geometry.bounds.centerX, candidateThreshold: threshold },
+    ];
+    const yCandidates: Array<{ boundary: SnapBoundary; value: number; candidateThreshold: number }> = [
+        { boundary: 'top', value: geometry.bounds.top, candidateThreshold: rotatedEdgeThreshold },
+        { boundary: 'bottom', value: geometry.bounds.bottom, candidateThreshold: rotatedEdgeThreshold },
+        { boundary: 'centerY', value: geometry.bounds.centerY, candidateThreshold: threshold },
+    ];
+
+    let bestXMatch: { target: SnapEdge; boundary: SnapBoundary; distance: number } | null = null;
     for (const target of VERTICAL_TARGETS) {
-        // Snap left edge
-        if (Math.abs(left - target.position) < threshold) {
-            newX = target.position;
-            snappedEdges.push(target.edge);
-            break;
-        }
-        // Snap right edge
-        if (Math.abs(right - target.position) < threshold) {
-            newX = target.position - size.width;
-            snappedEdges.push(target.edge);
-            break;
-        }
-        // Snap center
-        if (Math.abs(centerX - target.position) < threshold) {
-            newX = target.position - size.width / 2;
-            snappedEdges.push(target.edge);
-            break;
+        for (const candidate of xCandidates) {
+            const distance = Math.abs(candidate.value - target.position);
+            if (distance >= candidate.candidateThreshold) continue;
+            if (!bestXMatch || distance < bestXMatch.distance) {
+                bestXMatch = {
+                    target: target.edge,
+                    boundary: candidate.boundary,
+                    distance,
+                };
+            }
         }
     }
+    if (bestXMatch) {
+        const { dx } = getRotatedRectSnapDelta(geometry.frame, bestXMatch.boundary, SNAP_TARGETS.find(t => t.edge === bestXMatch.target)!.position);
+        newX = geometry.frame.left + dx;
+        snappedEdges.push(bestXMatch.target);
+    }
 
-    // Check horizontal snaps (for Y position) - use pre-filtered array
+    let bestYMatch: { target: SnapEdge; boundary: SnapBoundary; distance: number } | null = null;
     for (const target of HORIZONTAL_TARGETS) {
-        // Snap top edge
-        if (Math.abs(top - target.position) < threshold) {
-            newY = target.position;
-            snappedEdges.push(target.edge);
-            break;
+        for (const candidate of yCandidates) {
+            const distance = Math.abs(candidate.value - target.position);
+            if (distance >= candidate.candidateThreshold) continue;
+            if (!bestYMatch || distance < bestYMatch.distance) {
+                bestYMatch = {
+                    target: target.edge,
+                    boundary: candidate.boundary,
+                    distance,
+                };
+            }
         }
-        // Snap bottom edge
-        if (Math.abs(bottom - target.position) < threshold) {
-            newY = target.position - size.height;
-            snappedEdges.push(target.edge);
-            break;
-        }
-        // Snap center
-        if (Math.abs(centerY - target.position) < threshold) {
-            newY = target.position - size.height / 2;
-            snappedEdges.push(target.edge);
-            break;
-        }
+    }
+    if (bestYMatch) {
+        const { dy } = getRotatedRectSnapDelta(geometry.frame, bestYMatch.boundary, SNAP_TARGETS.find(t => t.edge === bestYMatch.target)!.position);
+        newY = geometry.frame.top + dy;
+        snappedEdges.push(bestYMatch.target);
     }
 
     return {

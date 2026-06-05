@@ -2,8 +2,9 @@ import * as fabric from 'fabric';
 import { APP_CONFIG } from '../config';
 import type { ImageContent, ImagePageElement } from '../types';
 import { applyCoverTransform } from '../utils/imageUtils';
-import { computeNormalizedBoxFromPixels } from '../utils/boxLayout';
+import { computeNormalizedBoxFromObjectGeometry } from '../utils/boxLayout';
 import { borderPtToCanvasPx, computeInsetRect, getImageBorder } from '../utils/propertyUtils';
+import { getObjectPositionForFrame, normalizeRotation } from '../utils/rotatedBounds';
 import {
     type OrientationMatrix, IDENTITY,
     getOrientedDimensions,
@@ -156,9 +157,9 @@ export class CanvasImageElement extends fabric.Group {
             ...options,
             originX: 'left',
             originY: 'top',
+            centeredRotation: true,
             subTargetCheck: false, // Don't allow selecting the inner image directly
             interactive: true,
-            lockRotation: true,
             selectable: options.interactive !== false,
             evented: options.interactive !== false,
             objectCaching: false,
@@ -241,6 +242,10 @@ export class CanvasImageElement extends fabric.Group {
      */
     applyLayout(canvasWidth: number = this.canvas?.width || 1, canvasHeight: number = this.canvas?.height || 1) {
         const rect = computeFrameRect(this.pageElement.box, canvasWidth, canvasHeight);
+        const objectPosition = getObjectPositionForFrame({
+            ...rect,
+            angle: this.pageElement.rotation ?? 0,
+        });
         const innerRect = this.getInnerRect(rect);
         const localInnerRect = {
             ...innerRect,
@@ -249,12 +254,14 @@ export class CanvasImageElement extends fabric.Group {
         };
 
         this.set({
-            left: rect.left,
-            top: rect.top,
+            left: objectPosition.x,
+            top: objectPosition.y,
             width: rect.width,
             height: rect.height,
             scaleX: 1,
             scaleY: 1,
+            angle: normalizeRotation(this.pageElement.rotation ?? 0),
+            centeredRotation: true,
         });
 
         // The clipPath in Fabric groups is relative to the center of the group by default.
@@ -544,20 +551,20 @@ export class CanvasImageElement extends fabric.Group {
 
     /**
      * Update Normalized Floats from current pixel dimensions
-     * Implementation of "Anchor Locking"
+     * Uses the live Fabric geometry as the source of truth for both rotated
+     * and unrotated interactions, then reconstructs the canonical frame.
      */
-    updateLayoutFromPixels(activeCorner: string = '', canvasWidth: number = this.canvas?.width || 1, canvasHeight: number = this.canvas?.height || 1) {
-        const left = this.left ?? 0;
-        const top = this.top ?? 0;
+    updateLayoutFromPixels(canvasWidth: number = this.canvas?.width || 1, canvasHeight: number = this.canvas?.height || 1) {
         const width = (this.width ?? 0) * (this.scaleX ?? 1);
         const height = (this.height ?? 0) * (this.scaleY ?? 1);
-        this.pageElement.box = computeNormalizedBoxFromPixels(
-            this.pageElement.box,
-            { left, top, width, height },
-            canvasWidth,
-            canvasHeight,
-            activeCorner
-        );
+        this.pageElement.box = computeNormalizedBoxFromObjectGeometry({
+            left: this.left ?? 0,
+            top: this.top ?? 0,
+            width,
+            height,
+            angle: this.angle ?? 0,
+        }, canvasWidth, canvasHeight);
+        this.pageElement.rotation = normalizeRotation(this.angle ?? 0);
     }
 
     /**
@@ -573,7 +580,7 @@ export class CanvasImageElement extends fabric.Group {
             tr: true,
             bl: true,
             br: true,
-            mtr: false, // Rotation is already locked at group level, but let's be explicit
+            mtr: true,
         });
     }
 }

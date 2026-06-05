@@ -10,7 +10,13 @@
  */
 import { useEffect, useRef, useMemo } from 'react';
 import * as fabric from 'fabric';
-import { calculateSnap, calculateResizeSnap, calculateAspectLockedResizeSnap, getActiveSnapLines } from '../utils/snapping';
+import {
+    buildSnapGeometry,
+    calculateSnap,
+    calculateResizeSnap,
+    calculateAspectLockedResizeSnap,
+    getActiveSnapLines,
+} from '../utils/snapping';
 import type { SnapEdge } from '../types';
 import { CustomFabricObject } from './fabricTypes';
 import { CanvasImageElement } from './CanvasImageElement';
@@ -19,6 +25,7 @@ import { CanvasTextElement } from './CanvasTextElement';
 import { getZoomCompensatedSizes } from '../utils/fabricRenderer';
 import { useIsSnappingEnabled, useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads } from '../states/albumStore';
+import { getFrameFromObjectGeometry, getObjectPositionForFrame } from '../utils/rotatedBounds';
 
 /**
  * Props for useCanvasSnapping.
@@ -118,31 +125,37 @@ export const useCanvasSnapping = ({
             // Clear existing snap lines
             clearSnapLines();
 
-            // Convert current position to top-left for snapping calculations
-            const isCenterOrigin = obj.originX === 'center';
-            const halfWidth = scaledWidth / 2;
-            const halfHeight = scaledHeight / 2;
-            const topLeftX = isCenterOrigin ? obj.left! - halfWidth : obj.left!;
-            const topLeftY = isCenterOrigin ? obj.top! - halfHeight : obj.top!;
+            const frame = getFrameFromObjectGeometry({
+                left: obj.left ?? 0,
+                top: obj.top ?? 0,
+                width: scaledWidth,
+                height: scaledHeight,
+                angle: obj.angle ?? 0,
+            });
+            const topLeftX = frame.left;
+            const topLeftY = frame.top;
 
             // Only calculate snapping if enabled
             if (isSnappingEnabledRef.current) {
-                const percentX = (topLeftX / canvasWidth) * 100;
-                const percentY = (topLeftY / canvasHeight) * 100;
-                const percentW = (scaledWidth / canvasWidth) * 100;
-                const percentH = (scaledHeight / canvasHeight) * 100;
-
-                const snapResult = calculateSnap(
-                    { x: percentX, y: percentY },
-                    { width: percentW, height: percentH }
-                );
+                const geometry = buildSnapGeometry({
+                    left: (topLeftX / canvasWidth) * 100,
+                    top: (topLeftY / canvasHeight) * 100,
+                    width: (scaledWidth / canvasWidth) * 100,
+                    height: (scaledHeight / canvasHeight) * 100,
+                    angle: obj.angle ?? 0,
+                });
+                const snapResult = calculateSnap(geometry);
 
                 if (snapResult.snappedEdges.length > 0) {
-                    // Convert snapped top-left back to object position
-                    const snappedTopLeftX = (snapResult.position.x / 100) * canvasWidth;
-                    const snappedTopLeftY = (snapResult.position.y / 100) * canvasHeight;
-                    newLeft = isCenterOrigin ? snappedTopLeftX + halfWidth : snappedTopLeftX;
-                    newTop = isCenterOrigin ? snappedTopLeftY + halfHeight : snappedTopLeftY;
+                    const snappedObjectPosition = getObjectPositionForFrame({
+                        left: (snapResult.position.x / 100) * canvasWidth,
+                        top: (snapResult.position.y / 100) * canvasHeight,
+                        width: scaledWidth,
+                        height: scaledHeight,
+                        angle: obj.angle ?? 0,
+                    });
+                    newLeft = snappedObjectPosition.x;
+                    newTop = snappedObjectPosition.y;
 
                     drawSnapLines(snapResult.snappedEdges);
                 }
@@ -166,6 +179,7 @@ export const useCanvasSnapping = ({
 
             clearSnapLines();
             if (!isSnappingEnabledRef.current) return;
+            if (Math.abs(obj.angle ?? 0) > 1e-4) return;
 
             const corner = e.transform?.corner || '';
             if (!corner) return;

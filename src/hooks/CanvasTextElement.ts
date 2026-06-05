@@ -1,6 +1,7 @@
 import * as fabric from 'fabric';
 import { PageElement, TextContent } from '../types';
-import { computeNormalizedBoxFromPixels } from '../utils/boxLayout';
+import { computeNormalizedBoxFromObjectGeometry } from '../utils/boxLayout';
+import { getObjectPositionForFrame, normalizeRotation } from '../utils/rotatedBounds';
 
 export class CanvasTextElement extends fabric.FabricObject {
     public pageElement: PageElement;
@@ -20,6 +21,7 @@ export class CanvasTextElement extends fabric.FabricObject {
             ...options,
             originX: 'left',
             originY: 'top',
+            centeredRotation: true,
             // @ts-expect-error - data is available on FabricObject
             data: { id: element.id },
             selectable: options.interactive !== false,
@@ -50,14 +52,23 @@ export class CanvasTextElement extends fabric.FabricObject {
         const targetTop = box.y1 * canvasHeight;
         const width = (box.x2 - box.x1) * canvasWidth;
         const height = (box.y2 - box.y1) * canvasHeight;
-
-        this.set({
+        const objectPosition = getObjectPositionForFrame({
             left: targetLeft,
             top: targetTop,
+            width,
+            height,
+            angle: this.pageElement.rotation ?? 0,
+        });
+
+        this.set({
+            left: objectPosition.x,
+            top: objectPosition.y,
             width: width,
             height: height,
             scaleX: 1,
             scaleY: 1,
+            angle: normalizeRotation(this.pageElement.rotation ?? 0),
+            centeredRotation: true,
         });
 
         this.setCoords();
@@ -67,21 +78,19 @@ export class CanvasTextElement extends fabric.FabricObject {
      * Read the pixel coordinates and save them back to the normalized box model.
      */
     updateLayoutFromPixels(
-        activeCorner: string = '',
         canvasWidth: number = this.canvas?.width || 1,
         canvasHeight: number = this.canvas?.height || 1
     ) {
-        const left = this.left ?? 0;
-        const top = this.top ?? 0;
         const width = (this.width ?? 0) * (this.scaleX ?? 1);
         const height = (this.height ?? 0) * (this.scaleY ?? 1);
-        this.pageElement.box = computeNormalizedBoxFromPixels(
-            this.pageElement.box,
-            { left, top, width, height },
-            canvasWidth,
-            canvasHeight,
-            activeCorner
-        );
+        this.pageElement.box = computeNormalizedBoxFromObjectGeometry({
+            left: this.left ?? 0,
+            top: this.top ?? 0,
+            width,
+            height,
+            angle: this.angle ?? 0,
+        }, canvasWidth, canvasHeight);
+        this.pageElement.rotation = normalizeRotation(this.angle ?? 0);
     }
 
     /**
@@ -189,7 +198,7 @@ export class CanvasTextElement extends fabric.FabricObject {
             mt: true,
             ml: true,
             mr: true,
-            mtr: false,
+            mtr: true,
         });
     }
 }

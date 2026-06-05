@@ -13,6 +13,7 @@ import { CanvasTextElement } from './CanvasTextElement';
 import { useCurrentSpreadIndex } from '../states/uiStore';
 import { useAlbumSpreads, useUpdateElement } from '../states/albumStore';
 import { useTextResizeReflow } from './useTextResizeReflow';
+import { normalizeRotation } from '../utils/rotatedBounds';
 
 interface UseCanvasPersistenceProps {
     /** The Fabric.js canvas instance. */
@@ -49,26 +50,34 @@ export const useCanvasPersistence = ({
         const handleObjectModified = (e: { target?: fabric.Object; transform?: any }) => {
             const obj = e.target;
             if (!obj) return;
+            const extendedObj = obj as import('./fabricTypes').ExtendedFabricObject;
+            const interactionType = extendedObj.interactionType ?? null;
 
             const spread = spreadRef.current;
             if (!spread) return;
 
             // Handle image elements
             if (obj instanceof CanvasImageElement) {
-                obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
+                if (interactionType !== 'rotate') {
+                    obj.updateLayoutFromPixels(canvasWidth, canvasHeight);
+                }
                 const imageContent = obj.pageElement.content as ImageContent;
                 onElementUpdateRef.current(spread.id, obj.pageElement.id, {
-                    box: obj.pageElement.box,
+                    ...(interactionType !== 'rotate' ? { box: obj.pageElement.box } : {}),
+                    rotation: normalizeRotation(obj.angle ?? 0),
                     content: {
                         ...imageContent,
                         contentTransform: imageContent.contentTransform,
                     }
                 });
             } else if (obj instanceof CanvasShapeElement) {
-                obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
+                if (interactionType !== 'rotate') {
+                    obj.updateLayoutFromPixels(canvasWidth, canvasHeight);
+                }
                 const shapeContent = obj.pageElement.content as ShapeContent;
                 onElementUpdateRef.current(spread.id, obj.pageElement.id, {
-                    box: obj.pageElement.box,
+                    ...(interactionType !== 'rotate' ? { box: obj.pageElement.box } : {}),
+                    rotation: normalizeRotation(obj.angle ?? 0),
                     content: shapeContent,
                 });
             } else if (obj instanceof CanvasTextElement) {
@@ -77,18 +86,21 @@ export const useCanvasPersistence = ({
                 const previousHeight = previousBox.y2 - previousBox.y1;
 
                 // For text, updateLayoutFromPixels handles coordinate conversion.
-                obj.updateLayoutFromPixels(e.transform?.corner || '', canvasWidth, canvasHeight);
+                if (interactionType !== 'rotate') {
+                    obj.updateLayoutFromPixels(canvasWidth, canvasHeight);
+                }
                 const nextBox = obj.pageElement.box;
                 const nextWidth = nextBox.x2 - nextBox.x1;
                 const nextHeight = nextBox.y2 - nextBox.y1;
 
                 const groupId = crypto.randomUUID();
                 onElementUpdateRef.current(spread.id, obj.pageElement.id, {
-                    box: obj.pageElement.box,
+                    ...(interactionType !== 'rotate' ? { box: obj.pageElement.box } : {}),
+                    rotation: normalizeRotation(obj.angle ?? 0),
                 }, groupId);
 
-                const widthChanged = Math.abs(nextWidth - previousWidth) > 1e-7;
-                const heightChanged = Math.abs(nextHeight - previousHeight) > 1e-7;
+                const widthChanged = interactionType !== 'rotate' && Math.abs(nextWidth - previousWidth) > 1e-7;
+                const heightChanged = interactionType !== 'rotate' && Math.abs(nextHeight - previousHeight) > 1e-7;
                 if (widthChanged || heightChanged) {
                     const textContent = obj.pageElement.content as TextContent;
                     requestReflowAfterResize({
@@ -101,6 +113,8 @@ export const useCanvasPersistence = ({
                     });
                 }
             }
+
+            extendedObj.interactionType = null;
         };
 
         canvas.on('object:modified', handleObjectModified);

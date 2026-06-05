@@ -5,6 +5,7 @@ import { OffscreenRenderOptions } from './rendererTypes';
 import { decomposeForRendering, IDENTITY, getOrientedDimensions } from './orientationMatrix';
 import { getImageUrlForPpi } from './imageSourceSelection';
 import { getCanvasFillRule, getShapeBorder, normalizeShapeContent, traceShapeSubpaths } from './shapeUtils';
+import { getRectCenter } from './rotatedBounds';
 
 /**
  * Helper to load an image as an ImageBitmap in a worker environment.
@@ -165,6 +166,27 @@ function renderPlaceholderElement(
     ctx.restore();
 }
 
+function renderWithElementRotation(
+    ctx: OffscreenCanvasRenderingContext2D,
+    box: { left: number; top: number; width: number; height: number },
+    rotation: number,
+    render: (localBox: { left: number; top: number; width: number; height: number }) => void
+): void {
+    ctx.save();
+    const center = getRectCenter(box);
+    ctx.translate(center.x, center.y);
+    if (rotation !== 0) {
+        ctx.rotate((rotation * Math.PI) / 180);
+    }
+    render({
+        left: -box.width / 2,
+        top: -box.height / 2,
+        width: box.width,
+        height: box.height,
+    });
+    ctx.restore();
+}
+
 function renderShapeElement(
     ctx: OffscreenCanvasRenderingContext2D,
     content: ShapeContent,
@@ -233,13 +255,17 @@ export async function renderSpread(
             // --- Text element rendering ---
             const content = element.content as TextContent;
             const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
-            renderTextElement(ctx, content, box.left, box.top, box.width, box.height, ppi);
+            renderWithElementRotation(ctx, box, element.rotation ?? 0, (localBox) => {
+                renderTextElement(ctx, content, localBox.left, localBox.top, localBox.width, localBox.height, ppi);
+            });
             continue;
         }
 
         if (element.type === 'shape') {
             const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
-            renderShapeElement(ctx, element.content, box, ppi);
+            renderWithElementRotation(ctx, box, element.rotation ?? 0, (localBox) => {
+                renderShapeElement(ctx, element.content, localBox, ppi);
+            });
             continue;
         }
 
@@ -247,82 +273,86 @@ export async function renderSpread(
 
         try {
             const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
-            const border = getImageBorder(element.content);
-            const hasBorder = border.widthPt > 0;
-            const borderWidthPx = hasBorder ? ptToPx(border.widthPt, ppi) : 0;
-            const innerBox = computeInsetRect(box, borderWidthPx);
+            renderWithElementRotation(ctx, box, element.rotation ?? 0, (localBox) => {
+                const border = getImageBorder(element.content);
+                const hasBorder = border.widthPt > 0;
+                const borderWidthPx = hasBorder ? ptToPx(border.widthPt, ppi) : 0;
+                const innerBox = computeInsetRect(localBox, borderWidthPx);
 
-            if (hasBorder) {
-                ctx.fillStyle = border.color;
-                ctx.fillRect(box.left, box.top, box.width, box.height);
-            }
+                if (hasBorder) {
+                    ctx.fillStyle = border.color;
+                    ctx.fillRect(localBox.left, localBox.top, localBox.width, localBox.height);
+                }
 
-            if (innerBox.width <= 0 || innerBox.height <= 0) {
-                continue;
-            }
+                if (innerBox.width <= 0 || innerBox.height <= 0) {
+                    return;
+                }
 
-            if (element.content.isPlaceholder) {
-                renderPlaceholderElement(ctx, innerBox);
-                continue;
-            }
+                if (element.content.isPlaceholder) {
+                    renderPlaceholderElement(ctx, innerBox);
+                    return;
+                }
+
+                const bitmap = preloadedBitmaps.get(element.id);
+                if (!bitmap) return;
+
+                // Determine orientation
+                const orientation = element.content.contentTransform?.orientation || IDENTITY;
+
+                // Get effective dimensions after rotation/flip for cover calculation
+                const oriented = getOrientedDimensions(bitmap.width, bitmap.height, orientation);
+
+                // Calculate image transform within that box (Cover fit)
+                const transform = applyCoverTransform(
+                    innerBox.width,
+                    innerBox.height,
+                    oriented.width,
+                    oriented.height,
+                    {
+                        zoom: element.content.contentTransform?.zoom ?? 1,
+                        panX: element.content.contentTransform?.panX ?? 0.5,
+                        panY: element.content.contentTransform?.panY ?? 0.5
+                    }
+                );
+
+                ctx.save();
+
+                // 1. Clip to the frame box
+                ctx.beginPath();
+                ctx.rect(innerBox.left, innerBox.top, innerBox.width, innerBox.height);
+                ctx.clip();
+
+                // 2. Handle Orientation/Transform
+                // We decompose orientation (D4 matrix) into angle and flipX to match 2D canvas transforms
+                const { angleDeg, flipX } = decomposeForRendering(orientation);
+
+                // Move coordinate system to the center of the rendered image area within the frame
+                ctx.translate(
+                    innerBox.left + transform.left + transform.width / 2,
+                    innerBox.top + transform.top + transform.height / 2
+                );
+
+                // Apply flip and rotation (order matters: flip then rotate to match decomposeForRendering)
+                if (flipX) ctx.scale(-1, 1);
+                if (angleDeg !== 0) ctx.rotate((angleDeg * Math.PI) / 180);
+
+                // 3. Draw image centered
+                ctx.drawImage(
+                    bitmap,
+                    -transform.width / 2,
+                    -transform.height / 2,
+                    transform.width,
+                    transform.height
+                );
+
+                ctx.restore();
+            });
 
             const bitmap = preloadedBitmaps.get(element.id);
-            if (!bitmap) continue;
-
-            // Determine orientation
-            const orientation = element.content.contentTransform?.orientation || IDENTITY;
-
-            // Get effective dimensions after rotation/flip for cover calculation
-            const oriented = getOrientedDimensions(bitmap.width, bitmap.height, orientation);
-
-            // Calculate image transform within that box (Cover fit)
-            const transform = applyCoverTransform(
-                innerBox.width,
-                innerBox.height,
-                oriented.width,
-                oriented.height,
-                {
-                    zoom: element.content.contentTransform?.zoom ?? 1,
-                    panX: element.content.contentTransform?.panX ?? 0.5,
-                    panY: element.content.contentTransform?.panY ?? 0.5
-                }
-            );
-
-            ctx.save();
-
-            // 1. Clip to the frame box
-            ctx.beginPath();
-            ctx.rect(innerBox.left, innerBox.top, innerBox.width, innerBox.height);
-            ctx.clip();
-
-            // 2. Handle Orientation/Transform
-            // We decompose orientation (D4 matrix) into angle and flipX to match 2D canvas transforms
-            const { angleDeg, flipX } = decomposeForRendering(orientation);
-
-            // Move coordinate system to the center of the rendered image area within the frame
-            ctx.translate(
-                innerBox.left + transform.left + transform.width / 2,
-                innerBox.top + transform.top + transform.height / 2
-            );
-
-            // Apply flip and rotation (order matters: flip then rotate to match decomposeForRendering)
-            if (flipX) ctx.scale(-1, 1);
-            if (angleDeg !== 0) ctx.rotate((angleDeg * Math.PI) / 180);
-
-            // 3. Draw image centered
-            ctx.drawImage(
-                bitmap,
-                -transform.width / 2,
-                -transform.height / 2,
-                transform.width,
-                transform.height
-            );
-
-            ctx.restore();
-
-            // Cleanup memory
-            bitmap.close();
-            preloadedBitmaps.delete(element.id);
+            if (bitmap) {
+                bitmap.close();
+                preloadedBitmaps.delete(element.id);
+            }
         } catch (error) {
             console.error(`Failed to load or render image for element ${element.id}:`, error);
         }
