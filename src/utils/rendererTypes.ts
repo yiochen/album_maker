@@ -3,6 +3,8 @@ import { ImageContent } from '../types';
 export interface InteractivityOptions {
     zoom: number;
     showPageSeam?: boolean;
+    /** Text Page Element hidden beneath the active DOM editing overlay. */
+    hiddenTextElementId?: string | null;
     onContentTransformChange?: (elementId: string, contentTransform: ImageContent['contentTransform']) => void;
 }
 

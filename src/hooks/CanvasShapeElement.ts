@@ -9,6 +9,8 @@ import {
     traceShapeSubpaths,
 } from '../utils/shapeUtils';
 import { getObjectPositionForFrame, normalizeRotation } from '../utils/rotatedBounds';
+import { APP_CONFIG } from '../config';
+import { resolveElementShadow } from '../utils/shadowPresets';
 
 export class CanvasShapeElement extends fabric.FabricObject {
     public pageElement: ShapePageElement;
@@ -95,6 +97,7 @@ export class CanvasShapeElement extends fabric.FabricObject {
         if (width <= 0 || height <= 0) return;
 
         const border = getShapeBorder(content);
+        const shadow = resolveElementShadow(this.pageElement.shadowPreset, APP_CONFIG.SCREEN_PPI);
 
         ctx.save();
         ctx.translate(-width / 2, -height / 2);
@@ -105,6 +108,23 @@ export class CanvasShapeElement extends fabric.FabricObject {
             width,
             height,
         });
+
+        if (shadow && (content.fill || border.widthPt > 0)) {
+            ctx.save();
+            ctx.shadowColor = shadow.colorWithOpacity;
+            ctx.shadowBlur = shadow.blurPx;
+            ctx.shadowOffsetX = shadow.offsetXPx;
+            ctx.shadowOffsetY = shadow.offsetYPx;
+            if (border.widthPt > 0) {
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = borderPtToCanvasPx(border.widthPt);
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = '#000000';
+                ctx.fill(getCanvasFillRule(content.fillRule));
+            }
+            ctx.restore();
+        }
 
         if (content.fill) {
             ctx.fillStyle = content.fill;

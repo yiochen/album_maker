@@ -206,6 +206,7 @@ export async function renderSpread(
 
                     existingText.set({
                         ...SHARED_SELECTION_STYLE,
+                        opacity: interactiveOpts?.hiddenTextElementId === element.id ? 0 : 1,
                         selectable: isInteractive,
                         hasControls: isInteractive,
                         evented: isInteractive,
@@ -230,6 +231,7 @@ export async function renderSpread(
 
                     const canvasEl = new CanvasTextElement(element, options.ppi, {
                         ...SHARED_SELECTION_STYLE,
+                        opacity: interactiveOpts?.hiddenTextElementId === element.id ? 0 : 1,
                         interactive: isInteractive,
                         uniformScaling: false,
                     });

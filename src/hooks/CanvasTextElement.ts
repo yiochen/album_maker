@@ -2,6 +2,8 @@ import * as fabric from 'fabric';
 import { PageElement, TextContent } from '../types';
 import { computeNormalizedBoxFromObjectGeometry } from '../utils/boxLayout';
 import { getObjectPositionForFrame, normalizeRotation } from '../utils/rotatedBounds';
+import { resolveElementShadow } from '../utils/shadowPresets';
+import { applyElementShadowToContext } from '../utils/shadowRendering';
 
 export class CanvasTextElement extends fabric.FabricObject {
     public pageElement: PageElement;
@@ -109,10 +111,6 @@ export class CanvasTextElement extends fabric.FabricObject {
         // Fabric transforms ctx so 0,0 is the center. 
         // We translate to top-left to use box-relative run coordinates.
         ctx.translate(-w / 2, -h / 2);
-        // Keep all text paint inside the text box bounds.
-        ctx.beginPath();
-        ctx.rect(0, 0, w, h);
-        ctx.clip();
 
         const hasRenderableText = content.runs.some((run) => {
             const text = run.text ?? '';
@@ -120,6 +118,10 @@ export class CanvasTextElement extends fabric.FabricObject {
         });
 
         if (!hasRenderableText && content.placeholderText) {
+            // Keep placeholder paint inside the text box bounds.
+            ctx.beginPath();
+            ctx.rect(0, 0, w, h);
+            ctx.clip();
             const style = content.defaultStyle;
             const fontSizePx = style.fontSize * pxPerPt;
             const paddingPx = 8 * pxPerPt;
@@ -152,29 +154,44 @@ export class CanvasTextElement extends fabric.FabricObject {
             return;
         }
 
-        ctx.textBaseline = 'alphabetic';
+        const drawRuns = (shadowMask: boolean) => {
+            ctx.textBaseline = 'alphabetic';
+            for (const run of content.runs) {
+                if (!run.text || run.text === '\n') continue;
 
-        for (const run of content.runs) {
-            if (!run.text || run.text === '\n') continue;
+                const style = { ...content.defaultStyle, ...run.style };
+                const fontSizePx = style.fontSize * pxPerPt;
 
-            const style = { ...content.defaultStyle, ...run.style };
-            const fontSizePx = style.fontSize * pxPerPt;
+                ctx.font = `${style.fontStyle || 'normal'} ${style.fontWeight || 'normal'} ${fontSizePx}px ${style.fontFamily}`;
+                ctx.fillStyle = shadowMask ? '#000000' : style.fill;
 
-            ctx.font = `${style.fontStyle || 'normal'} ${style.fontWeight || 'normal'} ${fontSizePx}px ${style.fontFamily}`;
-            ctx.fillStyle = style.fill;
+                const x = (run.x ?? 0) * pxPerPt;
+                const y = (run.baselineY ?? 0) * pxPerPt;
 
-            const x = (run.x ?? 0) * pxPerPt;
-            const y = (run.baselineY ?? 0) * pxPerPt;
+                ctx.fillText(run.text, x, y);
 
-            ctx.fillText(run.text, x, y);
-
-            if (style.underline) {
-                const textWidth = ctx.measureText(run.text).width;
-                const underlineThickness = Math.max(1, fontSizePx * 0.05);
-                const underlineY = y + fontSizePx * 0.1;
-                ctx.fillRect(x, underlineY, textWidth, underlineThickness);
+                if (style.underline) {
+                    const textWidth = ctx.measureText(run.text).width;
+                    const underlineThickness = Math.max(1, fontSizePx * 0.05);
+                    const underlineY = y + fontSizePx * 0.1;
+                    ctx.fillRect(x, underlineY, textWidth, underlineThickness);
+                }
             }
+        };
+
+        const shadow = resolveElementShadow(this.pageElement.shadowPreset, this.ppi);
+        if (shadow && hasRenderableText) {
+            ctx.save();
+            applyElementShadowToContext(ctx, shadow);
+            drawRuns(true);
+            ctx.restore();
         }
+
+        // Keep text paint inside the text box while allowing its shadow to extend beyond it.
+        ctx.beginPath();
+        ctx.rect(0, 0, w, h);
+        ctx.clip();
+        drawRuns(false);
 
         ctx.restore();
     }
