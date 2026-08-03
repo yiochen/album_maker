@@ -6,6 +6,8 @@ import { decomposeForRendering, IDENTITY, getOrientedDimensions } from './orient
 import { getImageUrlForPpi } from './imageSourceSelection';
 import { getCanvasFillRule, getShapeBorder, normalizeShapeContent, traceShapeSubpaths } from './shapeUtils';
 import { getRectCenter } from './rotatedBounds';
+import { resolveElementShadow } from './shadowPresets';
+import { applyElementShadowToContext, renderRectElementShadow } from './shadowRendering';
 
 /**
  * Helper to load an image as an ImageBitmap in a worker environment.
@@ -89,45 +91,54 @@ function renderTextElement(
     boxWidth: number,
     boxHeight: number,
     ppi: number,
+    shadowPreset?: string,
 ): void {
     const pxPerPt = ppi / 72;
 
     ctx.save();
 
-    // Clip to the text box frame
+    const drawRuns = (shadowMask: boolean) => {
+        ctx.textBaseline = 'alphabetic';
+        for (const run of content.runs) {
+            if (run.text.length === 0) continue;
+
+            const style = { ...content.defaultStyle, ...run.style };
+            const fontSizePx = style.fontSize * pxPerPt;
+
+            ctx.font = buildFontString(
+                style.fontStyle ?? 'normal',
+                style.fontWeight ?? 'normal',
+                fontSizePx,
+                style.fontFamily,
+            );
+            ctx.fillStyle = shadowMask ? '#000000' : style.fill;
+
+            const x = boxLeft + (run.x ?? 0) * pxPerPt;
+            const y = boxTop + (run.baselineY ?? 0) * pxPerPt;
+            ctx.fillText(run.text, x, y);
+
+            if (style.underline) {
+                const textWidth = ctx.measureText(run.text).width;
+                const underlineThickness = Math.max(1, fontSizePx * 0.05);
+                const underlineY = y + fontSizePx * 0.1;
+                ctx.fillRect(x, underlineY, textWidth, underlineThickness);
+            }
+        }
+    };
+
+    const shadow = resolveElementShadow(shadowPreset, ppi);
+    if (shadow) {
+        ctx.save();
+        applyElementShadowToContext(ctx, shadow);
+        drawRuns(true);
+        ctx.restore();
+    }
+
+    // Clip the text itself while allowing its shadow to extend beyond the box.
     ctx.beginPath();
     ctx.rect(boxLeft, boxTop, boxWidth, boxHeight);
     ctx.clip();
-
-    ctx.textBaseline = 'alphabetic';
-
-    for (const run of content.runs) {
-        if (run.text.length === 0) continue;
-
-        // Merge run style overrides with default style
-        const style = { ...content.defaultStyle, ...run.style };
-        const fontSizePx = style.fontSize * pxPerPt;
-
-        ctx.font = buildFontString(
-            style.fontStyle ?? 'normal',
-            style.fontWeight ?? 'normal',
-            fontSizePx,
-            style.fontFamily,
-        );
-        ctx.fillStyle = style.fill;
-
-        const x = boxLeft + (run.x ?? 0) * pxPerPt;
-        const y = boxTop + (run.baselineY ?? 0) * pxPerPt;
-        ctx.fillText(run.text, x, y);
-
-        // Draw underline decoration
-        if (style.underline) {
-            const textWidth = ctx.measureText(run.text).width;
-            const underlineThickness = Math.max(1, fontSizePx * 0.05);
-            const underlineY = y + fontSizePx * 0.1;
-            ctx.fillRect(x, underlineY, textWidth, underlineThickness);
-        }
-    }
+    drawRuns(false);
 
     ctx.restore();
 }
@@ -192,6 +203,7 @@ function renderShapeElement(
     content: ShapeContent,
     box: { left: number; top: number; width: number; height: number },
     ppi: number,
+    shadowPreset?: string,
 ) {
     const normalized = normalizeShapeContent(content);
     const border = getShapeBorder(normalized);
@@ -199,6 +211,21 @@ function renderShapeElement(
     ctx.save();
     ctx.beginPath();
     traceShapeSubpaths(ctx, normalized.subpaths, box);
+
+    const shadow = resolveElementShadow(shadowPreset, ppi);
+    if (shadow && (normalized.fill || border.widthPt > 0)) {
+        ctx.save();
+        applyElementShadowToContext(ctx, shadow);
+        if (border.widthPt > 0) {
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = ptToPx(border.widthPt, ppi);
+            ctx.stroke();
+        } else {
+            ctx.fillStyle = '#000000';
+            ctx.fill(getCanvasFillRule(normalized.fillRule));
+        }
+        ctx.restore();
+    }
 
     if (normalized.fill) {
         ctx.fillStyle = normalized.fill;
@@ -256,7 +283,16 @@ export async function renderSpread(
             const content = element.content as TextContent;
             const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
             renderWithElementRotation(ctx, box, element.rotation ?? 0, (localBox) => {
-                renderTextElement(ctx, content, localBox.left, localBox.top, localBox.width, localBox.height, ppi);
+                renderTextElement(
+                    ctx,
+                    content,
+                    localBox.left,
+                    localBox.top,
+                    localBox.width,
+                    localBox.height,
+                    ppi,
+                    element.shadowPreset,
+                );
             });
             continue;
         }
@@ -264,7 +300,7 @@ export async function renderSpread(
         if (element.type === 'shape') {
             const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
             renderWithElementRotation(ctx, box, element.rotation ?? 0, (localBox) => {
-                renderShapeElement(ctx, element.content, localBox, ppi);
+                renderShapeElement(ctx, element.content, localBox, ppi, element.shadowPreset);
             });
             continue;
         }
@@ -274,6 +310,7 @@ export async function renderSpread(
         try {
             const box = calculateGaplessRect(element.box, spreadWidthPx, pageHeightPx);
             renderWithElementRotation(ctx, box, element.rotation ?? 0, (localBox) => {
+                renderRectElementShadow(ctx, element.shadowPreset, localBox, ppi);
                 const border = getImageBorder(element.content);
                 const hasBorder = border.widthPt > 0;
                 const borderWidthPx = hasBorder ? ptToPx(border.widthPt, ppi) : 0;

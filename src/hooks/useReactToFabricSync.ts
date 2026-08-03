@@ -5,7 +5,7 @@ import { isImageElement } from '../types';
 import { renderSpread } from '../utils/fabricRenderer';
 import { CustomFabricObject } from './fabricTypes';
 import { useAlbumSettings, useAlbumSpreads, useUpdateElement } from '../states/albumStore';
-import { useUIStore, useCurrentSpreadIndex } from '../states/uiStore';
+import { useUIStore, useCurrentSpreadIndex, useEditingTextElementId } from '../states/uiStore';
 
 /**
  * Props for useReactToFabricSync.
@@ -26,6 +26,7 @@ export const useReactToFabricSync = ({
 }: UseReactToFabricSyncProps) => {
     const spreads = useAlbumSpreads();
     const currentSpreadIndex = useCurrentSpreadIndex();
+    const editingTextElementId = useEditingTextElementId();
     const spread = useMemo(() => spreads[currentSpreadIndex], [spreads, currentSpreadIndex]);
     const settings = useAlbumSettings();
     const onElementUpdate = useUpdateElement();
@@ -71,6 +72,7 @@ export const useReactToFabricSync = ({
                 interactivityOptions: {
                     zoom,
                     showPageSeam: true,
+                    hiddenTextElementId: editingTextElementId,
                     onContentTransformChange: (elementId, contentTransform) => {
                         const currentSpread = spreadRef.current;
                         if (!currentSpread) return;
@@ -125,5 +127,5 @@ export const useReactToFabricSync = ({
         sync();
         // NOTE: selectedElementIds is intentionally NOT in deps — it's read via ref
         // to avoid a render loop (selection change → sync → setActiveObject → selection event → repeat)
-    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, settings]);
+    }, [fabricCanvas, spread, zoom, modelWidth, modelHeight, settings, editingTextElementId]);
 };

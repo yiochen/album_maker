@@ -198,6 +198,8 @@ export interface BasePageElement {
   box: NormalizedRect;
   /** Clockwise rotation in degrees applied to the element frame. */
   rotation?: number;
+  /** Stable identity of the Element Shadow preset applied to this Page Element. */
+  shadowPreset?: string;
 }
 
 export interface ImagePageElement extends BasePageElement {

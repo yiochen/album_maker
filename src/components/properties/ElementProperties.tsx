@@ -26,6 +26,7 @@ import { MoveForwardIcon } from '../icons/MoveForwardIcon';
 import { MoveBackwardIcon } from '../icons/MoveBackwardIcon';
 import { TrashIcon } from '../icons/TrashIcon';
 import { APP_CONFIG } from '../../config';
+import { ShadowPresetSection } from './ShadowPresetSection';
 
 interface ElementPropertiesProps {
     element: PageElement;
@@ -269,6 +270,8 @@ export const ElementProperties: React.FC<ElementPropertiesProps> = ({
                     />
                 </PanelPropertyRow>
             </PropertySection>
+
+            <ShadowPresetSection element={element} onUpdate={onUpdate} />
 
             <PropertySection title="Actions">
                 <div className="image-action-grid">
