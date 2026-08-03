@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, type Plugin, type ResolvedConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { build } from 'esbuild'
 import path from 'path'
@@ -28,9 +28,12 @@ function serviceWorkerPlugin(): Plugin {
   return {
     name: 'service-worker',
 
-    // During dev, compile sw.ts → public/sw.js so the dev server serves it
-    async buildStart() {
-      await buildSW(path.resolve(__dirname, 'public'));
+    // Vite indexes publicDir before buildStart. Build during config resolution so
+    // a clean dev server recognizes /sw.js as a public asset on its first start.
+    async configResolved(config: ResolvedConfig) {
+      if (config.command === 'serve') {
+        await buildSW(path.resolve(__dirname, 'public'));
+      }
     },
 
     // During production build, also emit sw.js to the output directory
