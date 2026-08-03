@@ -82,6 +82,132 @@ async function rotateFirstCanvasObject(page: Page, angle: number): Promise<void>
   }, angle);
 }
 
+async function getImageShadowRingPixels(page: Page): Promise<number[]> {
+  return page.evaluate(() => {
+    const fabricCanvas = (window as unknown as {
+      __FABRIC_CANVAS__?: {
+        lowerCanvasEl: HTMLCanvasElement;
+        getObjects(): Array<{
+          pageElement?: { type?: string };
+          getBoundingRect(): { left: number; top: number; width: number; height: number };
+        }>;
+      };
+    }).__FABRIC_CANVAS__;
+    const imageObject = fabricCanvas?.getObjects().find((item) => item.pageElement?.type === 'image');
+    if (!fabricCanvas || !imageObject) throw new Error('No Image Page Element on the canvas');
+
+    const bounds = imageObject.getBoundingRect();
+    const context = fabricCanvas.lowerCanvasEl.getContext('2d');
+    if (!context) throw new Error('Could not inspect the Fabric canvas');
+    const pixels = context.getImageData(
+      0,
+      0,
+      fabricCanvas.lowerCanvasEl.width,
+      fabricCanvas.lowerCanvasEl.height,
+    );
+    const right = Math.ceil(bounds.left + bounds.width);
+    const bottom = Math.ceil(bounds.top + bounds.height);
+    const left = Math.floor(bounds.left);
+    const top = Math.floor(bounds.top);
+    const ringPixels: number[] = [];
+
+    for (let y = Math.max(0, top); y < Math.min(pixels.height, bottom + 50); y += 1) {
+      for (let x = Math.max(0, left); x < Math.min(pixels.width, right + 50); x += 1) {
+        const outsideFrame = x >= right + 2 || y >= bottom + 2;
+        if (!outsideFrame) continue;
+        const offset = (y * pixels.width + x) * 4;
+        ringPixels.push(
+          pixels.data[offset],
+          pixels.data[offset + 1],
+          pixels.data[offset + 2],
+        );
+      }
+    }
+    return ringPixels;
+  });
+}
+
+async function getTextRenderPixels(page: Page): Promise<number[]> {
+  return page.evaluate(() => {
+    const fabricCanvas = (window as unknown as {
+      __FABRIC_CANVAS__?: {
+        lowerCanvasEl: HTMLCanvasElement;
+        getObjects(): Array<{
+          pageElement?: { type?: string };
+          getBoundingRect(): { left: number; top: number; width: number; height: number };
+        }>;
+      };
+    }).__FABRIC_CANVAS__;
+    const textObject = fabricCanvas?.getObjects().find((item) => item.pageElement?.type === 'text');
+    if (!fabricCanvas || !textObject) throw new Error('No Text Page Element on the canvas');
+    const bounds = textObject.getBoundingRect();
+    const left = Math.max(0, Math.floor(bounds.left - 50));
+    const top = Math.max(0, Math.floor(bounds.top - 50));
+    const width = Math.min(fabricCanvas.lowerCanvasEl.width - left, Math.ceil(bounds.width + 100));
+    const height = Math.min(fabricCanvas.lowerCanvasEl.height - top, Math.ceil(bounds.height + 100));
+    const context = fabricCanvas.lowerCanvasEl.getContext('2d');
+    if (!context) throw new Error('Could not inspect the Fabric canvas');
+    const data = context.getImageData(left, top, width, height).data;
+    const pixels: number[] = [];
+    for (let offset = 0; offset < data.length; offset += 4) {
+      pixels.push(data[offset], data[offset + 1], data[offset + 2]);
+    }
+    return pixels;
+  });
+}
+
+function countDarkenedPixels(before: number[], after: number[]): number {
+  let darkenedPixels = 0;
+  for (let offset = 0; offset < Math.min(before.length, after.length); offset += 3) {
+    const beforeBrightness = before[offset] + before[offset + 1] + before[offset + 2];
+    const afterBrightness = after[offset] + after[offset + 1] + after[offset + 2];
+    if (afterBrightness < beforeBrightness - 6) darkenedPixels += 1;
+  }
+  return darkenedPixels;
+}
+
+async function rememberCurrentSpreadThumbnail(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const thumbnail = document.querySelector<HTMLImageElement>('[data-testid="page-half-thumbnail-left"] img');
+    if (!thumbnail) throw new Error('Spread thumbnail is not visible');
+    await thumbnail.decode();
+    const response = await fetch(thumbnail.currentSrc || thumbnail.src);
+    const bitmap = await createImageBitmap(await response.blob());
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not inspect the spread thumbnail');
+    context.drawImage(bitmap, 0, 0);
+    (window as unknown as { __SHADOW_THUMBNAIL_BASELINE__?: Uint8ClampedArray })
+      .__SHADOW_THUMBNAIL_BASELINE__ = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    bitmap.close();
+  });
+}
+
+async function countDarkenedThumbnailPixels(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const baseline = (window as unknown as { __SHADOW_THUMBNAIL_BASELINE__?: Uint8ClampedArray })
+      .__SHADOW_THUMBNAIL_BASELINE__;
+    const thumbnail = document.querySelector<HTMLImageElement>('[data-testid="page-half-thumbnail-left"] img');
+    if (!baseline || !thumbnail) throw new Error('Thumbnail baseline is unavailable');
+    await thumbnail.decode();
+    const response = await fetch(thumbnail.currentSrc || thumbnail.src);
+    const bitmap = await createImageBitmap(await response.blob());
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not inspect the spread thumbnail');
+    context.drawImage(bitmap, 0, 0);
+    const current = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    bitmap.close();
+    let darkenedPixels = 0;
+    for (let offset = 0; offset < Math.min(baseline.length, current.length); offset += 4) {
+      const before = baseline[offset] + baseline[offset + 1] + baseline[offset + 2];
+      const after = current[offset] + current[offset + 1] + current[offset + 2];
+      if (after < before - 18) darkenedPixels += 1;
+    }
+    return darkenedPixels;
+  });
+}
+
 async function exportCurrentSpreadAsPng(page: Page): Promise<Uint8Array> {
   await page.getByRole('button', { name: 'Export' }).click();
   await expect(page.getByTestId('export-page')).toBeVisible();
@@ -171,6 +297,29 @@ test.describe('Element Shadows', () => {
     await expect(dramatic).toHaveAttribute('aria-pressed', 'true');
   });
 
+  test('renders an Image Element Shadow on the live editor canvas', async ({ appPage }) => {
+    await appPage.getByTestId('add-image-btn').click();
+    await openNonImagePanel(appPage, 'properties');
+
+    const sizeSection = appPage.locator('.property-section').filter({
+      has: appPage.getByRole('heading', { name: 'Size (inch)' }),
+    });
+    await sizeSection.getByRole('spinbutton').nth(0).fill('3');
+    await sizeSection.getByRole('spinbutton').nth(1).fill('3');
+    const positionSection = appPage.locator('.property-section').filter({
+      has: appPage.getByRole('heading', { name: 'Position (inch)' }),
+    });
+    await positionSection.getByRole('spinbutton').nth(0).fill('1.5');
+    await positionSection.getByRole('spinbutton').nth(1).fill('3');
+
+    const pixelsWithoutShadow = await getImageShadowRingPixels(appPage);
+    await appPage.getByRole('button', { name: 'Dramatic shadow' }).click();
+    await expect.poll(async () => {
+      const pixelsWithShadow = await getImageShadowRingPixels(appPage);
+      return countDarkenedPixels(pixelsWithoutShadow, pixelsWithShadow);
+    }).toBeGreaterThan(100);
+  });
+
   test('changes a Text Shadow Preset without leaving text editing', async ({ appPage }) => {
     await appPage.getByRole('button', { name: 'Text' }).click();
     await openNonImagePanel(appPage, 'properties');
@@ -182,6 +331,45 @@ test.describe('Element Shadows', () => {
 
     await expect(lifted).toHaveAttribute('aria-pressed', 'true');
     await expect(appPage.getByTestId('tiptap-text-editor')).toBeVisible();
+  });
+
+  test('renders a Text Element Shadow in the static spread thumbnail', async ({ appPage }) => {
+    await appPage.getByRole('button', { name: 'Text' }).click();
+    await openNonImagePanel(appPage, 'properties');
+    const editor = appPage.locator('.ProseMirror[contenteditable="true"]');
+    await editor.fill('Static Shadow');
+    const interactionLayer = appPage.getByTestId('interaction-layer');
+    await interactionLayer.click({ force: true, position: { x: 30, y: 30 } });
+    await expect(appPage.getByTestId('tiptap-text-editor')).toHaveCount(0);
+
+    await openNonImagePanel(appPage, 'navigator');
+    const leftThumbnail = appPage.getByTestId('page-half-thumbnail-left').locator('img');
+    await expect(leftThumbnail).toBeVisible();
+    await expect.poll(() => leftThumbnail.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    await rememberCurrentSpreadThumbnail(appPage);
+
+    await selectFirstCanvasObject(appPage);
+    await openNonImagePanel(appPage, 'properties');
+    await appPage.getByRole('button', { name: 'Dramatic shadow' }).click();
+    await openNonImagePanel(appPage, 'navigator');
+    await expect.poll(() => countDarkenedThumbnailPixels(appPage)).toBeGreaterThan(100);
+  });
+
+  test('renders a Text Element Shadow after leaving the editing overlay', async ({ appPage }) => {
+    await appPage.getByRole('button', { name: 'Text' }).click();
+    await openNonImagePanel(appPage, 'properties');
+    const editor = appPage.locator('.ProseMirror[contenteditable="true"]');
+    await editor.fill('Static Shadow');
+    await appPage.getByTestId('interaction-layer').click({ force: true, position: { x: 30, y: 30 } });
+    await expect(appPage.getByTestId('tiptap-text-editor')).toHaveCount(0);
+    await selectFirstCanvasObject(appPage);
+
+    const pixelsWithoutShadow = await getTextRenderPixels(appPage);
+    await appPage.getByRole('button', { name: 'Dramatic shadow' }).click();
+    await expect.poll(async () => {
+      const pixelsWithShadow = await getTextRenderPixels(appPage);
+      return countDarkenedPixels(pixelsWithoutShadow, pixelsWithShadow);
+    }).toBeGreaterThan(100);
   });
 
   test('retains presets through copy, removal, and reload', async ({ appPage }) => {

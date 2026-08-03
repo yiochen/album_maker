@@ -238,16 +238,22 @@ export class CanvasImageElement extends fabric.Group {
         this.applyLayout();
     }
 
-    _render(ctx: CanvasRenderingContext2D) {
-        const width = this.width ?? 0;
-        const height = this.height ?? 0;
-        renderRectElementShadow(
-            ctx,
-            this.pageElement.shadowPreset,
-            { left: -width / 2, top: -height / 2, width, height },
-            APP_CONFIG.SCREEN_PPI,
-        );
-        super._render(ctx);
+    drawObject(
+        ctx: CanvasRenderingContext2D,
+        forClipping: boolean | undefined,
+        context: Parameters<fabric.Group['drawObject']>[2],
+    ) {
+        if (!forClipping) {
+            const width = this.width ?? 0;
+            const height = this.height ?? 0;
+            renderRectElementShadow(
+                ctx,
+                this.pageElement.shadowPreset,
+                { left: -width / 2, top: -height / 2, width, height },
+                APP_CONFIG.SCREEN_PPI,
+            );
+        }
+        super.drawObject(ctx, forClipping, context);
     }
 
     /**
